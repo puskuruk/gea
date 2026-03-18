@@ -26,37 +26,98 @@ This monorepo uses `@changesets/cli` for versioning and publishing.
 - **`updateInternalDependencies: "patch"`** — when a dependency bumps, dependents get their ranges updated automatically.
 - **`changelog: @changesets/changelog-github`** — entries link to PRs and contributors.
 
-## Workflow
+## How changesets works
 
-1. **After making changes**, create a changeset:
+Changesets splits releasing into three phases:
 
-   ```bash
-   npx changeset
-   ```
+1. **Declare** — you create a small `.md` file that says "package X needs a patch/minor/major bump" with a summary.
+2. **Version** — changesets reads all pending `.md` files, deletes them, bumps `package.json` versions, and writes CHANGELOGs.
+3. **Publish** — changesets runs `npm publish` for each bumped package and creates git tags.
 
-   Pick the affected packages, choose semver bump levels, and write a human-readable summary. One changeset can cover multiple packages.
+The `.md` files are **queued release intents**. In a team workflow, multiple developers each add one in their PRs over time, and they all get processed together at release time. For a solo developer, the queue usually has just one item.
 
-2. **To release**, consume all pending changesets:
+## Release workflow (step by step)
 
-   ```bash
-   npx changeset version   # bumps versions + updates CHANGELOGs
-   npx changeset publish   # publishes to npm
-   ```
+### Step 1: Make your code changes
 
-3. **Dry run** to verify what would be published without uploading:
+Write code, commit, push — normal development. Nothing special here.
 
-   ```bash
-   npx changeset publish --dry-run
-   ```
+### Step 2: Create a changeset
 
-4. **For pre-releases / testing**:
-   ```bash
-   npx changeset version --snapshot canary
-   npx changeset publish --tag canary
-   ```
+```bash
+npx changeset
+```
+
+This creates a `.md` file in `.changeset/` (e.g. `.changeset/shiny-kings-press.md`). It declares which packages changed and by how much (patch/minor/major), with a human-readable summary. Since `"commit": true` is set in config, this file is auto-committed.
+
+You can create multiple changesets across multiple PRs/commits. They accumulate until step 3.
+
+### Step 3: Push to GitHub
+
+```bash
+git push
+```
+
+**This must happen before step 4** because `@changesets/changelog-github` calls the GitHub API to look up commit info. If the commits aren't on GitHub, it will fail with a `Cannot read properties of null` error.
+
+### Step 4: Bump versions
+
+```bash
+GITHUB_TOKEN=$(gh auth token) npx changeset version
+```
+
+This does three things:
+
+- Deletes all pending `.changeset/*.md` files
+- Bumps version numbers in `package.json`
+- Writes CHANGELOG entries (using GitHub API to link PRs/authors)
+
+Since `"commit": true`, the result is auto-committed. **No git tags are created yet.**
+
+### Step 5: Publish to npm + create tags
+
+```bash
+npx changeset publish
+```
+
+This publishes every bumped package to npm **and** creates git tags (e.g. `create-gea@1.0.1`). **Tags are only created in this step, not in step 4.**
+
+### Step 6: Push the release commit and tags
+
+```bash
+git push --follow-tags
+```
+
+### Quick copy-paste version
+
+```bash
+# After your code is committed:
+npx changeset                                        # declare what changed
+git push                                             # push so GitHub API works
+GITHUB_TOKEN=$(gh auth token) npx changeset version  # bump versions + changelogs
+npx changeset publish                                # publish to npm + create tags
+git push --follow-tags                               # push release commit + tags
+```
+
+## Dry run
+
+Verify what would be published without actually uploading:
+
+```bash
+npx changeset publish --dry-run
+```
+
+## Pre-releases / testing
+
+```bash
+npx changeset version --snapshot canary
+npx changeset publish --tag canary
+```
 
 ## Rules
 
 - Never manually edit version numbers in `package.json` — let changesets own them.
 - Every PR that changes published package output should include a changeset file.
 - Use `npx changeset add --empty` for PRs that intentionally need no release (e.g., docs-only, CI config).
+- Always `git push` before running `changeset version` — the GitHub changelog plugin needs commits to exist on GitHub.
+- `GITHUB_TOKEN` is required for `changeset version` because of `@changesets/changelog-github`.
