@@ -579,7 +579,8 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
     }
   }
 
-  if (isComp && !ctx.inMapCallback) {
+  // In .map(), root item is a custom element placeholder (<issue-card>) for list sync; nested components need `new X()`.
+  if (isComp && (!ctx.inMapCallback || elementPath.length > 0)) {
     const propsEntries: t.ObjectProperty[] = []
     for (const attr of node.openingElement.attributes) {
       if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name)) continue
