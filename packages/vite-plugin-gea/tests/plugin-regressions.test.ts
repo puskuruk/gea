@@ -1475,3 +1475,32 @@ test('two components in a single file are both transformed', () => {
   assert.match(output, /class Header/, 'Header class should still exist')
   assert.match(output, /class App/, 'App class should still exist')
 })
+
+test('hyphenated component names inside .map() produce correct opening tags', () => {
+  const output = transformComponentSource(`
+    import { Component } from '@geajs/core'
+    import store from './todo-store'
+    import IssueCard from './IssueCard.jsx'
+
+    export default class Board extends Component {
+      template() {
+        return (
+          <div>
+            {store.todos.map(issue => (
+              <IssueCard key={issue.id} title={issue.text} />
+            ))}
+          </div>
+        )
+      }
+    }
+  `)
+
+  assert.doesNotMatch(
+    output,
+    /<issue\s[^>]*-card/,
+    'tag name must not be split around attributes — <issue ...-card> is malformed',
+  )
+  assert.match(output, /<issue-card\s/, 'full kebab-case tag name must appear before any attributes')
+})
+
+__PLACEHOLDER_FOR_SECOND_TEST__

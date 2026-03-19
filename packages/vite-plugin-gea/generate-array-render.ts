@@ -252,7 +252,7 @@ function insertItemMarker(
   eventToken?: string,
 ): t.TemplateLiteral {
   const first = tl.quasis[0].value.raw
-  const tagMatch = first.match(/^(<\w+)(\s|>)/)
+  const tagMatch = first.match(/^(<[\w-]+)(\s|>)/)
 
   let rewrittenFirst: string
   const itemIdExpr = itemIdProperty
@@ -266,7 +266,7 @@ function insertItemMarker(
       rewrittenFirst = `${tagMatch[1]} data-gea-item-id="`
     }
   } else {
-    const nameMatch = first.match(/^<(\w+)/)
+    const nameMatch = first.match(/^<([\w-]+)/)
     if (containerBindingId) {
       rewrittenFirst = nameMatch ? `${nameMatch[0]} id="` : first
     } else {
@@ -274,12 +274,12 @@ function insertItemMarker(
     }
   }
 
-  if (!tagMatch && !first.match(/^<(\w+)/)) {
+  if (!tagMatch && !first.match(/^<([\w-]+)/)) {
     return tl
   }
 
   const remainder =
-    (tagMatch ? first.substring(tagMatch[1].length) : first.substring(first.match(/^<(\w+)/)![0].length)) || ''
+    (tagMatch ? first.substring(tagMatch[1].length) : first.substring(first.match(/^<([\w-]+)/)![0].length)) || ''
 
   const eventAttr = eventToken ? ` data-gea-event="${eventToken}"` : ''
 

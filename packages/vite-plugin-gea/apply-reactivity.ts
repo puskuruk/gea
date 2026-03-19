@@ -1068,9 +1068,11 @@ export function applyStaticReactivity(
                 if (getterDepPaths && getterDepPaths.length > 0) {
                   const originalMethodName = getObserveMethodName(parts, storeVar)
                   const wrapperMethodName = `${originalMethodName}__via`
-                  if (!classPath.node.body.body.some(
-                    (m) => t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name === wrapperMethodName,
-                  )) {
+                  if (
+                    !classPath.node.body.body.some(
+                      (m) => t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name === wrapperMethodName,
+                    )
+                  ) {
                     classPath.node.body.body.push(
                       t.classMethod(
                         'method',
@@ -1078,13 +1080,10 @@ export function applyStaticReactivity(
                         [t.identifier('_v'), t.identifier('change')],
                         t.blockStatement([
                           t.expressionStatement(
-                            t.callExpression(
-                              t.memberExpression(t.thisExpression(), t.identifier(originalMethodName)),
-                              [
-                                t.memberExpression(t.identifier(storeVar), t.identifier(parts[0])),
-                                t.identifier('change'),
-                              ],
-                            ),
+                            t.callExpression(t.memberExpression(t.thisExpression(), t.identifier(originalMethodName)), [
+                              t.memberExpression(t.identifier(storeVar), t.identifier(parts[0])),
+                              t.identifier('change'),
+                            ]),
                           ),
                         ]),
                       ),
@@ -2083,7 +2082,7 @@ function injectMapItemAttrsIntoTemplate(
       const rootTL = findRootTemplateLiteral(t.isBlockStatement(fn.body) ? fn.body : fn.body)
       if (!rootTL) return
       const first = rootTL.quasis[0].value.raw
-      const tagMatch = first.match(/^(<\w+)/)
+      const tagMatch = first.match(/^(<[\w-]+)/)
       if (!tagMatch) return
       const tagPart = tagMatch[1]
       const remainder = first.substring(tagPart.length)
