@@ -30,6 +30,7 @@ export function transformComponentFile(
   sourceFile: string,
   originalAST: t.File,
   compImportsUsedAsTags: Set<string>,
+  knownComponentImports: Set<string> = new Set(),
 ): boolean {
   let transformed = false
   const stateRefs = collectStateReferences(originalAST, storeImports)
@@ -65,12 +66,10 @@ export function transformComponentFile(
       const retStmt = body.find((s): s is ReturnStatement => t.isReturnStatement(s) && s.argument !== null)
       if (!retStmt?.argument) return
 
+      const allComponentTags = new Set<string>(knownComponentImports)
       const instanceTags: string[] = []
-      const allComponentTags = new Set<string>()
-      if (t.isJSXElement(retStmt.argument))
-        collectComponentTags(retStmt.argument, imports, instanceTags, allComponentTags)
-      else if (t.isJSXFragment(retStmt.argument))
-        collectComponentTags(retStmt.argument, imports, instanceTags, allComponentTags)
+      if (t.isJSXElement(retStmt.argument)) collectComponentTags(retStmt.argument, imports, instanceTags)
+      else if (t.isJSXFragment(retStmt.argument)) collectComponentTags(retStmt.argument, imports, instanceTags)
 
       const componentInstances = new Map<string, ChildComponent[]>()
       const tagCounts = new Map<string, number>()

@@ -230,7 +230,7 @@ function renderInitialList(
   ])
 }
 
-function transformComponentSource(source: string): string {
+function transformComponentSource(source: string, knownComponentImports?: Set<string>): string {
   const parsed = parseSource(source)
   assert.ok(parsed)
   assert.ok(parsed.componentClassName)
@@ -253,6 +253,7 @@ function transformComponentSource(source: string): string {
     '/virtual/test-component.jsx',
     original.ast,
     new Set(),
+    knownComponentImports,
   )
 
   assert.equal(transformed, true)
@@ -1605,9 +1606,35 @@ test('&& guarded .map() with components does not leave raw JSX in compiled outpu
     }
   `)
 
-  assert.doesNotMatch(
+  assert.doesNotMatch(output, /<CommentItem/, 'raw JSX <CommentItem> must not appear anywhere in compiled output')
+})
+
+test('component used only in render prop is registered when in knownComponentImports', () => {
+  const output = transformComponentSource(
+    `
+    import { Component } from '@geajs/core'
+    import MySelect from './MySelect.jsx'
+    import Avatar from './Avatar.jsx'
+
+    export default class UserPicker extends Component {
+      template() {
+        return (
+          <div>
+            <MySelect
+              options={['a', 'b']}
+              renderOption={(opt) => <Avatar name={opt} />}
+            />
+          </div>
+        )
+      }
+    }
+  `,
+    new Set(['MySelect', 'Avatar']),
+  )
+
+  assert.match(
     output,
-    /<CommentItem/,
-    'raw JSX <CommentItem> must not appear anywhere in compiled output',
+    /Component\._register\(Avatar\)/,
+    'Avatar must be registered via Component._register even though it only appears in a render prop',
   )
 })

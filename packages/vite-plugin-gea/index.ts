@@ -248,6 +248,7 @@ function isComponentImportSource(source: string): boolean {
 
 export function geaPlugin(): Plugin {
   const storeModules = new Set<string>()
+  const componentModules = new Set<string>()
 
   const resolveImportPath = (importer: string, source: string): string | null => {
     const base = resolve(dirname(importer), source)
@@ -279,8 +280,26 @@ export function geaPlugin(): Plugin {
         storeModules.add(filePath)
         return true
       }
-      if (/from\s+['"]@geajs\/core['"]/.test(source) && (/createRouter\b/.test(source) || /new\s+Router\b/.test(source))) {
+      if (
+        /from\s+['"]@geajs\/core['"]/.test(source) &&
+        (/createRouter\b/.test(source) || /new\s+Router\b/.test(source))
+      ) {
         storeModules.add(filePath)
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
+  }
+
+  const isComponentModule = (filePath: string): boolean => {
+    if (componentModules.has(filePath)) return true
+    if (!existsSync(filePath)) return false
+    try {
+      const source = readFileSync(filePath, 'utf8')
+      if (source.includes('extends Component')) {
+        componentModules.add(filePath)
         return true
       }
       return false
@@ -360,6 +379,10 @@ export function geaPlugin(): Plugin {
           }
         }
 
+        if (componentClassNames.length > 0) {
+          componentModules.add(cleanId)
+        }
+
         let transformed = false
         const componentImportSet = new Set<string>()
         const componentImportsUsedAsTags = new Set<string>()
@@ -372,6 +395,7 @@ export function geaPlugin(): Plugin {
         const componentImports = Array.from(componentImportSet)
 
         const storeImports = new Map<string, string>()
+        const knownComponentImports = new Set<string>()
         const namedImportSources = new Map<string, string>()
         traverse(ast, {
           ExportDefaultDeclaration() {
@@ -381,8 +405,10 @@ export function geaPlugin(): Plugin {
             const source = path.node.source.value
             if (!isComponentImportSource(source)) return
             const resolvedImport = source.startsWith('.') ? resolveImportPath(cleanId, source) : null
+            const isComp = resolvedImport ? isComponentModule(resolvedImport) : false
             path.node.specifiers.forEach(
               (spec: { type: string; imported?: { name?: string }; local: { name: string } }) => {
+                if (isComp) knownComponentImports.add(spec.local.name)
                 if (spec.type === 'ImportDefaultSpecifier') {
                   if (resolvedImport && !isStoreModule(resolvedImport)) return
                   storeImports.set(spec.local.name, source)
@@ -424,6 +450,7 @@ export function geaPlugin(): Plugin {
                 cleanId,
                 originalAST,
                 componentImportsUsedAsTags,
+                knownComponentImports,
               )
               if (result) transformed = true
             }

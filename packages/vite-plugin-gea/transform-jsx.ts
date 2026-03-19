@@ -464,25 +464,23 @@ export function collectComponentTags(
   node: t.JSXElement | t.JSXFragment,
   imports: Map<string, string>,
   instanceTags: string[],
-  registrationTags?: Set<string>,
-  registrationOnly = false,
+  inMapCallback = false,
 ): void {
-  const allTags = registrationTags || new Set(instanceTags)
-  const visitExpr = (expr: t.Expression, inMapCallback = false) => {
-    if (t.isJSXElement(expr)) collectComponentTags(expr, imports, instanceTags, allTags, inMapCallback)
-    else if (t.isJSXFragment(expr)) collectComponentTags(expr, imports, instanceTags, allTags, inMapCallback)
+  const visitExpr = (expr: t.Expression, inMap = false) => {
+    if (t.isJSXElement(expr)) collectComponentTags(expr, imports, instanceTags, inMap)
+    else if (t.isJSXFragment(expr)) collectComponentTags(expr, imports, instanceTags, inMap)
     else if (t.isLogicalExpression(expr)) {
-      visitExpr(expr.left, inMapCallback)
-      visitExpr(expr.right, inMapCallback)
+      visitExpr(expr.left, inMap)
+      visitExpr(expr.right, inMap)
     } else if (t.isConditionalExpression(expr)) {
-      visitExpr(expr.consequent, inMapCallback)
-      visitExpr(expr.alternate, inMapCallback)
+      visitExpr(expr.consequent, inMap)
+      visitExpr(expr.alternate, inMap)
     } else if (t.isCallExpression(expr)) {
       expr.arguments.forEach((arg) => {
         if (!t.isArrowFunctionExpression(arg) && !t.isFunctionExpression(arg)) return
         const body = arg.body
-        if (t.isJSXElement(body)) collectComponentTags(body, imports, instanceTags, allTags, true)
-        else if (t.isJSXFragment(body)) collectComponentTags(body, imports, instanceTags, allTags, true)
+        if (t.isJSXElement(body)) collectComponentTags(body, imports, instanceTags, true)
+        else if (t.isJSXFragment(body)) collectComponentTags(body, imports, instanceTags, true)
         else if (t.isBlockStatement(body)) {
           const ret = body.body.find((s): s is t.ReturnStatement => t.isReturnStatement(s) && s.argument != null)
           if (ret?.argument) visitExpr(ret.argument as t.Expression, true)
@@ -493,28 +491,27 @@ export function collectComponentTags(
   if (t.isJSXElement(node)) {
     const tag = getJSXTagName(node.openingElement.name)
     if (tag && isCompTag(tag) && imports.has(tag)) {
-      allTags.add(tag)
-      if (!registrationOnly) instanceTags.push(tag)
+      if (!inMapCallback) instanceTags.push(tag)
     }
     node.children.forEach((c) => {
-      if (t.isJSXElement(c)) collectComponentTags(c, imports, instanceTags, allTags, registrationOnly)
-      else if (t.isJSXFragment(c)) collectComponentTags(c, imports, instanceTags, allTags, registrationOnly)
+      if (t.isJSXElement(c)) collectComponentTags(c, imports, instanceTags, inMapCallback)
+      else if (t.isJSXFragment(c)) collectComponentTags(c, imports, instanceTags, inMapCallback)
       else if (t.isJSXExpressionContainer(c) && !t.isJSXEmptyExpression(c.expression)) {
         const expr = c.expression as t.Expression
-        if (t.isJSXElement(expr)) collectComponentTags(expr, imports, instanceTags, allTags, registrationOnly)
-        else if (t.isJSXFragment(expr)) collectComponentTags(expr, imports, instanceTags, allTags, registrationOnly)
-        else visitExpr(expr, registrationOnly)
+        if (t.isJSXElement(expr)) collectComponentTags(expr, imports, instanceTags, inMapCallback)
+        else if (t.isJSXFragment(expr)) collectComponentTags(expr, imports, instanceTags, inMapCallback)
+        else visitExpr(expr, inMapCallback)
       }
     })
   } else {
     node.children.forEach((c) => {
-      if (t.isJSXElement(c)) collectComponentTags(c, imports, instanceTags, allTags, registrationOnly)
-      else if (t.isJSXFragment(c)) collectComponentTags(c, imports, instanceTags, allTags, registrationOnly)
+      if (t.isJSXElement(c)) collectComponentTags(c, imports, instanceTags, inMapCallback)
+      else if (t.isJSXFragment(c)) collectComponentTags(c, imports, instanceTags, inMapCallback)
       else if (t.isJSXExpressionContainer(c) && !t.isJSXEmptyExpression(c.expression)) {
         const expr = c.expression as t.Expression
-        if (t.isJSXElement(expr)) collectComponentTags(expr, imports, instanceTags, allTags, registrationOnly)
-        else if (t.isJSXFragment(expr)) collectComponentTags(expr, imports, instanceTags, allTags, registrationOnly)
-        else visitExpr(expr, registrationOnly)
+        if (t.isJSXElement(expr)) collectComponentTags(expr, imports, instanceTags, inMapCallback)
+        else if (t.isJSXFragment(expr)) collectComponentTags(expr, imports, instanceTags, inMapCallback)
+        else visitExpr(expr, inMapCallback)
       }
     })
   }
