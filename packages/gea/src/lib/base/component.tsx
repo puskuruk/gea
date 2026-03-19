@@ -83,24 +83,24 @@ export default class Component extends Store {
     return this.element_
   }
 
-  $$(selector) {
-    let rv = []
+  $$<T extends HTMLElement = HTMLElement>(selector?: string): T[] {
+    let rv: T[] = []
     const el = this.el
 
     if (el) {
-      if (selector == undefined || selector === ':scope') rv = [el]
-      else rv = [...el.querySelectorAll(selector)]
+      if (selector == undefined || selector === ':scope') rv = [el as T]
+      else rv = [...el.querySelectorAll<T>(selector)]
     }
 
     return rv
   }
 
-  $(selector) {
-    let rv = null
+  $<T extends HTMLElement = HTMLElement>(selector?: string): T | null {
+    let rv: T | null = null
     const el = this.element_
 
     if (el) {
-      rv = selector == undefined || selector === ':scope' ? el : el.querySelector(selector)
+      rv = (selector == undefined || selector === ':scope' ? el : el.querySelector<T>(selector)) as T | null
     }
 
     return rv

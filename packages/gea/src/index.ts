@@ -1,5 +1,7 @@
 export { default as Component } from './lib/base/component'
 export { Store, isInternalProp } from './lib/store'
+export { h } from './lib/h'
+export type { DOMEvent } from './lib/types'
 export { default as ComponentManager } from './lib/base/component-manager'
 export { applyListChanges } from './lib/base/list'
 export type { ListConfig } from './lib/base/list'
@@ -18,11 +20,13 @@ export type {
 import Component from './lib/base/component'
 import { applyListChanges } from './lib/base/list'
 import { Store } from './lib/store'
+import { h } from './lib/h'
 
 const gea = {
   Store,
   Component,
   applyListChanges,
+  h,
 }
 
 export default gea
