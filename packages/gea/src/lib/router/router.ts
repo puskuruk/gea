@@ -93,6 +93,7 @@ export class Router<T extends RouteMap = RouteMap> extends Store {
     window.addEventListener('popstate', this._popstateHandler)
 
     this._clickHandler = (e: MouseEvent) => {
+      if (e.defaultPrevented) return
       const anchor = (e.target as HTMLElement)?.closest?.('a[href]') as HTMLAnchorElement | null
       if (!anchor) return
       const href = anchor.getAttribute('href')
@@ -194,13 +195,15 @@ export class Router<T extends RouteMap = RouteMap> extends Store {
   }
 
   dispose(): void {
-    if (this._popstateHandler) {
-      window.removeEventListener('popstate', this._popstateHandler)
-      this._popstateHandler = null
-    }
-    if (this._clickHandler) {
-      document.removeEventListener('click', this._clickHandler)
-      this._clickHandler = null
+    if (typeof window !== 'undefined') {
+      if (this._popstateHandler) {
+        window.removeEventListener('popstate', this._popstateHandler)
+        this._popstateHandler = null
+      }
+      if (this._clickHandler) {
+        document.removeEventListener('click', this._clickHandler)
+        this._clickHandler = null
+      }
     }
   }
 
