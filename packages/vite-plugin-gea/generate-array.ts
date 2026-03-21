@@ -89,6 +89,44 @@ function buildPropPatcherFunction(
 
   if (binding.type === 'attribute') {
     const attrName = binding.attributeName || 'class'
+    const setExpr =
+      attrName === 'style'
+        ? t.expressionStatement(
+            t.assignmentExpression(
+              '=',
+              t.memberExpression(t.memberExpression(target, t.identifier('style')), t.identifier('cssText')),
+              t.conditionalExpression(
+                t.binaryExpression('===', t.unaryExpression('typeof', t.identifier('__attrValue')), t.stringLiteral('object')),
+                t.callExpression(
+                  t.memberExpression(
+                    t.callExpression(
+                      t.memberExpression(
+                        t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [t.identifier('__attrValue')]),
+                        t.identifier('map'),
+                      ),
+                      [
+                        t.arrowFunctionExpression(
+                          [t.arrayPattern([t.identifier('k'), t.identifier('v')])],
+                          t.binaryExpression('+', t.binaryExpression('+',
+                            t.callExpression(t.memberExpression(t.identifier('k'), t.identifier('replace')), [t.regExpLiteral('[A-Z]', 'g'), t.stringLiteral('-$&')]),
+                            t.stringLiteral(': ')), t.identifier('v')),
+                        ),
+                      ],
+                    ),
+                    t.identifier('join'),
+                  ),
+                  [t.stringLiteral('; ')],
+                ),
+                t.callExpression(t.identifier('String'), [t.identifier('__attrValue')]),
+              ),
+            ),
+          )
+        : t.expressionStatement(
+            t.callExpression(t.memberExpression(target, t.identifier('setAttribute')), [
+              t.stringLiteral(attrName),
+              t.callExpression(t.identifier('String'), [t.identifier('__attrValue')]),
+            ]),
+          )
     return t.arrowFunctionExpression(
       [row, value],
       t.blockStatement([
@@ -108,14 +146,7 @@ function buildPropPatcherFunction(
               ]),
             ),
           ]),
-          t.blockStatement([
-            t.expressionStatement(
-              t.callExpression(t.memberExpression(target, t.identifier('setAttribute')), [
-                t.stringLiteral(attrName),
-                t.callExpression(t.identifier('String'), [t.identifier('__attrValue')]),
-              ]),
-            ),
-          ]),
+          t.blockStatement([setExpr]),
         ),
       ]),
     )
@@ -190,6 +221,44 @@ function buildPatchEntryPropPatcher(entry: {
 
   if (entry.type === 'attribute') {
     const attrName = entry.attributeName || 'class'
+    const propSetExpr =
+      attrName === 'style'
+        ? t.expressionStatement(
+            t.assignmentExpression(
+              '=',
+              t.memberExpression(t.memberExpression(target, t.identifier('style')), t.identifier('cssText')),
+              t.conditionalExpression(
+                t.binaryExpression('===', t.unaryExpression('typeof', t.identifier('__attrValue')), t.stringLiteral('object')),
+                t.callExpression(
+                  t.memberExpression(
+                    t.callExpression(
+                      t.memberExpression(
+                        t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [t.identifier('__attrValue')]),
+                        t.identifier('map'),
+                      ),
+                      [
+                        t.arrowFunctionExpression(
+                          [t.arrayPattern([t.identifier('k'), t.identifier('v')])],
+                          t.binaryExpression('+', t.binaryExpression('+',
+                            t.callExpression(t.memberExpression(t.identifier('k'), t.identifier('replace')), [t.regExpLiteral('[A-Z]', 'g'), t.stringLiteral('-$&')]),
+                            t.stringLiteral(': ')), t.identifier('v')),
+                        ),
+                      ],
+                    ),
+                    t.identifier('join'),
+                  ),
+                  [t.stringLiteral('; ')],
+                ),
+                t.callExpression(t.identifier('String'), [t.identifier('__attrValue')]),
+              ),
+            ),
+          )
+        : t.expressionStatement(
+            t.callExpression(t.memberExpression(target, t.identifier('setAttribute')), [
+              t.stringLiteral(attrName),
+              t.callExpression(t.identifier('String'), [t.identifier('__attrValue')]),
+            ]),
+          )
     return t.arrowFunctionExpression(
       [row, value, item],
       t.blockStatement([
@@ -211,14 +280,7 @@ function buildPatchEntryPropPatcher(entry: {
               ]),
             ),
           ]),
-          t.blockStatement([
-            t.expressionStatement(
-              t.callExpression(t.memberExpression(target, t.identifier('setAttribute')), [
-                t.stringLiteral(attrName),
-                t.callExpression(t.identifier('String'), [t.identifier('__attrValue')]),
-              ]),
-            ),
-          ]),
+          t.blockStatement([propSetExpr]),
         ),
       ]),
     )
@@ -634,6 +696,20 @@ function buildConditionalPatchStatement(
   }
   if (binding.type === 'className') {
     return js`${jsExpr`${target}.className`} = (${expression}).trim();`
+  }
+  if (binding.attributeName === 'style') {
+    return t.blockStatement(
+      jsBlockBody`
+      const __attrValue = ${expression};
+      if (__attrValue == null || __attrValue === false) {
+        ${jsExpr`${target}.removeAttribute('style')`};
+      } else if (typeof __attrValue === 'object') {
+        ${jsExpr`${target}.style.cssText`} = Object.entries(__attrValue).map(([k, v]) => k.replace(/[A-Z]/g, '-$&') + ': ' + v).join('; ');
+      } else {
+        ${jsExpr`${target}.style.cssText`} = String(__attrValue);
+      }
+    `,
+    )
   }
   return t.blockStatement(
     jsBlockBody`

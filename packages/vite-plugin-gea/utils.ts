@@ -7,6 +7,7 @@ export function getJSXTagName(name: t.JSXIdentifier | t.JSXMemberExpression | t.
   if (t.isJSXMemberExpression(name)) {
     return `${getJSXTagName(name.object)}.${name.property.name}`
   }
+  if (t.isJSXNamespacedName(name)) return `${name.namespace.name}:${name.name.name}`
   return ''
 }
 
@@ -165,7 +166,7 @@ export function getObserveMethodName(parts: string | PathParts, storeVar?: strin
 }
 
 export function resolvePath(
-  expr: t.MemberExpression | t.Identifier | t.ThisExpression,
+  expr: t.MemberExpression | t.Identifier | t.ThisExpression | t.CallExpression,
   stateRefs: Map<string, StateRefMeta>,
   context: { inMap?: boolean; mapItemVar?: string } = {},
 ): { parts: PathParts | null; isImportedState?: boolean; storeVar?: string } | null {
@@ -203,6 +204,14 @@ export function resolvePath(
 
   if (t.isThisExpression(expr)) {
     return { parts: [] }
+  }
+
+  if (t.isCallExpression(expr) && t.isMemberExpression(expr.callee)) {
+    return resolvePath(
+      expr.callee.object as t.MemberExpression | t.Identifier | t.ThisExpression,
+      stateRefs,
+      context,
+    )
   }
 
   if (t.isMemberExpression(expr)) {

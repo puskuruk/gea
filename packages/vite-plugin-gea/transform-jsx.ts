@@ -15,6 +15,7 @@ import {
   getRootClassSelector,
   toGeaEventType,
 } from './component-event-helpers.ts'
+import { ITEM_IS_KEY } from './analyze-helpers.ts'
 
 const RESERVED_HTML_TAG_NAMES = new Set([
   'a',
@@ -145,6 +146,57 @@ function camelToKebab(name: string): string {
   return name.replace(/([A-Z])/g, '-$1').toLowerCase()
 }
 
+function tryStaticStyleObjectToCSS(expr: t.ObjectExpression): string | null {
+  const parts: string[] = []
+  for (const prop of expr.properties) {
+    if (!t.isObjectProperty(prop) || prop.computed) return null
+    const key = t.isIdentifier(prop.key) ? prop.key.name : t.isStringLiteral(prop.key) ? prop.key.value : null
+    if (!key) return null
+    let value: string | null = null
+    if (t.isStringLiteral(prop.value)) value = prop.value.value
+    else if (t.isNumericLiteral(prop.value)) value = prop.value.value === 0 ? '0' : `${prop.value.value}px`
+    else return null
+    parts.push(`${camelToKebab(key)}: ${value}`)
+  }
+  return parts.join('; ')
+}
+
+function buildStyleObjectExpression(expr: t.Expression): t.Expression {
+  return t.callExpression(
+    t.memberExpression(
+      t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [expr]),
+      t.identifier('map'),
+    ),
+    [
+      t.arrowFunctionExpression(
+        [t.arrayPattern([t.identifier('__k'), t.identifier('__v')])],
+        t.templateLiteral(
+          [
+            t.templateElement({ raw: '', cooked: '' }, false),
+            t.templateElement({ raw: ': ', cooked: ': ' }, false),
+            t.templateElement({ raw: '', cooked: '' }, true),
+          ],
+          [
+            t.callExpression(
+              t.memberExpression(t.identifier('__k'), t.identifier('replace')),
+              [t.regExpLiteral('[A-Z]', 'g'), t.stringLiteral('-$&')],
+            ),
+            t.conditionalExpression(
+              t.logicalExpression(
+                '&&',
+                t.binaryExpression('===', t.unaryExpression('typeof', t.identifier('__v')), t.stringLiteral('number')),
+                t.binaryExpression('!==', t.identifier('__v'), t.numericLiteral(0)),
+              ),
+              t.binaryExpression('+', t.identifier('__v'), t.stringLiteral('px')),
+              t.identifier('__v'),
+            ),
+          ],
+        ),
+      ),
+    ],
+  )
+}
+
 /** Map React-style attribute names to HTML/Gea equivalents. */
 function toHtmlAttrName(attrName: string, isComponent: boolean): string {
   if (isComponent) return `data-prop-${camelToKebab(attrName)}`
@@ -232,6 +284,17 @@ function expressionMayProduceJSXForCtx(expr: t.Expression): boolean {
     )
   }
   if (t.isParenthesizedExpression(expr)) return expressionMayProduceJSXForCtx(expr.expression as t.Expression)
+  if (t.isCallExpression(expr)) {
+    const callee = expr.callee
+    if (t.isArrowFunctionExpression(callee) || t.isFunctionExpression(callee)) {
+      if (t.isBlockStatement(callee.body)) {
+        return callee.body.body.some(
+          (s) => t.isReturnStatement(s) && !!s.argument && expressionMayProduceJSXForCtx(s.argument),
+        )
+      }
+      return expressionMayProduceJSXForCtx(callee.body as t.Expression)
+    }
+  }
   return false
 }
 
@@ -273,7 +336,7 @@ interface TemplatePart {
 }
 
 function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
 function getStaticStringValue(expr: t.Expression): string | null {
@@ -388,6 +451,8 @@ interface Ctx {
   mapItemIdProperty?: string
   /** Map callback param name (e.g. 'opt', 'item') for itemId expression */
   mapItemVariable?: string
+  /** Container binding ID for map items (when set, use `id` instead of `data-gea-item-id`) */
+  mapContainerBindingId?: string
   sourceFile?: string
   lazyChildComponents?: boolean
   conditionalSlots?: ConditionalSlotInfo[]
@@ -399,6 +464,10 @@ interface Ctx {
   mapRootEventToken?: string
   /** True when processing JSX inside a compiled child component's props (children, render props, etc.) */
   inChildrenProp?: boolean
+  /** Collected ref bindings: target expression + ref marker ID */
+  refBindings?: { refId: string; targetExpr: t.Expression }[]
+  /** Counter for generating unique ref marker IDs */
+  refCounter?: { value: number }
 }
 
 export function transformJSXToTemplate(el: t.JSXElement, ctx: Ctx, elementPath: string[] = []): t.TemplateLiteral {
@@ -572,6 +641,51 @@ function replaceJSXInExpression(
       ...node.arguments.slice(1).map((a) => t.cloneNode(a)),
     ])
   }
+  if (
+    t.isCallExpression(node) &&
+    (t.isArrowFunctionExpression(node.callee) || t.isFunctionExpression(node.callee))
+  ) {
+    const callee = node.callee
+    if (t.isBlockStatement(callee.body)) {
+      const replaceReturnsInStatements = (stmts: t.Statement[]): t.Statement[] =>
+        stmts.map((stmt) => {
+          if (t.isReturnStatement(stmt) && stmt.argument) {
+            return t.returnStatement(replaceJSXInExpression(stmt.argument, mapJSXNodes, ctx))
+          }
+          if (t.isIfStatement(stmt)) {
+            const consequent = t.isBlockStatement(stmt.consequent)
+              ? t.blockStatement(replaceReturnsInStatements(stmt.consequent.body))
+              : t.isReturnStatement(stmt.consequent) && stmt.consequent.argument
+                ? t.returnStatement(replaceJSXInExpression(stmt.consequent.argument, mapJSXNodes, ctx))
+                : stmt.consequent
+            const alternate = stmt.alternate
+              ? t.isBlockStatement(stmt.alternate)
+                ? t.blockStatement(replaceReturnsInStatements(stmt.alternate.body))
+                : t.isIfStatement(stmt.alternate)
+                  ? replaceReturnsInStatements([stmt.alternate])[0] as t.IfStatement
+                  : t.isReturnStatement(stmt.alternate) && stmt.alternate.argument
+                    ? t.returnStatement(replaceJSXInExpression(stmt.alternate.argument, mapJSXNodes, ctx))
+                    : stmt.alternate
+              : null
+            return t.ifStatement(stmt.test, consequent, alternate)
+          }
+          return stmt
+        })
+
+      const newBody = t.blockStatement(replaceReturnsInStatements(callee.body.body))
+      return t.callExpression(
+        t.isArrowFunctionExpression(callee)
+          ? t.arrowFunctionExpression(callee.params, newBody, callee.async)
+          : t.functionExpression(callee.id, callee.params, newBody, callee.generator, callee.async),
+        node.arguments,
+      )
+    }
+    const newBody = replaceJSXInExpression(callee.body as t.Expression, mapJSXNodes, ctx)
+    return t.callExpression(
+      t.arrowFunctionExpression(callee.params, newBody, callee.async),
+      node.arguments,
+    )
+  }
   return node
 }
 
@@ -588,6 +702,7 @@ export function transformJSXExpression(expr: t.Expression, ctx: Ctx, skipEvents 
     return replaceJSXInExpression(cloned, mapJSXNodes, effectiveCtx)
   } catch (err) {
     if (err instanceof Error && err.message.startsWith('[gea]')) throw err
+    console.warn('[gea] Failed to transform JSX expression:', err instanceof Error ? err.message : err)
     return expr
   }
 }
@@ -659,12 +774,21 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
   const tagName = getJSXTagName(node.openingElement.name)
   const isComp = tagName && isCompTag(tagName) && ctx.imports.has(tagName)
 
+  if (tagName && isCompTag(tagName) && !ctx.imports.has(tagName) && !ctx.inChildrenProp) {
+    const err = new Error(
+      `[gea] Component '${tagName}' is used as a JSX tag but is not imported. Dynamic component tags are not supported; import the component statically.`,
+    )
+    ;(err as any).__geaCompileError = true
+    throw err
+  }
+
   if (isComp && ctx.componentInstances && !ctx.inMapCallback) {
     if (ctx.eventHandlers && ctx.sourceFile) {
       const importSource = ctx.imports.get(tagName!)
       if (importSource) {
         const delegatedEvents = getHoistableRootEventsForImport(ctx.sourceFile, importSource)
         delegatedEvents.forEach((meta) => {
+          if (!EVENT_TYPES.has(meta.eventType)) return
           ctx.eventHandlers!.push({
             eventType: meta.eventType,
             selector: meta.selector,
@@ -757,18 +881,68 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
       html = '"'
     }
   }
+  if (ctx.inMapCallback && elementPath.length === 0 && ctx.mapItemVariable) {
+    const itemVar = ctx.mapItemVariable
+    const itemIdProp = ctx.mapItemIdProperty
+    const itemIdExpr: t.Expression =
+      itemIdProp && itemIdProp !== ITEM_IS_KEY
+        ? t.memberExpression(t.identifier(itemVar), t.identifier(itemIdProp))
+        : t.callExpression(t.identifier('String'), [t.identifier(itemVar)])
+
+    if (ctx.mapContainerBindingId) {
+      const idValueExpr = t.binaryExpression(
+        '+',
+        t.binaryExpression(
+          '+',
+          t.memberExpression(t.thisExpression(), t.identifier('id')),
+          t.stringLiteral('-' + ctx.mapContainerBindingId + '-'),
+        ),
+        t.callExpression(t.identifier('String'), [t.cloneNode(itemIdExpr, true)]),
+      )
+      parts.push({ type: 'string', value: html + ' id="' })
+      parts.push({ type: 'expression', value: idValueExpr })
+      parts.push({ type: 'string', value: '" data-gea-item-id="' })
+      parts.push({ type: 'expression', value: t.cloneNode(itemIdExpr, true) })
+      html = '"'
+    } else {
+      parts.push({ type: 'string', value: html + ' data-gea-item-id="' })
+      parts.push({ type: 'expression', value: itemIdExpr })
+      html = '"'
+    }
+  }
   let generatedEventSuffix: string | undefined
   let generatedEventToken: string | undefined
   node.openingElement.attributes.forEach((attr) => {
+    if (t.isJSXSpreadAttribute(attr)) {
+      const err = new Error(
+        `[gea] Spread attributes (<${effectiveTag} {...expr} />) are not supported. Destructure props and pass them individually.`,
+      )
+      ;(err as any).__geaCompileError = true
+      throw err
+    }
     if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name)) return
     const attrName = attr.name.name
     if (attrName === 'key') return
+    if (attrName === 'ref') {
+      const attrValue = attr.value
+      if (
+        t.isJSXExpressionContainer(attrValue) &&
+        !t.isJSXEmptyExpression(attrValue.expression) &&
+        ctx.refBindings &&
+        ctx.refCounter
+      ) {
+        const refId = `ref${ctx.refCounter.value++}`
+        ctx.refBindings.push({ refId, targetExpr: attrValue.expression as t.Expression })
+        html += ` data-gea-ref="${refId}"`
+      }
+      return
+    }
     const attrValue = attr.value
     const propAttrName = toHtmlAttrName(attrName, isComp)
     const eventType = toGeaEventType(attrName)
 
     if (t.isJSXExpressionContainer(attrValue) && !t.isJSXEmptyExpression(attrValue.expression)) {
-      if (!isComp && ctx.isRoot) {
+      if (!isComp && ctx.isRoot && EVENT_TYPES.has(eventType)) {
         const hoistedRootEvent = getHoistableRootEvent(
           attrName,
           attrValue.expression as t.Expression,
@@ -822,11 +996,7 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
             if (!generatedEventToken) {
               generatedEventToken = `ev${ctx.eventIdCounter?.value ?? 0}`
               if (ctx.eventIdCounter) ctx.eventIdCounter.value += 1
-              if (ctx.inMapCallback && elementPath.length === 0) {
-                ctx.mapRootEventToken = generatedEventToken
-              } else {
-                html += ` data-gea-event="${generatedEventToken}"`
-              }
+              html += ` data-gea-event="${generatedEventToken}"`
             }
             selector = `[data-gea-event="${generatedEventToken}"]`
           }
@@ -865,6 +1035,10 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
           )
           if (!hasItemId) {
             const itemVar = ctx.mapItemVariable || 'item'
+            const propItemIdExpr: t.Expression =
+              itemIdProp && itemIdProp !== ITEM_IS_KEY
+                ? t.memberExpression(t.identifier(itemVar), t.identifier(itemIdProp))
+                : t.callExpression(t.identifier('String'), [t.identifier(itemVar)])
             parts.push({ type: 'string', value: html })
             parts.push({
               type: 'expression',
@@ -873,7 +1047,7 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
                   t.templateElement({ raw: ` data-prop-item-id="`, cooked: ` data-prop-item-id="` }, false),
                   t.templateElement({ raw: '"', cooked: '"' }, true),
                 ],
-                [t.memberExpression(t.identifier(itemVar), t.identifier(itemIdProp))],
+                [propItemIdExpr],
               ),
             })
             html = ''
@@ -889,6 +1063,35 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
           )
           ;(err as any).__geaCompileError = true
           throw err
+        }
+        if (propAttrName === 'style' && t.isObjectExpression(rawExpr)) {
+          const staticCSS = tryStaticStyleObjectToCSS(rawExpr)
+          if (staticCSS) {
+            html += ` style="${staticCSS}"`
+            return
+          }
+          parts.push({ type: 'string', value: html })
+          const styleExpr = t.callExpression(
+            t.memberExpression(buildStyleObjectExpression(rawExpr), t.identifier('join')),
+            [t.stringLiteral('; ')],
+          )
+          const skipCondition = buildAttrSkipCondition(styleExpr, rawExpr)
+          parts.push({
+            type: 'expression',
+            value: t.conditionalExpression(
+              skipCondition,
+              t.stringLiteral(''),
+              t.templateLiteral(
+                [
+                  t.templateElement({ raw: ' style="', cooked: ' style="' }, false),
+                  t.templateElement({ raw: '"', cooked: '"' }, true),
+                ],
+                [styleExpr],
+              ),
+            ),
+          })
+          html = ''
+          return
         }
         parts.push({ type: 'string', value: html })
         const expr = transformJSXExpression(rawExpr, ctx)
@@ -994,6 +1197,16 @@ function processChildren(
         })
         appendString(parts, `-->`)
       } else {
+        if (
+          !ctx.inChildrenProp &&
+          (t.isArrowFunctionExpression(rawExpr) || t.isFunctionExpression(rawExpr))
+        ) {
+          const err = new Error(
+            `[gea] Function-as-child ({(ctx) => ...}) is not supported. Pass callback functions via named props instead (e.g., renderItem={...}).`,
+          )
+          ;(err as any).__geaCompileError = true
+          throw err
+        }
         pushString(parts, '')
         let expr = transformJSXExpression(rawExpr, ctx)
         const stateSlots = ctx.stateChildSlots

@@ -15,6 +15,7 @@ import {
 } from './generate-array.ts'
 import { generateRenderItemMethod, buildPopulateItemHandlersMethod } from './generate-array-render.ts'
 import { generateCreateItemMethod } from './generate-array-patch.ts'
+import { ITEM_IS_KEY } from './analyze-helpers.ts'
 import {
   generateComponentArrayMethods,
   getComponentArrayBuildMethodName,
@@ -363,28 +364,92 @@ export function applyStaticReactivity(
               )
             } else if (pb.type === 'attribute' && pb.attributeName) {
               const attrName = pb.attributeName
-              const isBooleanAttr = BOOLEAN_HTML_ATTRS.has(attrName)
-              const removeCondition = isBooleanAttr
-                ? t.unaryExpression('!', valueExpr)
-                : t.logicalExpression(
+              if (attrName === 'style') {
+                updateStmt = t.ifStatement(
+                  t.logicalExpression(
                     '||',
                     t.binaryExpression('===', valueExpr, t.nullLiteral()),
                     t.binaryExpression('===', valueExpr, t.identifier('undefined')),
-                  )
-              updateStmt = t.ifStatement(
-                removeCondition,
-                t.expressionStatement(
-                  t.callExpression(t.memberExpression(t.identifier('__el'), t.identifier('removeAttribute')), [
-                    t.stringLiteral(attrName),
-                  ]),
-                ),
-                t.expressionStatement(
-                  t.callExpression(t.memberExpression(t.identifier('__el'), t.identifier('setAttribute')), [
-                    t.stringLiteral(attrName),
-                    isBooleanAttr ? t.stringLiteral('') : t.callExpression(t.identifier('String'), [valueExpr]),
-                  ]),
-                ),
-              )
+                  ),
+                  t.expressionStatement(
+                    t.callExpression(t.memberExpression(t.identifier('__el'), t.identifier('removeAttribute')), [
+                      t.stringLiteral('style'),
+                    ]),
+                  ),
+                  t.expressionStatement(
+                    t.assignmentExpression(
+                      '=',
+                      t.memberExpression(
+                        t.memberExpression(t.identifier('__el'), t.identifier('style')),
+                        t.identifier('cssText'),
+                      ),
+                      t.conditionalExpression(
+                        t.binaryExpression(
+                          '===',
+                          t.unaryExpression('typeof', valueExpr),
+                          t.stringLiteral('object'),
+                        ),
+                        t.callExpression(
+                          t.memberExpression(
+                            t.callExpression(
+                              t.memberExpression(
+                                t.callExpression(
+                                  t.memberExpression(t.identifier('Object'), t.identifier('entries')),
+                                  [valueExpr],
+                                ),
+                                t.identifier('map'),
+                              ),
+                              [
+                                t.arrowFunctionExpression(
+                                  [t.arrayPattern([t.identifier('k'), t.identifier('v')])],
+                                  t.binaryExpression(
+                                    '+',
+                                    t.binaryExpression(
+                                      '+',
+                                      t.callExpression(
+                                        t.memberExpression(t.identifier('k'), t.identifier('replace')),
+                                        [t.regExpLiteral('[A-Z]', 'g'), t.stringLiteral('-$&')],
+                                      ),
+                                      t.stringLiteral(': '),
+                                    ),
+                                    t.identifier('v'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            t.identifier('join'),
+                          ),
+                          [t.stringLiteral('; ')],
+                        ),
+                        t.callExpression(t.identifier('String'), [valueExpr]),
+                      ),
+                    ),
+                  ),
+                )
+              } else {
+                const isBooleanAttr = BOOLEAN_HTML_ATTRS.has(attrName)
+                const removeCondition = isBooleanAttr
+                  ? t.unaryExpression('!', valueExpr)
+                  : t.logicalExpression(
+                      '||',
+                      t.binaryExpression('===', valueExpr, t.nullLiteral()),
+                      t.binaryExpression('===', valueExpr, t.identifier('undefined')),
+                    )
+                updateStmt = t.ifStatement(
+                  removeCondition,
+                  t.expressionStatement(
+                    t.callExpression(t.memberExpression(t.identifier('__el'), t.identifier('removeAttribute')), [
+                      t.stringLiteral(attrName),
+                    ]),
+                  ),
+                  t.expressionStatement(
+                    t.callExpression(t.memberExpression(t.identifier('__el'), t.identifier('setAttribute')), [
+                      t.stringLiteral(attrName),
+                      isBooleanAttr ? t.stringLiteral('') : t.callExpression(t.identifier('String'), [valueExpr]),
+                    ]),
+                  ),
+                )
+              }
             } else {
               continue
             }
@@ -2363,9 +2428,10 @@ function injectMapItemAttrsIntoTemplate(
       const tagPart = tagMatch[1]
       const remainder = first.substring(tagPart.length)
 
-      const itemIdExpr = info.itemIdProperty
-        ? t.memberExpression(t.identifier(info.itemVariable), t.identifier(info.itemIdProperty))
-        : t.callExpression(t.identifier('String'), [t.identifier(info.itemVariable)])
+      const itemIdExpr =
+        info.itemIdProperty && info.itemIdProperty !== ITEM_IS_KEY
+          ? t.memberExpression(t.identifier(info.itemVariable), t.identifier(info.itemIdProperty))
+          : t.callExpression(t.identifier('String'), [t.identifier(info.itemVariable)])
       const eventAttr = info.eventToken ? ` data-gea-event="${info.eventToken}"` : ''
 
       if (info.containerBindingId) {

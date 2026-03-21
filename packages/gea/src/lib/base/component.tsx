@@ -152,12 +152,16 @@ export default class Component extends Store {
     }
 
     this.rendered_ = true
+    if (this.element_) (this.element_ as any).__geaComponent = this
     ComponentManager.getInstance().markComponentRendered(this)
 
     this.attachBindings_()
     this.mountCompiledChildComponents_()
     this.instantiateChildComponents_()
     this.setupEventDirectives_()
+    if (typeof (this as any).__setupRefs === 'function') {
+      ;(this as any).__setupRefs()
+    }
 
     this.onAfterRender()
     this.onAfterRenderHooks()
@@ -231,6 +235,7 @@ export default class Component extends Store {
   dispose() {
     ComponentManager.getInstance().removeComponent(this)
 
+    if (this.element_) (this.element_ as any).__geaComponent = undefined
     this.element_ && this.element_.parentNode && this.element_.parentNode.removeChild(this.element_)
     this.element_ = null
 
@@ -296,6 +301,9 @@ export default class Component extends Store {
     this.mountCompiledChildComponents_()
     this.instantiateChildComponents_()
     this.setupEventDirectives_()
+    if (typeof (this as any).__setupRefs === 'function') {
+      ;(this as any).__setupRefs()
+    }
 
     if (shouldRestoreFocus) {
       const focusTarget =
@@ -428,6 +436,7 @@ export default class Component extends Store {
       if (child.rendered_ && child.element_ === existing) return
       existing.setAttribute('data-gea-compiled-child-root', '')
       child.element_ = existing
+      ;(existing as any).__geaComponent = child
       child.rendered_ = true
       manager.markComponentRendered(child)
       child.attachBindings_()

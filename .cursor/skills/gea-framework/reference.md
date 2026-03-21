@@ -486,6 +486,80 @@ Method references (`this.methodName`) are compiled to a direct entry in the even
 <span>{activeCount} {activeCount === 1 ? 'item' : 'items'} left</span>
 ```
 
+### Style Objects
+
+Gea supports inline style objects with camelCase property names (like React). The compiler handles them in two ways:
+
+**Static style objects** — converted to CSS strings at compile time (zero runtime cost):
+
+```jsx
+<div style={{ backgroundColor: 'red', fontSize: '14px', fontWeight: 'bold' }}>
+  Styled content
+</div>
+// Compiles to: <div style="background-color:red;font-size:14px;font-weight:bold">
+```
+
+**Dynamic style objects** — converted to `cssText` at runtime:
+
+```jsx
+<div style={{ color: this.textColor, opacity: this.isVisible ? 1 : 0 }}>
+  Dynamic styling
+</div>
+```
+
+**String styles** continue to work and are passed through as-is:
+
+```jsx
+<div style="color:red">Static string</div>
+<div style={`width:${this.width}px`}>Dynamic string</div>
+```
+
+Property name conversion: `backgroundColor` → `background-color`, `fontSize` → `font-size`, `borderTopLeftRadius` → `border-top-left-radius`.
+
+### `ref` Attribute
+
+Use `ref` to obtain a direct reference to a DOM element after render. Assign it to a component property:
+
+```jsx
+export default class DrawingCanvas extends Component {
+  canvasEl = null
+  overlayEl = null
+
+  template() {
+    return (
+      <div class="drawing-area">
+        <canvas ref={this.canvasEl} width="800" height="600"></canvas>
+        <div ref={this.overlayEl} class="overlay"></div>
+      </div>
+    )
+  }
+
+  onAfterRender() {
+    const ctx = this.canvasEl.getContext('2d')
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, 100, 100)
+  }
+}
+```
+
+**How it works:** The compiler replaces the `ref` attribute with a `data-gea-ref` marker attribute and generates a `__setupRefs()` method that uses `querySelector` to find the marked element and assign it to the component property. Refs are assigned after each render cycle, so they are available in `onAfterRender()`.
+
+**Limitations:**
+- `ref` works on HTML elements, not on component tags.
+- The element must be a descendant of the component's root element (not the root element itself).
+
+### Compiler Errors (Unsupported JSX Patterns)
+
+The Gea compiler throws clear, descriptive errors at build time for JSX patterns it cannot compile. These errors appear in the Vite dev server console and include the tag name or expression that caused the issue.
+
+| Pattern | Error message | Suggested fix |
+| --- | --- | --- |
+| `<div {...props} />` | `Spread attributes (<Tag {...expr} />) are not supported. Destructure props and pass them individually.` | Extract needed props and pass them as individual attributes. |
+| `<MyComp />` (without import) | `Component <MyComp> is used in JSX but not found in imports.` | Add an `import MyComp from './my-comp'` statement. |
+| `{() => <div />}` (function as child) | `Bare function expressions as JSX children are not supported. Use a named render prop attribute instead.` | Pass the function as a named prop: `renderItem={() => <div />}`. |
+| `export function Foo() { return <div /> }` | `Named function/const exports that return JSX are not supported. Use export default.` | Change to `export default function Foo()`. |
+| `<>{items.map(x => <Item key={x.id} />)}</>` | `Fragments (<>...</>) are not supported as the root of a .map() item.` | Wrap in a single root element: `<div>...</div>`. |
+
 ---
 
 ## Conditional Rendering

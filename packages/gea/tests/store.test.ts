@@ -487,3 +487,68 @@ describe('Store – derived arrays passed as values', () => {
     assert.equal(big.length, 1)
   })
 })
+
+describe('Store – silent()', () => {
+  it('updates values but does not notify observers', async () => {
+    const store = new Store({ count: 0 })
+    let notified = false
+    store.observe('count', () => {
+      notified = true
+    })
+
+    store.silent(() => {
+      store.count = 42
+    })
+
+    assert.equal(store.count, 42, 'value must be updated')
+    await flush()
+    assert.equal(notified, false, 'observer must not fire')
+  })
+
+  it('suppresses notifications for nested mutations', async () => {
+    const store = new Store({ user: { name: 'Alice' } })
+    let notified = false
+    store.observe('user', () => {
+      notified = true
+    })
+
+    store.silent(() => {
+      store.user.name = 'Bob'
+    })
+
+    assert.equal(store.user.name, 'Bob')
+    await flush()
+    assert.equal(notified, false, 'observer must not fire for nested mutation')
+  })
+
+  it('does not suppress notifications after silent() returns', async () => {
+    const store = new Store({ x: 0 })
+    const values: number[] = []
+    store.observe('x', (v) => values.push(v))
+
+    store.silent(() => {
+      store.x = 1
+    })
+
+    store.x = 2
+    await flush()
+    assert.deepEqual(values, [2], 'only the post-silent mutation should notify')
+  })
+
+  it('suppresses array mutations', async () => {
+    const store = new Store({ items: [1, 2, 3] })
+    let notified = false
+    store.observe('items', () => {
+      notified = true
+    })
+
+    store.silent(() => {
+      store.items.push(4)
+      store.items.splice(0, 1)
+    })
+
+    assert.deepEqual(store.items, [2, 3, 4])
+    await flush()
+    assert.equal(notified, false, 'observer must not fire for array mutations inside silent()')
+  })
+})

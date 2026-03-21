@@ -70,16 +70,19 @@ Compare both apps side-by-side, pixel by pixel. Fix visual discrepancies by insp
 | `useState(initial)` | Member variable: `myField = initial` |
 | `useEffect(() => {}, [])` | `created()` lifecycle method |
 | `useEffect(() => { return cleanup }, [])` | `created()` + `dispose()` |
-| `useRef()` for DOM | `this.el` (component's root element) |
+| `useRef()` for DOM | `ref={this.myElement}` on the element, or `this.el` for the root |
 | `useCallback` / `useMemo` | Not needed — use class methods or store getters |
 | `React.Fragment` / `<>...</>` | Not supported — use a wrapper `<div>` |
 | `className="foo"` | `class="foo"` |
+| `style={{ color: 'red' }}` | `style={{ color: 'red' }}` (same syntax — compiled to CSS string) |
 | `onClick={fn}` | `click={fn}` |
 | `onChange={fn}` (on input) | `input={fn}` (for text) or `change={fn}` (for checkbox/select) |
 | `onKeyDown={fn}` | `keydown={fn}` |
+| `<div {...props} />` | Not supported — destructure and pass props individually (compile error) |
 | `dangerouslySetInnerHTML={{ __html: html }}` | Use `onAfterRender` with `el.innerHTML` |
 | `children` | `children` prop (works the same) |
 | Render props `renderContent={modal => <Foo />}` | Supported — render props compile to component instantiation |
+| `{(data) => <Child />}` (function as child) | Not supported — use named render prop attributes instead (compile error) |
 | `propTypes` / `defaultProps` | Not needed — use TypeScript types and default parameter values |
 
 ### Entry Point
@@ -243,7 +246,7 @@ React apps commonly use styled-components or CSS-in-JS. Gea uses plain CSS with 
 3. Create equivalent CSS rules in a stylesheet.
 4. Replace styled component usage with `<div class="my-class">`.
 5. For dynamic styles, use template literal classes: `` class={`btn ${active ? 'active' : ''}`} ``
-6. For truly dynamic values (computed sizes, positions), use inline `style`: `` style={`width:${size}px`} ``
+6. For truly dynamic values (computed sizes, positions), use inline `style` — either a string (`` style={`width:${size}px`} ``) or a style object (`style={{ width: size + 'px' }}`). Gea supports React-style camelCase style objects.
 
 ### Event Handlers
 
@@ -272,7 +275,7 @@ React apps commonly use styled-components or CSS-in-JS. Gea uses plain CSS with 
 | `useEffect(fn, [])` | `created()` lifecycle |
 | `useEffect(fn, [dep])` | Read `dep` in `template()` — compiler creates observer automatically |
 | `useEffect(() => () => cleanup)` | `dispose()` lifecycle (call `super.dispose()` if overriding) |
-| `useRef` | `this.el` for DOM; member variable for mutable refs |
+| `useRef` | `ref={this.myEl}` for specific elements; `this.el` for root; member variable for mutable refs |
 | `useMemo(fn, [deps])` | Store getter or class getter |
 | `useCallback(fn, [deps])` | Class method (stable by default) |
 | `useContext` | Import the store singleton directly |

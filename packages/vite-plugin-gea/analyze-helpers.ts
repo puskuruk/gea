@@ -185,6 +185,9 @@ function rewriteEarlyReturns(node: t.Statement): void {
   }
 }
 
+/** Sentinel returned by detectItemIdProperty when `key={item}` — the item itself is the key. */
+export const ITEM_IS_KEY = '__self__'
+
 export function detectItemIdProperty(
   template: t.JSXElement | t.JSXFragment | undefined,
   itemVar: string,
@@ -201,6 +204,7 @@ export function detectItemIdProperty(
       t.isIdentifier(keyExpr.property)
     )
       return keyExpr.property.name
+    if (t.isIdentifier(keyExpr) && keyExpr.name === itemVar) return ITEM_IS_KEY
   }
   return undefined
 }

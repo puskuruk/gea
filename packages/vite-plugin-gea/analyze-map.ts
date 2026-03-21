@@ -7,6 +7,7 @@ import type {
   RelationalMapBinding,
 } from './ir.ts'
 import { buildObserveKey, resolvePath, generateSelector, getDirectChildElements } from './utils.ts'
+import { ITEM_IS_KEY } from './analyze-helpers.ts'
 import type { StateRefMeta } from './parse.ts'
 import type { NodePath } from '@babel/traverse'
 import { createRequire } from 'module'
@@ -440,6 +441,9 @@ function resolveSide(
   itemIdProperty: string,
   stateRefs: Map<string, StateRefMeta>,
 ): { kind: 'external'; observePathParts: PathParts; storeVar?: string } | { kind: 'item-id' } | null {
+  if (itemIdProperty === ITEM_IS_KEY && t.isIdentifier(expr) && expr.name === itemVar) {
+    return { kind: 'item-id' }
+  }
   if (
     t.isMemberExpression(expr) &&
     t.isIdentifier(expr.object) &&

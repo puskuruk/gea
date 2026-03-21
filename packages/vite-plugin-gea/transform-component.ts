@@ -121,6 +121,7 @@ export function transformComponentFile(
         if (info) conditionalSlotNodeMap.set(node, info)
       }
       const stateChildSlots: import('./transform-jsx').StateChildSlot[] = []
+      const refBindings: { refId: string; targetExpr: import('@babel/types').Expression }[] = []
       const ctx = {
         imports,
         componentInstances,
@@ -140,6 +141,8 @@ export function transformComponentFile(
         conditionalSlotNodeMap,
         stateChildSlots,
         stateChildSlotCounter: { value: 0 },
+        refBindings,
+        refCounter: { value: 0 },
       }
 
       if (t.isJSXElement(retStmt.argument)) {
@@ -218,6 +221,38 @@ export function transformComponentFile(
         if (classPath) {
           const setupStatements = returnIndex >= 0 ? body.slice(0, returnIndex) : []
           transformed = appendCompiledEventMethods(classPath.node.body, eventHandlers, setupStatements) || transformed
+        }
+      }
+
+      if (refBindings.length > 0) {
+        const classPath = path.findParent((p) => t.isClassDeclaration(p.node)) as NodePath<t.ClassDeclaration> | null
+        if (classPath) {
+          const refStatements: t.Statement[] = refBindings.map((ref) =>
+            t.expressionStatement(
+              t.assignmentExpression(
+                '=',
+                ref.targetExpr,
+                t.callExpression(
+                  t.memberExpression(
+                    t.memberExpression(t.thisExpression(), t.identifier('element_')),
+                    t.identifier('querySelector'),
+                  ),
+                  [t.stringLiteral(`[data-gea-ref="${ref.refId}"]`)],
+                ),
+              ),
+            ),
+          )
+          const existingSetup = classPath.node.body.body.find(
+            (m) => t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name === '__setupRefs',
+          )
+          if (existingSetup && t.isClassMethod(existingSetup)) {
+            existingSetup.body.body.push(...refStatements)
+          } else {
+            classPath.node.body.body.push(
+              t.classMethod('method', t.identifier('__setupRefs'), [], t.blockStatement(refStatements)),
+            )
+          }
+          transformed = true
         }
       }
 
@@ -492,8 +527,8 @@ function transformRemainingJSX(ast: t.File, imports: Map<string, string>): void 
         return
       try {
         path.replaceWith(transformJSXToTemplate(path.node, { imports }))
-      } catch {
-        // JSX transform may fail for non-standard syntax
+      } catch (err) {
+        console.warn('[gea] Failed to transform JSX element:', err instanceof Error ? err.message : err)
       }
     },
     JSXFragment(path: NodePath<t.JSXFragment>) {
@@ -507,8 +542,8 @@ function transformRemainingJSX(ast: t.File, imports: Map<string, string>): void 
         return
       try {
         path.replaceWith(transformJSXFragmentToTemplate(path.node, { imports }))
-      } catch {
-        // Fragment transform may fail for non-standard syntax
+      } catch (err) {
+        console.warn('[gea] Failed to transform JSX fragment:', err instanceof Error ? err.message : err)
       }
     },
   })

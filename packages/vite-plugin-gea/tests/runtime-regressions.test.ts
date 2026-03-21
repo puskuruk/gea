@@ -4975,6 +4975,7 @@ test('jira_clone: Board keeps data-gea-compiled-child-root after Project.__geaRe
     )
 
     // Board — real source
+    const { dndManager } = await import('../../gea-ui/src/components/dnd-manager')
     const Board = await compileJsxComponent(readJira('views/Board.tsx'), join(jiraRoot, 'views/Board.tsx'), 'Board', {
       Component,
       projectStore,
@@ -4982,6 +4983,7 @@ test('jira_clone: Board keeps data-gea-compiled-child-root after Project.__geaRe
       authStore,
       IssueStatus,
       Avatar,
+      dndManager,
       Breadcrumbs,
       BoardColumn,
     })
@@ -8746,6 +8748,726 @@ test('full hierarchy: adding a comment must be a surgical DOM update, not a full
     await flushMicrotasks()
   } finally {
     ;(globalThis as any).fetch = origFetch
+    restoreDom()
+  }
+})
+
+test('component array children reconcile by key, not by index', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-keyed-component-array`
+    const [{ default: Component }] = await loadRuntimeModules(seed)
+
+    const ChildItem = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+
+        export default class ChildItem extends Component {
+          template({ label }: any) {
+            return <div class="item">{label}</div>
+          }
+        }
+      `,
+      '/virtual/ChildItem.tsx',
+      'ChildItem',
+      { Component },
+    )
+
+    const ParentList = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+        import ChildItem from './ChildItem'
+
+        export default class ParentList extends Component {
+          template({ items }: any) {
+            return (
+              <div class="list">
+                {items.map((item: any) => (
+                  <ChildItem key={item.id} itemId={item.id} label={item.label} />
+                ))}
+              </div>
+            )
+          }
+        }
+      `,
+      '/virtual/ParentList.tsx',
+      'ParentList',
+      { Component, ChildItem },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const parent = new ParentList({
+      items: [
+        { id: 'a', label: 'Alpha' },
+        { id: 'b', label: 'Beta' },
+      ],
+    })
+    parent.render(root)
+    await flushMicrotasks()
+
+    const childrenBefore = parent._itemsItems
+    assert.ok(childrenBefore, '_itemsItems must exist')
+    assert.equal(childrenBefore.length, 2)
+
+    const compA = childrenBefore[0]
+    const compB = childrenBefore[1]
+    const elA = compA.element_
+    const elB = compB.element_
+    assert.ok(elA, 'component A must have an element')
+    assert.ok(elB, 'component B must have an element')
+    assert.equal(elA.textContent, 'Alpha')
+    assert.equal(elB.textContent, 'Beta')
+
+    parent.__geaUpdateProps({
+      items: [
+        { id: 'c', label: 'Gamma' },
+        { id: 'a', label: 'Alpha' },
+        { id: 'b', label: 'Beta' },
+      ],
+    })
+    await flushMicrotasks()
+
+    const childrenAfter = parent._itemsItems
+    assert.equal(childrenAfter.length, 3)
+
+    assert.notStrictEqual(childrenAfter[0], compA, 'index 0 must be a new component (Gamma), not the old A')
+    assert.strictEqual(childrenAfter[1], compA, 'old component A must be reused at index 1')
+    assert.strictEqual(childrenAfter[2], compB, 'old component B must be reused at index 2')
+
+    assert.strictEqual(childrenAfter[1].element_, elA, 'component A must keep the same DOM node')
+    assert.strictEqual(childrenAfter[2].element_, elB, 'component B must keep the same DOM node')
+
+    const container = parent.el.querySelector('.list') || parent.el
+    const domChildren = Array.from(container.children)
+    assert.equal(domChildren.length, 3, 'container must have 3 children')
+    assert.equal(domChildren[0].textContent, 'Gamma')
+    assert.equal(domChildren[1].textContent, 'Alpha')
+    assert.equal(domChildren[2].textContent, 'Beta')
+
+    parent.dispose()
+    await flushMicrotasks()
+  } finally {
+    restoreDom()
+  }
+})
+
+test('conditional slot updates attributes from non-condition props (alt attribute bug)', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-cond-slot-attr`
+    const [{ default: Component }] = await loadRuntimeModules(seed)
+
+    const ImgCard = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+
+        export default class ImgCard extends Component {
+          template({ src, name, title }: any) {
+            return (
+              <div class="card">
+                <p class="title">{title}</p>
+                {src ? <img src={src} alt={name || ''} class="avatar" /> : ''}
+              </div>
+            )
+          }
+        }
+      `,
+      '/virtual/ImgCard.tsx',
+      'ImgCard',
+      { Component },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const card = new ImgCard({ src: 'baby-yoda.jpg', name: 'Baby Yoda', title: 'Character' })
+    card.render(root)
+    await flushMicrotasks()
+
+    const imgBefore = card.el.querySelector('img')
+    assert.ok(imgBefore, 'img element must exist')
+    assert.equal(imgBefore.getAttribute('src'), 'baby-yoda.jpg')
+    assert.equal(imgBefore.getAttribute('alt'), 'Baby Yoda')
+
+    card.__geaUpdateProps({ src: 'gaben.jpg', name: 'Lord Gaben', title: 'Character' })
+    await flushMicrotasks()
+
+    const imgAfter = card.el.querySelector('img')
+    assert.ok(imgAfter, 'img element must still exist after prop update')
+    assert.equal(imgAfter.getAttribute('src'), 'gaben.jpg', 'src must update')
+    assert.equal(imgAfter.getAttribute('alt'), 'Lord Gaben', 'alt must update when name prop changes')
+
+    card.dispose()
+    await flushMicrotasks()
+  } finally {
+    restoreDom()
+  }
+})
+
+test('dndManager discovers draggable elements via data-draggable-id attribute', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const { dndManager } = await import('../../gea-ui/src/components/dnd-manager')
+    dndManager.destroy()
+
+    const container = document.createElement('div')
+    container.dataset.droppableId = 'col-1'
+    document.body.appendChild(container)
+
+    const item1 = document.createElement('div')
+    item1.dataset.draggableId = 'item-a'
+    item1.textContent = 'Item A'
+    container.appendChild(item1)
+
+    const item2 = document.createElement('div')
+    item2.dataset.draggableId = 'item-b'
+    item2.textContent = 'Item B'
+    container.appendChild(item2)
+
+    dndManager.registerDroppable('col-1', container)
+
+    let result: any = null
+    dndManager.onDragEnd = (r) => {
+      result = r
+    }
+
+    const rect = item1.getBoundingClientRect()
+    const pointerDownEvent = new (globalThis.window as any).PointerEvent('pointerdown', {
+      clientX: rect.left + 5,
+      clientY: rect.top + 5,
+      button: 0,
+      bubbles: true,
+    })
+    item1.dispatchEvent(pointerDownEvent)
+
+    assert.ok((dndManager as any)._dragging, 'dndManager must start tracking on pointerdown')
+    assert.equal((dndManager as any)._draggedId, 'item-a', 'draggedId must match data-draggable-id')
+    assert.equal((dndManager as any)._sourceDroppableId, 'col-1', 'source droppableId must be discovered from ancestor')
+
+    const pointerUpEvent = new (globalThis.window as any).PointerEvent('pointerup', {
+      clientX: rect.left + 5,
+      clientY: rect.top + 5,
+      button: 0,
+      bubbles: true,
+    })
+    document.dispatchEvent(pointerUpEvent)
+
+    dndManager.destroy()
+    container.remove()
+  } finally {
+    restoreDom()
+  }
+})
+
+test('dndManager performs automatic component transfer on drop', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-dnd-transfer`
+    const [{ default: Component }] = await loadRuntimeModules(seed)
+
+    const ChildItem = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+
+        export default class ChildItem extends Component {
+          template({ itemId, label }: any) {
+            return <div class="child-item" data-draggable-id={itemId}>{label}</div>
+          }
+        }
+      `,
+      '/virtual/ChildItem.tsx',
+      'ChildItem',
+      { Component },
+    )
+
+    const ParentList = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+        import ChildItem from './ChildItem'
+
+        export default class ParentList extends Component {
+          template({ listId, items }: any) {
+            return (
+              <div class="parent-list" data-droppable-id={listId}>
+                {items.map((it: any) => (
+                  <ChildItem key={it.id} itemId={it.id} label={it.label} />
+                ))}
+              </div>
+            )
+          }
+        }
+      `,
+      '/virtual/ParentList.tsx',
+      'ParentList',
+      { Component, ChildItem },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const list1 = new ParentList({
+      listId: 'list-1',
+      items: [
+        { id: 'a', label: 'Alpha' },
+        { id: 'b', label: 'Beta' },
+      ],
+    })
+    list1.render(root)
+    await flushMicrotasks()
+
+    const list2 = new ParentList({
+      listId: 'list-2',
+      items: [{ id: 'c', label: 'Gamma' }],
+    })
+    list2.render(root)
+    await flushMicrotasks()
+
+    assert.equal(list1._itemsItems.length, 2, 'list1 must have 2 items')
+    assert.equal(list2._itemsItems.length, 1, 'list2 must have 1 item')
+
+    const itemA = list1._itemsItems[0]
+    const itemAEl = itemA.el
+
+    assert.ok(itemAEl, 'item A must have a DOM element')
+    assert.equal(itemAEl.textContent, 'Alpha')
+
+    const { dndManager } = await import('../../gea-ui/src/components/dnd-manager')
+    dndManager.destroy()
+
+    const container1 = list1.el as HTMLElement
+    const container2 = list2.el as HTMLElement
+    assert.equal(container1.dataset.droppableId, 'list-1', 'list1 root must have data-droppable-id')
+    assert.equal(container2.dataset.droppableId, 'list-2', 'list2 root must have data-droppable-id')
+    dndManager.registerDroppable('list-1', container1)
+    dndManager.registerDroppable('list-2', container2)
+
+    const destination = { droppableId: 'list-2', index: 0 }
+    ;(dndManager as any)._sourceEl = itemAEl
+    ;(dndManager as any)._performTransfer(destination)
+
+    assert.equal(list1._itemsItems.length, 1, 'list1 must have 1 item after transfer')
+    assert.equal(list2._itemsItems.length, 2, 'list2 must have 2 items after transfer')
+    assert.equal(list2._itemsItems[0], itemA, 'transferred component must be the same instance')
+    assert.equal(itemA.parentComponent, list2, 'parentComponent must point to dest parent')
+    assert.equal(itemAEl.parentElement, container2, 'DOM element must be in destination container')
+    assert.equal(itemAEl.textContent, 'Alpha', 'content must be preserved')
+
+    dndManager.destroy()
+    list1.dispose()
+    list2.dispose()
+    root.remove()
+    await flushMicrotasks()
+  } finally {
+    restoreDom()
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Static style object renders inline CSS
+// ---------------------------------------------------------------------------
+
+test('static style object renders as inline CSS on the DOM element', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-static-style-obj`
+    const [{ default: Component }] = await loadRuntimeModules(seed)
+
+    const StyledBox = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+
+        export default class StyledBox extends Component {
+          template() {
+            return <div style={{ backgroundColor: 'red', padding: '10px', fontSize: '14px' }}>Box</div>
+          }
+        }
+      `,
+      '/virtual/StyledBox.jsx',
+      'StyledBox',
+      { Component },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const component = new StyledBox()
+    component.render(root)
+    await flushMicrotasks()
+
+    const el = component.el as HTMLElement
+    assert.ok(el, 'Component element should exist')
+    assert.ok(!el.getAttribute('style')?.includes('[object Object]'), 'Style should not be [object Object]')
+    assert.ok(
+      el.style.backgroundColor === 'red' || el.getAttribute('style')?.includes('background-color'),
+      'background-color should be applied',
+    )
+
+    component.dispose()
+    root.remove()
+    await flushMicrotasks()
+  } finally {
+    restoreDom()
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Dynamic style object renders and updates
+// ---------------------------------------------------------------------------
+
+test('dynamic style object renders and updates CSS on state change', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-dyn-style-obj`
+    const [{ default: Component }] = await loadRuntimeModules(seed)
+
+    const DynStyle = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+
+        export default class DynStyle extends Component {
+          textColor = 'blue'
+
+          template() {
+            return <div style={{ color: this.textColor }}>Colorful</div>
+          }
+        }
+      `,
+      '/virtual/DynStyle.jsx',
+      'DynStyle',
+      { Component },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const component = new DynStyle()
+    component.render(root)
+    await flushMicrotasks()
+
+    const el = component.el as HTMLElement
+    assert.ok(el, 'Component element should exist')
+    assert.ok(!el.getAttribute('style')?.includes('[object Object]'), 'Style should not be [object Object]')
+
+    component.textColor = 'green'
+    await flushMicrotasks()
+
+    const styleAfter = el.getAttribute('style') || el.style.cssText
+    assert.ok(
+      styleAfter.includes('green') || el.style.color === 'green',
+      `Style should reflect updated color "green", got style: "${styleAfter}", color: "${el.style.color}"`,
+    )
+
+    component.dispose()
+    root.remove()
+    await flushMicrotasks()
+  } finally {
+    restoreDom()
+  }
+})
+
+// ---------------------------------------------------------------------------
+// IIFE with JSX renders correctly
+// ---------------------------------------------------------------------------
+
+test('IIFE in JSX renders the correct branch based on state', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-iife-jsx`
+    const [{ default: Component }] = await loadRuntimeModules(seed)
+
+    const IIFEView = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+
+        export default class IIFEView extends Component {
+          loading = true
+
+          template() {
+            return (
+              <div>
+                {(() => {
+                  if (this.loading) return <span class="loading">Loading...</span>
+                  return <span class="done">Done</span>
+                })()}
+              </div>
+            )
+          }
+        }
+      `,
+      '/virtual/IIFEView.jsx',
+      'IIFEView',
+      { Component },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const component = new IIFEView()
+    component.render(root)
+    await flushMicrotasks()
+
+    assert.ok(
+      component.el.textContent?.includes('Loading'),
+      `Should render loading state initially, got: "${component.el.textContent}"`,
+    )
+
+    component.loading = false
+    await flushMicrotasks()
+
+    assert.ok(
+      component.el.textContent?.includes('Done'),
+      `Should render done state after update, got: "${component.el.textContent}"`,
+    )
+
+    component.dispose()
+    root.remove()
+    await flushMicrotasks()
+  } finally {
+    restoreDom()
+  }
+})
+
+// ---------------------------------------------------------------------------
+// ref attribute assigns DOM element to component property
+// ---------------------------------------------------------------------------
+
+test('ref attribute assigns the DOM element to the component property', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-ref-attr`
+    const [{ default: Component }] = await loadRuntimeModules(seed)
+
+    const CanvasComp = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+
+        export default class CanvasComp extends Component {
+          canvasEl = null
+
+          template() {
+            return (
+              <div>
+                <canvas ref={this.canvasEl} width="800" height="600" />
+              </div>
+            )
+          }
+        }
+      `,
+      '/virtual/CanvasComp.jsx',
+      'CanvasComp',
+      { Component },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const component = new CanvasComp()
+    component.render(root)
+    await flushMicrotasks()
+
+    assert.ok(component.canvasEl, 'canvasEl should be assigned after render')
+    assert.equal(component.canvasEl.tagName?.toLowerCase(), 'canvas', 'canvasEl should point to the canvas DOM element')
+    assert.equal(component.canvasEl.getAttribute('width'), '800', 'Canvas should have width attribute')
+
+    component.dispose()
+    root.remove()
+    await flushMicrotasks()
+  } finally {
+    restoreDom()
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Multiple refs are assigned independently
+// ---------------------------------------------------------------------------
+
+test('multiple ref attributes each point to their respective DOM elements', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-multi-ref`
+    const [{ default: Component }] = await loadRuntimeModules(seed)
+
+    const MultiRef = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+
+        export default class MultiRef extends Component {
+          headerEl = null
+          footerEl = null
+
+          template() {
+            return (
+              <div>
+                <header ref={this.headerEl}>Header</header>
+                <footer ref={this.footerEl}>Footer</footer>
+              </div>
+            )
+          }
+        }
+      `,
+      '/virtual/MultiRef.jsx',
+      'MultiRef',
+      { Component },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const component = new MultiRef()
+    component.render(root)
+    await flushMicrotasks()
+
+    assert.ok(component.headerEl, 'headerEl should be assigned')
+    assert.ok(component.footerEl, 'footerEl should be assigned')
+    assert.equal(component.headerEl.tagName?.toLowerCase(), 'header', 'headerEl should be a header element')
+    assert.equal(component.footerEl.tagName?.toLowerCase(), 'footer', 'footerEl should be a footer element')
+    assert.equal(component.headerEl.textContent, 'Header')
+    assert.equal(component.footerEl.textContent, 'Footer')
+
+    component.dispose()
+    root.remove()
+    await flushMicrotasks()
+  } finally {
+    restoreDom()
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Spread attributes throw at compile time (via plugin transform)
+// ---------------------------------------------------------------------------
+
+test('spread attributes in JSX cause a compile-time rejection via plugin', async () => {
+  const plugin = geaPlugin()
+  const transform = typeof plugin.transform === 'function' ? plugin.transform : plugin.transform?.handler
+
+  await assert.rejects(
+    async () => {
+      await transform?.call(
+        {} as never,
+        `
+          import { Component } from '@geajs/core'
+
+          export default class BadSpread extends Component {
+            template() {
+              return <div {...this.props}>Content</div>
+            }
+          }
+        `,
+        '/virtual/BadSpread.jsx',
+      )
+    },
+    (err: Error) => {
+      assert.ok(
+        err.message.includes('Spread attributes') || err.message.includes('[gea]'),
+        `Expected spread error, got: ${err.message}`,
+      )
+      return true
+    },
+  )
+})
+
+// ---------------------------------------------------------------------------
+// Function-as-child throws at compile time (via plugin transform)
+// ---------------------------------------------------------------------------
+
+test('function-as-child in JSX causes a compile-time rejection via plugin', async () => {
+  const plugin = geaPlugin()
+  const transform = typeof plugin.transform === 'function' ? plugin.transform : plugin.transform?.handler
+
+  await assert.rejects(
+    async () => {
+      await transform?.call(
+        {} as never,
+        `
+          import { Component } from '@geajs/core'
+
+          export default class BadFuncChild extends Component {
+            template() {
+              return (
+                <div>
+                  {(user) => <span>{user.name}</span>}
+                </div>
+              )
+            }
+          }
+        `,
+        '/virtual/BadFuncChild.jsx',
+      )
+    },
+    (err: Error) => {
+      assert.ok(
+        err.message.includes('Function-as-child') || err.message.includes('[gea]'),
+        `Expected function-as-child error, got: ${err.message}`,
+      )
+      return true
+    },
+  )
+})
+
+test('dndManager attaches document listener when onDragEnd is set (attribute-driven init)', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const { dndManager } = await import('../../gea-ui/src/components/dnd-manager')
+    dndManager.destroy()
+
+    const container = document.createElement('div')
+    container.dataset.droppableId = 'col-a'
+    document.body.appendChild(container)
+
+    const item = document.createElement('div')
+    item.dataset.draggableId = 'item-1'
+    item.textContent = 'Item 1'
+    container.appendChild(item)
+
+    assert.equal(
+      (dndManager as any)._docListenerAttached,
+      false,
+      'listener must not be attached before onDragEnd is set',
+    )
+
+    let receivedResult: any = null
+    dndManager.onDragEnd = (r) => {
+      receivedResult = r
+    }
+
+    assert.equal((dndManager as any)._docListenerAttached, true, 'listener must be attached after onDragEnd is set')
+
+    const rect = item.getBoundingClientRect()
+    const downEvt = new (globalThis.window as any).PointerEvent('pointerdown', {
+      clientX: rect.left + 5,
+      clientY: rect.top + 5,
+      button: 0,
+      bubbles: true,
+    })
+    item.dispatchEvent(downEvt)
+
+    assert.ok((dndManager as any)._dragging, 'must start tracking after pointerdown on [data-draggable-id]')
+    assert.equal((dndManager as any)._draggedId, 'item-1')
+    assert.equal((dndManager as any)._sourceDroppableId, 'col-a')
+
+    const upEvt = new (globalThis.window as any).PointerEvent('pointerup', {
+      clientX: rect.left + 5,
+      clientY: rect.top + 5,
+      button: 0,
+      bubbles: true,
+    })
+    document.dispatchEvent(upEvt)
+
+    dndManager.destroy()
+    container.remove()
+  } finally {
     restoreDom()
   }
 })

@@ -8,6 +8,7 @@ import {
   replacePropRefsInExpression,
   replacePropRefsInStatements,
 } from './utils.ts'
+import { ITEM_IS_KEY } from './analyze-helpers.ts'
 import { collectTemplateSetupStatements } from './transform-attributes.ts'
 import type { TemplateSetupContext } from './transform-attributes.ts'
 
@@ -41,9 +42,10 @@ function buildHandlerRegistrationStatements(
       bodyWithProps.length === 1 && t.isExpressionStatement(bodyWithProps[0]) && !t.isBlockStatement(handlerExpr.body)
         ? t.arrowFunctionExpression([t.identifier('e')], (bodyWithProps[0] as t.ExpressionStatement).expression)
         : t.arrowFunctionExpression([t.identifier('e')], t.blockStatement(bodyWithProps))
-    const keyExpr = hp.itemIdProperty
-      ? t.memberExpression(t.identifier(itemVariable), t.identifier(hp.itemIdProperty))
-      : t.callExpression(t.identifier('String'), [t.identifier(itemVariable)])
+    const keyExpr =
+      hp.itemIdProperty && hp.itemIdProperty !== ITEM_IS_KEY
+        ? t.memberExpression(t.identifier(itemVariable), t.identifier(hp.itemIdProperty))
+        : t.callExpression(t.identifier('String'), [t.identifier(itemVariable)])
     stmts.push(
       t.expressionStatement(
         t.assignmentExpression(
@@ -79,9 +81,10 @@ export function buildPopulateItemHandlersMethod(
         ? t.arrowFunctionExpression([t.identifier('e')], (bodyWithProps[0] as t.ExpressionStatement).expression)
         : t.arrowFunctionExpression([t.identifier('e')], t.blockStatement(bodyWithProps))
     const itemVar = 'item' // populate method uses generic loop var
-    const keyExpr = hp.itemIdProperty
-      ? t.memberExpression(t.identifier(itemVar), t.identifier(hp.itemIdProperty))
-      : t.callExpression(t.identifier('String'), [t.identifier(itemVar)])
+    const keyExpr =
+      hp.itemIdProperty && hp.itemIdProperty !== ITEM_IS_KEY
+        ? t.memberExpression(t.identifier(itemVar), t.identifier(hp.itemIdProperty))
+        : t.callExpression(t.identifier('String'), [t.identifier(itemVar)])
     loopBody.push(
       t.expressionStatement(
         t.assignmentExpression(
@@ -180,19 +183,17 @@ export function generateRenderItemMethod(
     handlerPropsInMap,
     mapItemIdProperty: arrayMap.itemIdProperty || 'id',
     mapItemVariable: arrayMap.itemVariable,
+    mapContainerBindingId: arrayMap.containerBindingId,
   }
-  const templateLiteral = t.isJSXElement(modified)
-    ? transformJSXToTemplate(modified, ctx)
-    : transformJSXFragmentToTemplate(modified, ctx)
+  if (t.isJSXFragment(modified)) {
+    const err = new Error(
+      `[gea] Fragments as .map() item roots are not supported. Wrap the fragment children in a single root element (e.g., <div>...</div>).`,
+    )
+    ;(err as any).__geaCompileError = true
+    throw err
+  }
+  const wrapped = transformJSXToTemplate(modified as t.JSXElement, ctx)
 
-  const effectiveItemIdProp = arrayMap.itemIdProperty
-  const wrapped = insertItemMarker(
-    templateLiteral,
-    arrayMap.itemVariable,
-    effectiveItemIdProp,
-    arrayMap.containerBindingId,
-    (ctx as any).mapRootEventToken,
-  )
   const methodName = `render${arrayPath.charAt(0).toUpperCase() + arrayPath.slice(1).replace(/\./g, '')}Item`
 
   const propNames = new Set<string>()
@@ -278,75 +279,3 @@ export function generateRenderItemMethod(
   return { method, handlers: renderEventHandlers, handlerPropsInMap }
 }
 
-function insertItemMarker(
-  tl: t.TemplateLiteral,
-  itemVar: string,
-  itemIdProperty: string | undefined,
-  containerBindingId?: string,
-  eventToken?: string,
-  indexParam?: string,
-): t.TemplateLiteral {
-  const first = tl.quasis[0].value.raw
-  const tagMatch = first.match(/^(<[\w-]+)(\s|>)/)
-
-  let rewrittenFirst: string
-  const itemIdExpr = itemIdProperty
-    ? t.memberExpression(t.identifier(itemVar), t.identifier(itemIdProperty))
-    : indexParam
-      ? t.identifier(indexParam)
-      : t.callExpression(t.identifier('String'), [t.identifier(itemVar)])
-
-  if (tagMatch) {
-    if (containerBindingId) {
-      rewrittenFirst = `${tagMatch[1]} id="`
-    } else {
-      rewrittenFirst = `${tagMatch[1]} data-gea-item-id="`
-    }
-  } else {
-    const nameMatch = first.match(/^<([\w-]+)/)
-    if (containerBindingId) {
-      rewrittenFirst = nameMatch ? `${nameMatch[0]} id="` : first
-    } else {
-      rewrittenFirst = nameMatch ? `${nameMatch[0]} data-gea-item-id="` : first
-    }
-  }
-
-  if (!tagMatch && !first.match(/^<([\w-]+)/)) {
-    return tl
-  }
-
-  const remainder =
-    (tagMatch ? first.substring(tagMatch[1].length) : first.substring(first.match(/^<([\w-]+)/)![0].length)) || ''
-
-  const eventAttr = eventToken ? ` data-gea-event="${eventToken}"` : ''
-
-  if (containerBindingId) {
-    const idValueExpr = t.binaryExpression(
-      '+',
-      t.binaryExpression(
-        '+',
-        t.memberExpression(t.thisExpression(), t.identifier('id')),
-        t.stringLiteral('-' + containerBindingId + '-'),
-      ),
-      t.callExpression(t.identifier('String'), [itemIdExpr]),
-    )
-    return t.templateLiteral(
-      [
-        t.templateElement({ raw: rewrittenFirst, cooked: rewrittenFirst }, false),
-        t.templateElement({ raw: `" data-gea-item-id="`, cooked: `" data-gea-item-id="` }, false),
-        t.templateElement({ raw: `"${eventAttr}${remainder}`, cooked: `"${eventAttr}${remainder}` }, tl.quasis[0].tail),
-        ...tl.quasis.slice(1),
-      ],
-      [idValueExpr, itemIdExpr, ...tl.expressions],
-    )
-  }
-
-  return t.templateLiteral(
-    [
-      t.templateElement({ raw: rewrittenFirst, cooked: rewrittenFirst }, false),
-      t.templateElement({ raw: `"${eventAttr}${remainder}`, cooked: `"${eventAttr}${remainder}` }, tl.quasis[0].tail),
-      ...tl.quasis.slice(1),
-    ],
-    [itemIdExpr, ...tl.expressions],
-  )
-}

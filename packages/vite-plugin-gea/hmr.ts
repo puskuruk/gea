@@ -135,7 +135,8 @@ function generate(node: t.Node): string {
   try {
     const gen = require('@babel/generator').default
     return gen(node).code
-  } catch {
+  } catch (err) {
+    console.warn('[gea] Failed to generate code from AST node:', err instanceof Error ? err.message : err)
     return ''
   }
 }

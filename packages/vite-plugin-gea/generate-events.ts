@@ -2,6 +2,7 @@ import * as t from '@babel/types'
 import { id, jsBlockBody, jsMethod } from 'eszter'
 import type { EventHandler } from './ir.ts'
 import { buildMemberChainFromParts, extractHandlerBody, replacePropRefsInStatements } from './utils.ts'
+import { ITEM_IS_KEY } from './analyze-helpers.ts'
 import { collectTemplateSetupStatements } from './transform-attributes.ts'
 
 interface TemplateParamContext {
@@ -80,21 +81,31 @@ function ensureMapItemHelper(
     return rest.length > 0 ? buildMemberChainFromParts(optionalFirst, rest) : optionalFirst
   })()
 
-  const findPredicate = ctx.itemIdProperty
-    ? t.arrowFunctionExpression(
-        [t.identifier('__candidate')],
-        t.binaryExpression(
-          '===',
-          t.callExpression(t.identifier('String'), [
-            t.optionalMemberExpression(t.identifier('__candidate'), t.identifier(ctx.itemIdProperty), false, true),
-          ]),
-          t.identifier('__itemId'),
-        ),
-      )
-    : t.arrowFunctionExpression(
-        [t.identifier('_'), t.identifier('__i')],
-        t.binaryExpression('===', t.callExpression(t.identifier('String'), [t.identifier('__i')]), t.identifier('__itemId')),
-      )
+  const findPredicate =
+    ctx.itemIdProperty && ctx.itemIdProperty !== ITEM_IS_KEY
+      ? t.arrowFunctionExpression(
+          [t.identifier('__candidate')],
+          t.binaryExpression(
+            '===',
+            t.callExpression(t.identifier('String'), [
+              t.optionalMemberExpression(t.identifier('__candidate'), t.identifier(ctx.itemIdProperty), false, true),
+            ]),
+            t.identifier('__itemId'),
+          ),
+        )
+      : ctx.itemIdProperty === ITEM_IS_KEY
+        ? t.arrowFunctionExpression(
+            [t.identifier('__candidate')],
+            t.binaryExpression(
+              '===',
+              t.callExpression(t.identifier('String'), [t.identifier('__candidate')]),
+              t.identifier('__itemId'),
+            ),
+          )
+        : t.arrowFunctionExpression(
+            [t.identifier('_'), t.identifier('__i')],
+            t.binaryExpression('===', t.callExpression(t.identifier('String'), [t.identifier('__i')]), t.identifier('__itemId')),
+          )
   const method = jsMethod`${id(helperName)}(e) {
     const __el = e.target.closest('[data-gea-item-id]');
     if (!__el) return null;

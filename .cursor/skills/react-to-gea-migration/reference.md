@@ -2094,7 +2094,72 @@ Extract design tokens from styled-components into CSS custom properties:
 
 Use them in both CSS and inline styles: `background: var(--color-primary)`.
 
-### 15. Store object updates — direct mutation
+### 15. Style objects work like React
+
+Gea supports React-style inline style objects with camelCase property names. Static objects are compiled to CSS strings at build time; dynamic values are converted at runtime. Both approaches work:
+
+```tsx
+// Style object (same as React)
+<div style={{ backgroundColor: 'red', fontSize: '14px' }}>Styled</div>
+
+// Style string (Gea-specific, also works)
+<div style={`background-color:red;font-size:14px`}>Styled</div>
+```
+
+When migrating, you can keep most `style={{...}}` expressions unchanged. Gea handles the `camelCase` → `kebab-case` conversion automatically.
+
+### 16. `ref` attribute for DOM access
+
+React's `useRef` maps to Gea's `ref` attribute. Declare a member variable and use `ref={this.myField}`:
+
+```tsx
+export default class VideoPlayer extends Component {
+  videoEl = null
+
+  template() {
+    return (
+      <div class="player">
+        <video ref={this.videoEl} src={this.props.src}></video>
+        <button click={() => this.videoEl.play()}>Play</button>
+      </div>
+    )
+  }
+}
+```
+
+The element is assigned after render, so it's available in `onAfterRender()` and event handlers. For the component's root element, use `this.el` instead.
+
+### 17. Spread attributes are not supported
+
+React's `<div {...props} />` pattern does not compile in Gea. Destructure the props you need and pass them individually:
+
+```tsx
+// React
+const Button = ({ className, ...rest }) => <button className={className} {...rest} />
+
+// Gea — destructure explicitly
+export default function Button({ class: cls, disabled, click, children }) {
+  return <button class={cls} disabled={disabled} click={click}>{children}</button>
+}
+```
+
+The compiler throws a clear error at build time if spread attributes are used.
+
+### 18. Function-as-child is not supported
+
+React's render-prop-as-children pattern (`<Parent>{(data) => <Child />}</Parent>`) does not work in Gea. Use a named render prop attribute instead:
+
+```tsx
+// React
+<DataProvider>{(data) => <Display data={data} />}</DataProvider>
+
+// Gea — use a named prop
+<DataProvider renderContent={(data) => <Display data={data} />} />
+```
+
+Named render props (`renderContent`, `renderItem`, etc.) are fully supported.
+
+### 19. Store object updates — direct mutation
 
 Update store object fields directly. Each assignment triggers reactivity:
 

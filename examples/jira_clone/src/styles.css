@@ -678,7 +678,7 @@ body {
 }
 
 .board-list-issues {
-  height: 100%;
+  flex: 1;
   padding: 0 5px;
 }
 
@@ -731,14 +731,7 @@ body {
 }
 
 /* Drag state */
-.issue-card.dragging {
-  opacity: 0.15;
-  box-shadow: none;
-}
-
-.issue-card.drag-over {
-  border-top: 3px solid var(--color-border-input-focus);
-}
+/* Drag state — element is physically moved to document.body during drag */
 
 /* ------------------------------------------------------------
    Issue Type Icon
@@ -2637,23 +2630,14 @@ body {
 /* ------------------------------------------------------------
    Drag-and-Drop helpers
    ------------------------------------------------------------ */
-.board-list--drag-over {
-  background: var(--color-bg-light);
-}
-
-.dnd-placeholder {
+.gea-dnd-placeholder {
   background: rgba(9, 30, 66, 0.04);
-  border: 2px dashed rgba(9, 30, 66, 0.14);
   border-radius: 3px;
   margin-bottom: 5px;
   height: 0;
   transition: height 0.2s cubic-bezier(0.2, 0, 0, 1);
   overflow: hidden;
   pointer-events: none;
-}
-
-.drag-ghost {
-  opacity: 0.5;
 }
 
 /* ------------------------------------------------------------

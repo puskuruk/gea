@@ -6,6 +6,7 @@ import * as t from '@babel/types'
 import { id, jsBlockBody, jsExpr, jsMethod } from 'eszter'
 import type { NodePath } from '@babel/traverse'
 import type { UnresolvedMapInfo } from './ir.ts'
+import { ITEM_IS_KEY } from './analyze-helpers.ts'
 import { buildComponentPropsExpression, collectTemplateSetupStatements } from './transform-attributes.ts'
 import type { TemplateSetupContext } from './transform-attributes.ts'
 import { transformJSXExpression, transformJSXFragmentToTemplate } from './transform-jsx.ts'
@@ -156,18 +157,37 @@ export function generateComponentArrayMethods(
   const itemPropsMethod = jsMethod`${id(itemPropsMethodName)}(opt) {}`
   itemPropsMethod.body.body.push(...itemPropsSetup, t.returnStatement(finalPropsExpr))
 
+  const itemIdProp = um.itemIdProperty
+  const keyExpr: t.Expression =
+    itemIdProp && itemIdProp !== ITEM_IS_KEY
+      ? t.callExpression(t.identifier('String'), [t.memberExpression(t.identifier('opt'), t.identifier(itemIdProp))])
+      : itemIdProp === ITEM_IS_KEY
+        ? t.callExpression(t.identifier('String'), [t.identifier('opt')])
+        : t.binaryExpression('+', t.stringLiteral('__idx_'), t.identifier('__k'))
+
   const buildMethod = jsMethod`${id(buildMethodName)}() {}`
   buildMethod.body.body.push(
     ...arrSetupStatements,
-    ...jsBlockBody`
-       const arr = ${arrAccessExpr} ?? [];
-       this.${id(itemsName)} = arr.map(opt => {
-         const item = new ${id(comp.componentTag)}(${t.cloneNode(itemPropsCall, true)});
-         item.parentComponent = this;
-         item.__geaCompiledChild = true;
-         return item;
-       });
-     `,
+    ...(itemIdProp
+      ? jsBlockBody`
+           const arr = ${arrAccessExpr} ?? [];
+           this.${id(itemsName)} = arr.map((opt, __k) => {
+             const item = new ${id(comp.componentTag)}(${t.cloneNode(itemPropsCall, true)});
+             item.parentComponent = this;
+             item.__geaCompiledChild = true;
+             item.__geaItemKey = ${t.cloneNode(keyExpr, true)};
+             return item;
+           });
+         `
+      : jsBlockBody`
+           const arr = ${arrAccessExpr} ?? [];
+           this.${id(itemsName)} = arr.map(opt => {
+             const item = new ${id(comp.componentTag)}(${t.cloneNode(itemPropsCall, true)});
+             item.parentComponent = this;
+             item.__geaCompiledChild = true;
+             return item;
+           });
+         `),
   )
 
   const mountMethod = jsMethod`${id(mountMethodName)}() {}`
@@ -190,58 +210,118 @@ export function generateComponentArrayMethods(
   )
 
   const refreshMethod = jsMethod`${id(refreshMethodName)}() {}`
-  refreshMethod.body.body.push(
-    ...arrSetupStatements.map((stmt) => t.cloneNode(stmt, true) as t.Statement),
-    ...jsBlockBody`
-       const arr = ${t.cloneNode(arrAccessExpr, true)} ?? [];
-       const __old = this.${id(itemsName)} ?? [];
-       const __oldLen = __old.length;
-       const __newLen = arr.length;
-       if (__oldLen !== __newLen) {
-         if (__newLen > __oldLen) {
-           for (let __k = 0; __k < __oldLen; __k++) {
-             const opt = arr[__k];
-             __old[__k].__geaUpdateProps(${t.cloneNode(itemPropsCall, true)});
+  if (itemIdProp) {
+    refreshMethod.body.body.push(
+      ...arrSetupStatements.map((stmt) => t.cloneNode(stmt, true) as t.Statement),
+      ...jsBlockBody`
+         const arr = ${t.cloneNode(arrAccessExpr, true)} ?? [];
+         const __old = this.${id(itemsName)} ?? [];
+         const __keyMap = new Map();
+         for (let __k = 0; __k < __old.length; __k++) {
+           if (__old[__k].__geaItemKey != null) {
+             __keyMap.set(__old[__k].__geaItemKey, __old[__k]);
            }
-           if (!this.${id(containerName)} && this.rendered_) {
-             this.${id(containerName)} = ${t.cloneNode(containerLookupExpr, true)};
-           }
-           for (let __k = __oldLen; __k < __newLen; __k++) {
-             const opt = arr[__k];
+         }
+         const __new = [];
+         for (let __k = 0; __k < arr.length; __k++) {
+           const opt = arr[__k];
+           const __key = ${t.cloneNode(keyExpr, true)};
+           const __existing = __keyMap.get(__key);
+           if (__existing) {
+             __existing.__geaUpdateProps(${t.cloneNode(itemPropsCall, true)});
+             __new.push(__existing);
+             __keyMap.delete(__key);
+           } else {
              const __item = new ${id(comp.componentTag)}(${t.cloneNode(itemPropsCall, true)});
              __item.parentComponent = this;
              __item.__geaCompiledChild = true;
-             this.${id(itemsName)}.push(__item);
-             if (!this.__childComponents.includes(__item)) {
-               this.__childComponents.push(__item);
-             }
-             if (this.rendered_ && this.${id(containerName)}) {
-               __item.render(this.${id(containerName)}, __k);
-             }
+             __item.__geaItemKey = __key;
+             __new.push(__item);
            }
-           return;
          }
-         if (__newLen < __oldLen) {
-           for (let __k = __newLen; __k < __oldLen; __k++) {
-             __old[__k]?.dispose?.();
-           }
-           this.${id(itemsName)}.length = __newLen;
-           this.__childComponents = (this.__childComponents || []).filter(
-             child => !__old.slice(__newLen).includes(child)
-           );
-           for (let __k = 0; __k < __newLen; __k++) {
-             const opt = arr[__k];
-             this.${id(itemsName)}[__k].__geaUpdateProps(${t.cloneNode(itemPropsCall, true)});
-           }
-           return;
+         for (const [, __removed] of __keyMap) {
+           __removed.dispose?.();
          }
-       }
-       for (let i = 0; i < arr.length; i++) {
-         const opt = arr[i];
-         this.${id(itemsName)}[i].__geaUpdateProps(${t.cloneNode(itemPropsCall, true)});
-       }
-     `,
-  )
+         if (!this.${id(containerName)} && this.rendered_) {
+           this.${id(containerName)} = ${t.cloneNode(containerLookupExpr, true)};
+         }
+         const __container = this.${id(containerName)};
+         if (__container && this.rendered_) {
+           for (let __k = 0; __k < __new.length; __k++) {
+             if (!__new[__k].rendered_) {
+               if (!this.__childComponents.includes(__new[__k])) {
+                 this.__childComponents.push(__new[__k]);
+               }
+               __new[__k].render(__container);
+             }
+           }
+           for (let __k = 0; __k < __new.length; __k++) {
+             const __el = __new[__k].element_;
+             if (__el && __container.children[__k] !== __el) {
+               __container.insertBefore(__el, __container.children[__k] || null);
+             }
+           }
+         }
+         this.${id(itemsName)} = __new;
+         this.__childComponents = (this.__childComponents || []).filter(
+           child => !__old.includes(child) || __new.includes(child)
+         );
+       `,
+    )
+  } else {
+    refreshMethod.body.body.push(
+      ...arrSetupStatements.map((stmt) => t.cloneNode(stmt, true) as t.Statement),
+      ...jsBlockBody`
+         const arr = ${t.cloneNode(arrAccessExpr, true)} ?? [];
+         const __old = this.${id(itemsName)} ?? [];
+         const __oldLen = __old.length;
+         const __newLen = arr.length;
+         if (__oldLen !== __newLen) {
+           if (__newLen > __oldLen) {
+             for (let __k = 0; __k < __oldLen; __k++) {
+               const opt = arr[__k];
+               __old[__k].__geaUpdateProps(${t.cloneNode(itemPropsCall, true)});
+             }
+             if (!this.${id(containerName)} && this.rendered_) {
+               this.${id(containerName)} = ${t.cloneNode(containerLookupExpr, true)};
+             }
+             for (let __k = __oldLen; __k < __newLen; __k++) {
+               const opt = arr[__k];
+               const __item = new ${id(comp.componentTag)}(${t.cloneNode(itemPropsCall, true)});
+               __item.parentComponent = this;
+               __item.__geaCompiledChild = true;
+               this.${id(itemsName)}.push(__item);
+               if (!this.__childComponents.includes(__item)) {
+                 this.__childComponents.push(__item);
+               }
+               if (this.rendered_ && this.${id(containerName)}) {
+                 __item.render(this.${id(containerName)}, __k);
+               }
+             }
+             return;
+           }
+           if (__newLen < __oldLen) {
+             for (let __k = __newLen; __k < __oldLen; __k++) {
+               __old[__k]?.dispose?.();
+             }
+             this.${id(itemsName)}.length = __newLen;
+             this.__childComponents = (this.__childComponents || []).filter(
+               child => !__old.slice(__newLen).includes(child)
+             );
+             for (let __k = 0; __k < __newLen; __k++) {
+               const opt = arr[__k];
+               this.${id(itemsName)}[__k].__geaUpdateProps(${t.cloneNode(itemPropsCall, true)});
+             }
+             return;
+           }
+         }
+         for (let i = 0; i < arr.length; i++) {
+           const opt = arr[i];
+           this.${id(itemsName)}[i].__geaUpdateProps(${t.cloneNode(itemPropsCall, true)});
+         }
+       `,
+    )
+  }
 
   return [itemPropsMethod, buildMethod, mountMethod, refreshMethod]
 }

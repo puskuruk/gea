@@ -43,6 +43,19 @@ export function parseSource(code: string): ParseResult | null {
   const importKinds = new Map<string, 'default' | 'named' | 'namespace'>()
   let hasJSX = false
 
+  const checkReturnsJSX = (node: t.Node): boolean => {
+    if (t.isJSXElement(node) || t.isJSXFragment(node)) return true
+    if (t.isReturnStatement(node) && node.argument) return checkReturnsJSX(node.argument)
+    if (t.isBlockStatement(node)) {
+      const ret = node.body.find((s) => t.isReturnStatement(s))
+      return !!ret && t.isReturnStatement(ret) && !!ret.argument && checkReturnsJSX(ret.argument)
+    }
+    if (t.isArrowFunctionExpression(node)) return checkReturnsJSX(node.body)
+    if (t.isConditionalExpression(node)) return checkReturnsJSX(node.consequent) || checkReturnsJSX(node.alternate)
+    if (t.isLogicalExpression(node)) return checkReturnsJSX(node.right)
+    return false
+  }
+
   traverse(ast, {
     ImportDeclaration(path: NodePath<t.ImportDeclaration>) {
       const source = path.node.source.value
@@ -80,19 +93,6 @@ export function parseSource(code: string): ParseResult | null {
       let name: string | null = null
       let returnsJSX = false
 
-      const checkReturnsJSX = (node: t.Node): boolean => {
-        if (t.isJSXElement(node) || t.isJSXFragment(node)) return true
-        if (t.isReturnStatement(node) && node.argument) return checkReturnsJSX(node.argument)
-        if (t.isBlockStatement(node)) {
-          const ret = node.body.find((s) => t.isReturnStatement(s))
-          return !!ret && t.isReturnStatement(ret) && !!ret.argument && checkReturnsJSX(ret.argument)
-        }
-        if (t.isArrowFunctionExpression(node)) return checkReturnsJSX(node.body)
-        if (t.isConditionalExpression(node)) return checkReturnsJSX(node.consequent) || checkReturnsJSX(node.alternate)
-        if (t.isLogicalExpression(node)) return checkReturnsJSX(node.right)
-        return false
-      }
-
       if (t.isFunctionDeclaration(decl)) {
         name = decl.id?.name || null
         if (decl.body && t.isBlockStatement(decl.body)) {
@@ -121,6 +121,33 @@ export function parseSource(code: string): ParseResult | null {
 
       if (name && returnsJSX) {
         functionalComponentInfo = { name }
+      }
+    },
+
+    ExportNamedDeclaration(path: NodePath<t.ExportNamedDeclaration>) {
+      const decl = path.node.declaration
+      if (!decl) return
+
+      const checkNamedFn = (name: string, fn: t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration) => {
+        const body = t.isFunctionDeclaration(fn) ? fn.body : fn.body
+        if (checkReturnsJSX(body)) {
+          const err = new Error(
+            `[gea] Named JSX component export '${name}' is not supported. Use 'export default' or convert to a class extending Component. Only one component per file is allowed.`,
+          )
+          ;(err as any).__geaCompileError = true
+          throw err
+        }
+      }
+
+      if (t.isFunctionDeclaration(decl) && decl.id) {
+        checkNamedFn(decl.id.name, decl)
+      } else if (t.isVariableDeclaration(decl)) {
+        for (const declarator of decl.declarations) {
+          if (!t.isIdentifier(declarator.id) || !declarator.init) continue
+          if (t.isArrowFunctionExpression(declarator.init) || t.isFunctionExpression(declarator.init)) {
+            checkNamedFn(declarator.id.name, declarator.init)
+          }
+        }
       }
     },
 

@@ -349,6 +349,64 @@ Supported event attributes: `click`, `dblclick`, `input`, `change`, `keydown`, `
 
 With `@geajs/mobile`: `tap`, `longTap`, `swipeRight`, `swipeUp`, `swipeLeft`, `swipeDown`.
 
+### Style Objects
+
+Gea supports React-style inline style objects. The compiler converts static style objects to CSS strings at build time and generates runtime conversion for dynamic values:
+
+```jsx
+// Static — compiled to a CSS string at build time (zero runtime cost)
+<div style={{ backgroundColor: 'red', fontSize: '14px', fontWeight: 'bold' }}>
+  Styled content
+</div>
+
+// Dynamic — converted to cssText at runtime
+<div style={{ color: this.textColor, opacity: this.isVisible ? 1 : 0 }}>
+  Dynamic styling
+</div>
+
+// String styles still work (passed through as-is)
+<div style={`width:${this.width}px`}>Sized content</div>
+```
+
+CSS property names use camelCase (like React). The compiler converts them to kebab-case: `backgroundColor` → `background-color`, `fontSize` → `font-size`.
+
+### `ref` Attribute
+
+Use `ref` to get a direct reference to a DOM element after render:
+
+```jsx
+export default class Canvas extends Component {
+  canvasEl = null
+
+  template() {
+    return (
+      <div class="canvas-wrapper">
+        <canvas ref={this.canvasEl} width="800" height="600"></canvas>
+      </div>
+    )
+  }
+
+  onAfterRender() {
+    const ctx = this.canvasEl.getContext('2d')
+    ctx.fillRect(0, 0, 100, 100)
+  }
+}
+```
+
+The compiler replaces `ref` with a `data-gea-ref` marker and generates a `__setupRefs()` method that assigns the DOM element to the specified component property after render. Multiple refs on different elements are supported.
+
+### Compiler Errors (Unsupported Patterns)
+
+The Gea compiler throws clear errors for JSX patterns it cannot compile. These are caught at build time, not at runtime:
+
+| Pattern | Error | Fix |
+| --- | --- | --- |
+| `<div {...props} />` | Spread attributes not supported | Destructure and pass props individually |
+| `<{DynamicTag} />` | Dynamic component tags not supported | Use conditional rendering (`{isA ? <A /> : <B />}`) |
+| `{() => <div />}` | Function-as-child not supported | Use render props with named attributes instead |
+| `export function Foo() { return <div /> }` | Named JSX component exports not supported | Use `export default function` |
+| `<>{items.map(...)}</>` | Fragments as `.map()` item roots not supported | Wrap each item in a single root element |
+
 ## Rendering
 
 ```js

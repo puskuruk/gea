@@ -1068,13 +1068,21 @@ function handleTextBinding(
       const dependencies = hasNestedMapCall
         ? allDeps
         : allDeps.filter((d) => !d.storeVar && d.pathParts.length > 0 && d.pathParts[0] !== 'props')
-      const dependentProps = collectDependentPropNames(
+      const conditionDependentProps = collectDependentPropNames(
         conditionExpr,
         condSetupStatements,
         propsParamName,
         destructuredPropNames,
         classBody,
       )
+      const allDependentProps = collectDependentPropNames(
+        expr,
+        fullSetupStatements,
+        propsParamName,
+        destructuredPropNames,
+        classBody,
+      )
+      const dependentProps = [...new Set([...conditionDependentProps, ...allDependentProps])]
       dependentProps.forEach((propName) => rerenderPropNames.add(propName))
       if (dependentProps.length > 0 || dependencies.length > 0) {
         rerenderConditions?.push({
@@ -1175,6 +1183,17 @@ function expressionMayProduceJSX(expr: t.Expression | t.JSXEmptyExpression): boo
   }
   if (t.isParenthesizedExpression(expr)) {
     return expressionMayProduceJSX(expr.expression as t.Expression)
+  }
+  if (t.isCallExpression(expr)) {
+    const callee = expr.callee
+    if (t.isArrowFunctionExpression(callee) || t.isFunctionExpression(callee)) {
+      if (t.isBlockStatement(callee.body)) {
+        return callee.body.body.some(
+          (s) => t.isReturnStatement(s) && !!s.argument && expressionMayProduceJSX(s.argument),
+        )
+      }
+      return expressionMayProduceJSX(callee.body as t.Expression)
+    }
   }
   return false
 }

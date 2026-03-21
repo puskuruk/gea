@@ -170,6 +170,8 @@ function reRenderComponent(instance) {
   for (var __ki = 0; __ki < __ownKeys.length; __ki++) {
     var __k = __ownKeys[__ki];
     if (__k.charAt(0) === '_' || __k === 'props' || __k === 'element_' || __k === 'rendered_' || __k === 'id') continue;
+    var __desc = Object.getOwnPropertyDescriptor(instance, __k);
+    if (__desc && (__desc.get || __desc.set)) continue;
     try { __stateSnapshot[__k] = instance[__k]; } catch(e) {}
   }
   instance.rendered_ = false;

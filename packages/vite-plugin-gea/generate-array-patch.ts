@@ -3,6 +3,7 @@ import { appendToBody, id, js, jsMethod } from 'eszter'
 import type { NodePath } from '@babel/traverse'
 import type { ArrayMapBinding } from './ir.ts'
 import { normalizePathParts, pathPartsToString, replacePropRefsInExpression } from './utils.ts'
+import { ITEM_IS_KEY } from './analyze-helpers.ts'
 import { createRequire } from 'module'
 
 const require = createRequire(import.meta.url)
@@ -339,7 +340,7 @@ export function generateCreateItemMethod(
 
   body.push(t.variableDeclaration('var', [t.variableDeclarator(cVar, containerRef)]))
 
-  const isPrimitiveKey = !itemIdProperty
+  const isPrimitiveKey = !itemIdProperty || itemIdProperty === ITEM_IS_KEY
   const dummyItem: t.Expression = isPrimitiveKey
     ? t.stringLiteral('__dummy__')
     : (() => {
@@ -467,35 +468,84 @@ export function generateCreateItemMethod(
         break
       case 'attribute': {
         const attrVal = t.identifier('__av')
-        body.push(
-          t.variableDeclaration('var', [t.variableDeclarator(attrVal, entry.expression)]),
-          t.ifStatement(
-            t.logicalExpression(
-              '||',
-              t.binaryExpression('==', attrVal, t.nullLiteral()),
-              t.binaryExpression('===', attrVal, t.booleanLiteral(false)),
+        if (entry.attributeName === 'style') {
+          body.push(
+            t.variableDeclaration('var', [t.variableDeclarator(attrVal, entry.expression)]),
+            t.ifStatement(
+              t.logicalExpression(
+                '||',
+                t.binaryExpression('==', attrVal, t.nullLiteral()),
+                t.binaryExpression('===', attrVal, t.booleanLiteral(false)),
+              ),
+              t.expressionStatement(
+                t.callExpression(t.memberExpression(navExpr, t.identifier('removeAttribute')), [
+                  t.stringLiteral('style'),
+                ]),
+              ),
+              t.expressionStatement(
+                t.assignmentExpression(
+                  '=',
+                  t.memberExpression(t.memberExpression(navExpr, t.identifier('style')), t.identifier('cssText')),
+                  t.conditionalExpression(
+                    t.binaryExpression('===', t.unaryExpression('typeof', attrVal), t.stringLiteral('object')),
+                    t.callExpression(
+                      t.memberExpression(
+                        t.callExpression(
+                          t.memberExpression(
+                            t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [attrVal]),
+                            t.identifier('map'),
+                          ),
+                          [
+                            t.arrowFunctionExpression(
+                              [t.arrayPattern([t.identifier('k'), t.identifier('v')])],
+                              t.binaryExpression('+', t.binaryExpression('+',
+                                t.callExpression(t.memberExpression(t.identifier('k'), t.identifier('replace')), [t.regExpLiteral('[A-Z]', 'g'), t.stringLiteral('-$&')]),
+                                t.stringLiteral(': ')), t.identifier('v')),
+                            ),
+                          ],
+                        ),
+                        t.identifier('join'),
+                      ),
+                      [t.stringLiteral('; ')],
+                    ),
+                    t.callExpression(t.identifier('String'), [attrVal]),
+                  ),
+                ),
+              ),
             ),
-            t.expressionStatement(
-              t.callExpression(t.memberExpression(navExpr, t.identifier('removeAttribute')), [
-                t.stringLiteral(entry.attributeName!),
-              ]),
+          )
+        } else {
+          body.push(
+            t.variableDeclaration('var', [t.variableDeclarator(attrVal, entry.expression)]),
+            t.ifStatement(
+              t.logicalExpression(
+                '||',
+                t.binaryExpression('==', attrVal, t.nullLiteral()),
+                t.binaryExpression('===', attrVal, t.booleanLiteral(false)),
+              ),
+              t.expressionStatement(
+                t.callExpression(t.memberExpression(navExpr, t.identifier('removeAttribute')), [
+                  t.stringLiteral(entry.attributeName!),
+                ]),
+              ),
+              t.expressionStatement(
+                t.callExpression(t.memberExpression(navExpr, t.identifier('setAttribute')), [
+                  t.stringLiteral(entry.attributeName!),
+                  t.callExpression(t.identifier('String'), [attrVal]),
+                ]),
+              ),
             ),
-            t.expressionStatement(
-              t.callExpression(t.memberExpression(navExpr, t.identifier('setAttribute')), [
-                t.stringLiteral(entry.attributeName!),
-                t.callExpression(t.identifier('String'), [attrVal]),
-              ]),
-            ),
-          ),
-        )
+          )
+        }
         break
       }
     }
   }
 
-  const itemIdExpr = itemIdProperty
-    ? t.memberExpression(t.identifier('item'), t.identifier(itemIdProperty))
-    : t.callExpression(t.identifier('String'), [t.identifier('item')])
+  const itemIdExpr =
+    itemIdProperty && itemIdProperty !== ITEM_IS_KEY
+      ? t.memberExpression(t.identifier('item'), t.identifier(itemIdProperty))
+      : t.callExpression(t.identifier('String'), [t.identifier('item')])
   body.push(
     t.expressionStatement(
       t.callExpression(t.memberExpression(elVar, t.identifier('setAttribute')), [

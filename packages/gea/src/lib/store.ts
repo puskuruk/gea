@@ -277,6 +277,15 @@ export class Store {
     return this
   }
 
+  silent(fn: () => void): void {
+    try {
+      fn()
+    } finally {
+      this._pendingChanges = []
+      this._flushScheduled = false
+    }
+  }
+
   observe(path: string | string[], handler: StoreObserver): () => void {
     const pathParts = splitPath(path)
     const nodes = [this._observerRoot]

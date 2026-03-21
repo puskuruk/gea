@@ -299,6 +299,36 @@ With `@geajs/mobile`: `tap`, `longTap`, `swipeRight`, `swipeUp`, `swipeLeft`, `s
 <span>{activeCount} {activeCount === 1 ? 'item' : 'items'} left</span>
 ```
 
+### Style Objects
+
+Inline style objects with camelCase property names are supported:
+
+```jsx
+<div style={{ backgroundColor: 'red', fontSize: '14px' }}>Styled</div>
+<div style={{ color: this.textColor }}>Dynamic</div>
+<div style="color:red">String style</div>
+```
+
+Static objects are compiled to CSS strings at build time. Dynamic values are converted to `cssText` at runtime.
+
+### `ref` Attribute
+
+```jsx
+export default class Canvas extends Component {
+  canvasEl = null
+
+  template() {
+    return (
+      <div>
+        <canvas ref={this.canvasEl} width="800" height="600"></canvas>
+      </div>
+    )
+  }
+}
+```
+
+Assigns the DOM element to the component property after render. Available in `onAfterRender()` and event handlers.
+
 ---
 
 ## Conditional Rendering

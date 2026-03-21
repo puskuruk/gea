@@ -59,6 +59,56 @@ Use curly braces for dynamic content:
 <span>{activeCount} {activeCount === 1 ? 'item' : 'items'} left</span>
 ```
 
+## Style Objects
+
+Gea supports inline style objects with camelCase property names, like React:
+
+```jsx
+// Static — compiled to a CSS string at build time
+<div style={{ backgroundColor: 'red', fontSize: '14px', fontWeight: 'bold' }}>
+  Styled content
+</div>
+
+// Dynamic — converted to cssText at runtime
+<div style={{ color: this.textColor, opacity: this.isVisible ? 1 : 0 }}>
+  Dynamic styling
+</div>
+```
+
+String styles are also supported and passed through as-is:
+
+```jsx
+<div style="color:red">Static string</div>
+<div style={`width:${size}px`}>Dynamic string</div>
+```
+
+Property names use camelCase: `backgroundColor` → `background-color`, `fontSize` → `font-size`.
+
+## `ref` Attribute
+
+Use `ref` to get a direct reference to a DOM element after render:
+
+```jsx
+export default class Canvas extends Component {
+  canvasEl = null
+
+  template() {
+    return (
+      <div class="wrapper">
+        <canvas ref={this.canvasEl} width="800" height="600"></canvas>
+      </div>
+    )
+  }
+
+  onAfterRender() {
+    const ctx = this.canvasEl.getContext('2d')
+    ctx.fillRect(0, 0, 100, 100)
+  }
+}
+```
+
+The compiler generates a setup method that assigns the DOM element to the specified property after each render. Multiple refs are supported. For the component's root element, use `this.el` instead.
+
 ## Component Tags
 
 Components are referenced by their import name in PascalCase. The Vite plugin converts them to kebab-case custom elements internally and passes props via `data-prop-*` attributes.
@@ -68,3 +118,15 @@ import TodoItem from './todo-item'
 
 <TodoItem todo={todo} onToggle={() => store.toggle(todo.id)} />
 ```
+
+## Unsupported Patterns
+
+The compiler throws clear errors at build time for these patterns:
+
+| Pattern | Fix |
+| --- | --- |
+| `<div {...props} />` | Destructure and pass props individually |
+| Dynamic tag names | Use conditional rendering instead |
+| `{() => <div />}` (function as child) | Use named render prop attributes |
+| `export function Foo() { return <div /> }` | Use `export default function` |
+| Fragments as `.map()` item roots | Wrap in a single root element |

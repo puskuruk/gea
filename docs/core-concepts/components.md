@@ -131,6 +131,27 @@ Is this state shared across components?
 | `$(selector)` | First matching descendant element (scoped `querySelector`) |
 | `$$(selector)` | All matching descendants as an array (scoped `querySelectorAll`) |
 
+## `ref` Attribute
+
+Use `ref` on a JSX element to get a direct reference to its DOM node:
+
+```jsx
+export default class VideoPlayer extends Component {
+  videoEl = null
+
+  template() {
+    return (
+      <div class="player">
+        <video ref={this.videoEl} src={this.props.src}></video>
+        <button click={() => this.videoEl.play()}>Play</button>
+      </div>
+    )
+  }
+}
+```
+
+The element is assigned to the component property after render. Use `onAfterRender()` for initialization that needs the DOM node. For the component's root element, use `this.el` instead.
+
 ## Rendering
 
 ```ts

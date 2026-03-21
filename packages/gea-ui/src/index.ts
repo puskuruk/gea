@@ -41,3 +41,10 @@ export { default as Badge } from './components/badge'
 export { Alert, AlertTitle, AlertDescription } from './components/alert'
 export { default as Separator } from './components/separator'
 export { default as Skeleton } from './components/skeleton'
+
+// Drag and Drop
+export { dndManager } from './components/dnd-manager'
+export type { DragResult } from './components/dnd-manager'
+export { default as Draggable } from './components/draggable'
+export { default as Droppable } from './components/droppable'
+export { default as DragDropContext } from './components/drag-drop-context'

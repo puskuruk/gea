@@ -47,31 +47,24 @@ export function injectChildComponents(
 
   let injected = false
   traverse(ast, {
-    ClassMethod(path: NodePath<t.ClassMethod>) {
-      if (!t.isIdentifier(path.node.key) || path.node.key.name !== 'constructor') return
-      const body = path.node.body.body
-      body.push(...instanceStatements)
-      injected = true
-    },
-  })
+    ClassDeclaration(path: NodePath<t.ClassDeclaration>) {
+      if (!t.isIdentifier(path.node.superClass)) return
 
-  if (!injected) {
-    traverse(ast, {
-      ClassDeclaration(path: NodePath<t.ClassDeclaration>) {
-        if (!t.isIdentifier(path.node.superClass)) return
+      const existingCtor = path.node.body.body.find(
+        (m): m is t.ClassMethod => t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name === 'constructor',
+      )
+      if (existingCtor) {
+        existingCtor.body.body.push(...instanceStatements)
+        injected = true
+      } else if (!injected) {
         const ctor = appendToBody(
           jsMethod`constructor(...args) {}`,
           t.expressionStatement(t.callExpression(t.super(), [t.spreadElement(t.identifier('args'))])),
           ...instanceStatements,
         )
         path.node.body.body.unshift(ctor)
-      },
-    })
-  }
-
-  traverse(ast, {
-    ClassDeclaration(path: NodePath<t.ClassDeclaration>) {
-      if (!t.isIdentifier(path.node.superClass)) return
+        injected = true
+      }
 
       childComponents.forEach((child) => {
         const isDirect = directForwardingChildren?.has(child.instanceVar)

@@ -3,7 +3,7 @@ import projectStore from '../stores/project-store'
 import filtersStore from '../stores/filters-store'
 import authStore from '../stores/auth-store'
 import { IssueStatus } from '../constants/issues'
-import { Avatar } from '@geajs/ui'
+import { Avatar, dndManager } from '@geajs/ui'
 import Breadcrumbs from '../components/Breadcrumbs'
 import BoardColumn from '../components/BoardColumn'
 
@@ -49,6 +49,17 @@ function filterIssues(
 }
 
 export default class Board extends Component {
+  created() {
+    dndManager.onDragEnd = (result) => {
+      projectStore.moveIssue(result.draggableId, result.destination.droppableId, result.destination.index)
+    }
+  }
+
+  dispose() {
+    dndManager.onDragEnd = null
+    super.dispose()
+  }
+
   template() {
     const project = projectStore.project
     if (!project) return <div></div>

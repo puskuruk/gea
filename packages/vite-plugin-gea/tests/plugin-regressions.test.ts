@@ -16,7 +16,7 @@ import { parseSource } from '../parse'
 import type { StateRefMeta } from '../parse'
 import { transformComponentFile } from '../transform-component'
 import { generatePatchItemMethod, generateCreateItemMethod } from '../generate-array-patch'
-import { getObserveMethodName } from '../utils'
+import { getObserveMethodName, getJSXTagName } from '../utils'
 import { applyListChanges } from '../../gea/src/lib/base/list'
 
 const generate = 'default' in babelGenerator ? babelGenerator.default : babelGenerator
@@ -2382,4 +2382,502 @@ test('store deps used in component array item props must route to __refreshXxxIt
       '__observe_projectStore_project__users must NOT call __geaRequestRender. Got: ' + usersObserver,
     )
   }
+})
+
+// ---------------------------------------------------------------------------
+// Unsupported JSX pattern compile errors
+// ---------------------------------------------------------------------------
+
+test('spread attributes throw a compile error', () => {
+  assert.throws(
+    () =>
+      transformComponentSource(`
+        import { Component } from '@geajs/core'
+
+        export default class Card extends Component {
+          template() {
+            return <div {...this.props} class="card">Hello</div>
+          }
+        }
+      `),
+    (err: Error) => {
+      assert.ok(err.message.includes('[gea]'), 'Error should be prefixed with [gea]')
+      assert.ok(err.message.includes('Spread attributes'), 'Error should mention spread attributes')
+      assert.ok(err.message.includes('not supported'), 'Error should say not supported')
+      return true
+    },
+  )
+})
+
+test('spread attributes error includes the element tag name', () => {
+  assert.throws(
+    () =>
+      transformComponentSource(`
+        import { Component } from '@geajs/core'
+
+        export default class Btn extends Component {
+          template() {
+            return <button {...this.attrs}>Click</button>
+          }
+        }
+      `),
+    (err: Error) => {
+      assert.ok(err.message.includes('button'), `Error should include the tag name "button", got: ${err.message}`)
+      return true
+    },
+  )
+})
+
+test('dynamic component tags throw a compile error', () => {
+  assert.throws(
+    () =>
+      transformComponentSource(`
+        import { Component } from '@geajs/core'
+
+        export default class Wrapper extends Component {
+          template() {
+            const Tag = this.as || 'div'
+            return <Tag class="wrapper">Content</Tag>
+          }
+        }
+      `),
+    (err: Error) => {
+      assert.ok(err.message.includes('[gea]'), 'Error should be prefixed with [gea]')
+      assert.ok(err.message.includes('not imported'), 'Error should mention the component is not imported')
+      assert.ok(err.message.includes('Tag'), `Error should include the tag name "Tag", got: ${err.message}`)
+      return true
+    },
+  )
+})
+
+test('imported component tags do not throw dynamic component error', () => {
+  const output = transformComponentSource(
+    `
+      import { Component } from '@geajs/core'
+      import Header from './Header'
+
+      export default class Page extends Component {
+        template() {
+          return (
+            <div>
+              <Header title="Hello" />
+            </div>
+          )
+        }
+      }
+    `,
+    new Set(['Header']),
+  )
+  assert.ok(output, 'Should compile without errors')
+})
+
+test('function-as-child throws a compile error', () => {
+  assert.throws(
+    () =>
+      transformComponentSource(`
+        import { Component } from '@geajs/core'
+
+        export default class App extends Component {
+          template() {
+            return (
+              <div>
+                {(user) => <span>{user.name}</span>}
+              </div>
+            )
+          }
+        }
+      `),
+    (err: Error) => {
+      assert.ok(err.message.includes('[gea]'), 'Error should be prefixed with [gea]')
+      assert.ok(
+        err.message.includes('Function-as-child'),
+        `Error should mention function-as-child, got: ${err.message}`,
+      )
+      return true
+    },
+  )
+})
+
+test('function expression as child also throws', () => {
+  assert.throws(
+    () =>
+      transformComponentSource(`
+        import { Component } from '@geajs/core'
+
+        export default class App extends Component {
+          template() {
+            return (
+              <div>
+                {function(ctx) { return <span>{ctx.name}</span> }}
+              </div>
+            )
+          }
+        }
+      `),
+    (err: Error) => {
+      assert.ok(err.message.includes('Function-as-child'), `Expected function-as-child error, got: ${err.message}`)
+      return true
+    },
+  )
+})
+
+test('named JSX component exports throw a compile error', () => {
+  assert.throws(
+    () => {
+      parseSource(`
+        export const Header = ({ title }) => <h1>{title}</h1>
+        export default function App() {
+          return <div><Header title="hi" /></div>
+        }
+      `)
+    },
+    (err: Error) => {
+      assert.ok(err.message.includes('[gea]'), 'Error should be prefixed with [gea]')
+      assert.ok(err.message.includes('Header'), `Error should include component name, got: ${err.message}`)
+      assert.ok(
+        err.message.includes('Named JSX component export'),
+        `Error should mention named export, got: ${err.message}`,
+      )
+      return true
+    },
+  )
+})
+
+test('named function declaration export returning JSX throws', () => {
+  assert.throws(
+    () => {
+      parseSource(`
+        export function Sidebar() {
+          return <nav>Links</nav>
+        }
+        export default function App() {
+          return <div>Main</div>
+        }
+      `)
+    },
+    (err: Error) => {
+      assert.ok(err.message.includes('Sidebar'), `Error should include "Sidebar", got: ${err.message}`)
+      return true
+    },
+  )
+})
+
+test('named export of non-JSX function does not throw', () => {
+  const result = parseSource(`
+    export const add = (a, b) => a + b
+    export default function App() {
+      return <div>Main</div>
+    }
+  `)
+  assert.ok(result, 'parseSource should succeed for non-JSX named exports')
+})
+
+test('fragments as .map() item roots throw a compile error (key validation catches fragments first)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'gea-frag-test-'))
+  try {
+    const storePath = join(dir, 'store.ts')
+    await writeFile(storePath, 'export default { items: [{ id: 1, term: "a", def: "b" }] }')
+    await assert.rejects(
+      async () =>
+        await transformWithPlugin(
+          `
+            import { Component } from '@geajs/core'
+            import store from './store'
+
+            export default class DefinitionList extends Component {
+              template() {
+                return (
+                  <dl>
+                    {store.items.map(item => (
+                      <>
+                        <dt key={item.id}>{item.term}</dt>
+                        <dd>{item.def}</dd>
+                      </>
+                    ))}
+                  </dl>
+                )
+              }
+            }
+          `,
+          storePath.replace('store.ts', 'DefinitionList.tsx'),
+        ),
+      (err: Error) => {
+        assert.ok(err.message.includes('[gea]'), `Error should be prefixed with [gea], got: ${err.message}`)
+        assert.ok(
+          err.message.includes('key') || err.message.includes('Fragments'),
+          `Error should mention key or fragments, got: ${err.message}`,
+        )
+        return true
+      },
+    )
+  } finally {
+    await rm(dir, { recursive: true })
+  }
+})
+
+test('fragment root in generateRenderItemMethod throws fragment-specific error', async () => {
+  const { generateRenderItemMethod } = await import('../generate-array-render')
+  const fragmentTemplate = t.jsxFragment(
+    t.jsxOpeningFragment(),
+    t.jsxClosingFragment(),
+    [t.jsxElement(t.jsxOpeningElement(t.jsxIdentifier('dt'), []), t.jsxClosingElement(t.jsxIdentifier('dt')), [])],
+  )
+  assert.throws(
+    () =>
+      generateRenderItemMethod(
+        {
+          arrayPathParts: ['items'],
+          itemVariable: 'item',
+          itemIdProperty: 'id',
+          containerBindingId: 'b0',
+          itemTemplate: fragmentTemplate,
+        } as any,
+        new Map(),
+        { value: 0 },
+      ),
+    (err: Error) => {
+      assert.ok(err.message.includes('Fragments'), `Error should mention fragments, got: ${err.message}`)
+      assert.ok(err.message.includes('not supported'), `Error should say not supported, got: ${err.message}`)
+      return true
+    },
+  )
+})
+
+// ---------------------------------------------------------------------------
+// Style object support
+// ---------------------------------------------------------------------------
+
+test('static style object is compiled to inline CSS string', () => {
+  const output = transformComponentSource(`
+    import { Component } from '@geajs/core'
+
+    export default class StyledBox extends Component {
+      template() {
+        return <div style={{ backgroundColor: 'red', padding: '10px', fontSize: '14px' }}>Box</div>
+      }
+    }
+  `)
+  assert.match(output, /background-color:\s*red/, 'camelCase key should be converted to kebab-case')
+  assert.match(output, /padding:\s*10px/, 'padding should appear in output')
+  assert.match(output, /font-size:\s*14px/, 'fontSize should become font-size')
+  assert.ok(!output.includes('[object Object]'), 'Style object should not become [object Object]')
+})
+
+test('dynamic style object generates runtime conversion', () => {
+  const output = transformComponentSource(`
+    import { Component } from '@geajs/core'
+
+    export default class DynStyle extends Component {
+      template() {
+        return <div style={{ color: this.textColor }}>Dynamic</div>
+      }
+    }
+  `)
+  assert.ok(!output.includes('[object Object]'), 'Style object should not become [object Object]')
+  assert.match(output, /Object\.entries/, 'Dynamic style should use Object.entries at runtime')
+})
+
+test('string style attribute still works as before', () => {
+  const output = transformComponentSource(`
+    import { Component } from '@geajs/core'
+
+    export default class InlineStyle extends Component {
+      template() {
+        return <div style="color: blue">Blue text</div>
+      }
+    }
+  `)
+  assert.match(output, /style="color: blue"/, 'String style should pass through unchanged')
+})
+
+// ---------------------------------------------------------------------------
+// IIFE support in JSX
+// ---------------------------------------------------------------------------
+
+test('IIFE returning JSX is detected and transformed', () => {
+  const output = transformComponentSource(`
+    import { Component } from '@geajs/core'
+
+    export default class StatusView extends Component {
+      template() {
+        return (
+          <div>
+            {(() => {
+              if (this.loading) return <span>Loading...</span>
+              return <span>Done</span>
+            })()}
+          </div>
+        )
+      }
+    }
+  `)
+  assert.match(output, /Loading/, 'Loading branch should be in the output')
+  assert.match(output, /Done/, 'Done branch should be in the output')
+  assert.ok(
+    output.includes('<span>') || output.includes('`<span'),
+    'JSX inside IIFE should be converted to template literal strings',
+  )
+})
+
+test('IIFE with multiple return branches containing JSX is transformed', () => {
+  const output = transformComponentSource(`
+    import { Component } from '@geajs/core'
+
+    export default class MultiReturn extends Component {
+      template() {
+        return (
+          <div>
+            {(() => {
+              if (this.status === 'loading') return <span>Loading</span>
+              if (this.status === 'error') return <span>Error</span>
+              return <span>Ready</span>
+            })()}
+          </div>
+        )
+      }
+    }
+  `)
+  assert.match(output, /Loading/, 'Loading branch should appear in output')
+  assert.match(output, /Error/, 'Error branch should appear in output')
+  assert.match(output, /Ready/, 'Ready branch should appear in output')
+})
+
+// ---------------------------------------------------------------------------
+// Chained array methods (.filter().map())
+// ---------------------------------------------------------------------------
+
+test('chained .filter().map() resolves store path for reactivity', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'gea-chain-test-'))
+  try {
+    const storePath = join(dir, 'store.ts')
+    await writeFile(storePath, 'export default { users: [{ id: 1, name: "Alice", active: true }] }')
+    const output = await transformWithPlugin(
+      `
+        import { Component } from '@geajs/core'
+        import store from './store'
+
+        export default class UserList extends Component {
+          template() {
+            return (
+              <ul>
+                {store.users.filter(u => u.active).map(u => (
+                  <li key={u.id}>{u.name}</li>
+                ))}
+              </ul>
+            )
+          }
+        }
+      `,
+      storePath.replace('store.ts', 'UserList.tsx'),
+    )
+    assert.ok(output, 'Should compile without errors')
+    assert.match(
+      output!,
+      /render.*Item|__geaRegisterMap/,
+      'Should generate a render item method or register a map for the chained array',
+    )
+    assert.ok(
+      output!.includes('.filter(') || output!.includes('.filter(u'),
+      'Filter call should be preserved in the output',
+    )
+  } finally {
+    await rm(dir, { recursive: true })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// ref attribute support
+// ---------------------------------------------------------------------------
+
+test('ref attribute generates data-gea-ref marker and __setupRefs method', () => {
+  const output = transformComponentSource(`
+    import { Component } from '@geajs/core'
+
+    export default class Canvas extends Component {
+      template() {
+        return <canvas ref={this.canvasEl} width="800" height="600" />
+      }
+    }
+  `)
+  assert.match(output, /data-gea-ref="ref0"/, 'Should emit data-gea-ref marker attribute')
+  assert.match(output, /__setupRefs/, 'Should generate __setupRefs method')
+  assert.match(output, /querySelector.*data-gea-ref/, 'Should query for data-gea-ref elements in __setupRefs')
+  assert.ok(!/ ref="[^"]*"/.test(output.replace(/data-gea-ref="[^"]*"/g, '')), 'ref should not be emitted as a bare HTML attribute')
+})
+
+test('multiple ref attributes get unique IDs', () => {
+  const output = transformComponentSource(`
+    import { Component } from '@geajs/core'
+
+    export default class Dual extends Component {
+      template() {
+        return (
+          <div>
+            <canvas ref={this.canvas} />
+            <input ref={this.input} />
+          </div>
+        )
+      }
+    }
+  `)
+  assert.match(output, /data-gea-ref="ref0"/, 'First ref should get ref0')
+  assert.match(output, /data-gea-ref="ref1"/, 'Second ref should get ref1')
+  assert.match(output, /__setupRefs/, 'Should generate __setupRefs method')
+})
+
+// ---------------------------------------------------------------------------
+// escapeHtml single-quote coverage
+// ---------------------------------------------------------------------------
+
+test('static text with single quotes is escaped as &#39;', () => {
+  const output = transformComponentSource(`
+    import { Component } from '@geajs/core'
+
+    export default class Quote extends Component {
+      template() {
+        return <div>{"it's a test"}</div>
+      }
+    }
+  `)
+  assert.match(output, /it&#39;s a test/, "Single quote should be escaped to &#39;")
+})
+
+// ---------------------------------------------------------------------------
+// JSXNamespacedName handling
+// ---------------------------------------------------------------------------
+
+test('getJSXTagName handles namespaced names', () => {
+  const name = t.jsxNamespacedName(t.jsxIdentifier('xlink'), t.jsxIdentifier('href'))
+  assert.equal(getJSXTagName(name), 'xlink:href')
+})
+
+test('getJSXTagName handles simple identifier', () => {
+  const name = t.jsxIdentifier('div')
+  assert.equal(getJSXTagName(name), 'div')
+})
+
+test('getJSXTagName handles member expression', () => {
+  const name = t.jsxMemberExpression(t.jsxIdentifier('React'), t.jsxIdentifier('Fragment'))
+  assert.equal(getJSXTagName(name), 'React.Fragment')
+})
+
+// ---------------------------------------------------------------------------
+// HMR getter safety
+// ---------------------------------------------------------------------------
+
+test('HMR runtime skips accessor properties during state snapshot', () => {
+  const plugin = geaPlugin()
+  const load = typeof plugin.load === 'function' ? plugin.load : plugin.load?.handler
+  const hmrSource = load?.call({} as never, '\0virtual:gea-hmr') as string | undefined
+  assert.ok(hmrSource, 'HMR virtual module should return source code')
+  assert.match(
+    hmrSource!,
+    /getOwnPropertyDescriptor/,
+    'HMR runtime should use getOwnPropertyDescriptor to check for accessors',
+  )
+  assert.match(
+    hmrSource!,
+    /__desc\.get\s*\|\|\s*__desc\.set|__desc\s*&&\s*\(__desc\.get\s*\|\|\s*__desc\.set\)/,
+    'HMR runtime should skip properties with get/set descriptors',
+  )
 })
