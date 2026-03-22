@@ -115,6 +115,19 @@ interface StoreChange {
 }
 ```
 
+### silent(fn)
+
+Executes a function that may mutate the store without triggering observers. Pending changes are discarded after the function returns.
+
+```ts
+store.silent(() => {
+  store.items.splice(fromIndex, 1)
+  store.items.splice(toIndex, 0, draggedItem)
+})
+```
+
+Useful for drag-and-drop, bulk imports, or any case where you manage DOM updates yourself.
+
 ### Intercepted Array Methods
 
 | Method | Change type |
@@ -352,7 +365,7 @@ Compiled into `<template>` markers with swap logic.
 </ul>
 ```
 
-The `key` prop is required. Gea uses `applyListChanges` for efficient add, delete, append, reorder, and swap operations.
+The `key` prop is required. Gea uses `applyListChanges` for efficient add, delete, append, reorder, and swap operations. By default the runtime uses `item.id` when available. You can use any property as the key (`key={option.value}`), or the item itself for primitives (`key={tag}`).
 
 ---
 
@@ -441,20 +454,25 @@ Both class components and function components are supported. Matched params are 
 
 ### `Link`
 
-Renders an `<a>` tag for SPA navigation. Clicks call `router.navigate()` instead of triggering a full page reload.
+Renders an `<a>` tag for SPA navigation. Left-clicks call `router.push()` (or `router.replace()` with the `replace` prop) instead of triggering a full page reload. Modifier-key clicks (Cmd, Ctrl, Shift, Alt), non-left-button clicks, and external URLs pass through to the browser.
 
 | Prop | Type | Required | Description |
 | --- | --- | --- | --- |
 | `to` | `string` | Yes | Target path |
-| `label` | `string` | Yes | Text content of the link |
+| `label` | `string` | No | Text content (alternative to children) |
+| `children` | `string` | No | Inner HTML content: `<Link to="/about">About</Link>` |
 | `class` | `string` | No | CSS class(es) for the `<a>` tag |
+| `replace` | `boolean` | No | Use `router.replace()` instead of `router.push()` |
+| `target` | `string` | No | Link target (e.g. `_blank`) |
+| `rel` | `string` | No | Link relationship (e.g. `noopener`) |
+| `onNavigate` | `(e: MouseEvent) => void` | No | Callback fired before SPA navigation |
 
 ```jsx
 <Link to="/about" label="About" />
-<Link to="/users/1" label="Alice" class="nav-link" />
+<Link to="/about">About</Link>
+<Link to="/users/1" class="nav-link">Alice</Link>
+<Link to="/external" target="_blank" rel="noopener">Docs</Link>
 ```
-
-Modifier keys (Cmd, Ctrl, Shift, Alt) preserve native browser behavior (open in new tab, etc.).
 
 ---
 

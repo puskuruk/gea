@@ -31,6 +31,7 @@
 - [Styled Components](gea-ui/styled-components.md)
 - [Interactive Components](gea-ui/interactive-components.md)
 - [Theming](gea-ui/theming.md)
+- [Drag and Drop](gea-ui/drag-and-drop.md)
 - [Architecture](gea-ui/architecture.md)
 - [Component Showcase](gea-ui/showcase.md)
 

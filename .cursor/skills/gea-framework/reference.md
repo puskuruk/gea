@@ -19,6 +19,7 @@
 - [ViewManager](#viewmanager)
 - [GestureHandler](#gesturehandler)
 - [UI Components](#ui-components)
+- [Drag and Drop](#drag-and-drop)
 - [Project Setup](#project-setup)
 
 ---
@@ -148,6 +149,19 @@ interface StoreChange {
   otherIndex?: number // for swap
 }
 ```
+
+### silent(fn)
+
+Executes a function that may mutate the store without triggering observers. Pending changes are discarded after the function returns.
+
+```ts
+store.silent(() => {
+  store.items.splice(fromIndex, 1)
+  store.items.splice(toIndex, 0, draggedItem)
+})
+```
+
+Useful for drag-and-drop, bulk imports, or any case where you manage DOM updates yourself.
 
 ### Intercepted Array Methods
 
@@ -601,6 +615,22 @@ Use `.map()` with a `key` prop to render arrays:
 
 The `key` prop is required for efficient list diffing. Gea uses `applyListChanges` internally to handle add, delete, append, reorder, and swap operations without re-rendering the entire list.
 
+By default the runtime uses `item.id` when available. You can use any property as the key:
+
+```jsx
+{options.map(option => (
+  <li key={option.value}>{option.label}</li>
+))}
+```
+
+When items are primitives, use the item itself:
+
+```jsx
+{tags.map(tag => (
+  <span key={tag}>{tag}</span>
+))}
+```
+
 Callbacks inside `.map()` use event delegation — the framework resolves which array item was targeted using `data-gea-item-id` attributes.
 
 ---
@@ -852,6 +882,7 @@ Options (for `createRouter` or `new Router(routes, options)`):
 | ------------------- | ------------------------------------------------------------------ |
 | `setRoutes(routes)`  | Set or replace the route config and re-resolve the current URL.   |
 | `push(target)`      | Push a new history entry.                                          |
+| `navigate(target)`  | Alias for `push`.                                                  |
 | `replace(target)`   | Replace the current history entry.                                 |
 | `back()`            | Go back one entry.                                                 |
 | `forward()`         | Go forward one entry.                                              |
@@ -998,27 +1029,34 @@ An older component that renders the first matching route from a `routes` array. 
 
 ### `Link`
 
-A component that renders an `<a>` tag for SPA navigation. Clicks call `router.navigate()` instead of triggering a full page reload.
+A component that renders an `<a>` tag for SPA navigation. Left-clicks call `router.push()` (or `router.replace()` with the `replace` prop) instead of triggering a full page reload. Modifier-key clicks, non-left-button clicks, and external URLs pass through to the browser.
 
 **Props:**
 
-| Prop    | Type     | Required | Description                       |
-| ------- | -------- | -------- | --------------------------------- |
-| `to`    | `string` | Yes      | Target path.                      |
-| `label` | `string` | Yes      | Text content of the link.         |
-| `class` | `string` | No       | CSS class(es) for the `<a>` tag.  |
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `to` | `string` | Yes | Target path |
+| `label` | `string` | No | Text content (alternative to children) |
+| `children` | `string` | No | Inner HTML: `<Link to="/about">About</Link>` |
+| `class` | `string` | No | CSS class(es) for the `<a>` tag |
+| `replace` | `boolean` | No | Use `router.replace()` instead of `router.push()` |
+| `target` | `string` | No | Link target (e.g. `_blank`) |
+| `rel` | `string` | No | Link relationship (e.g. `noopener`) |
+| `onNavigate` | `(e: MouseEvent) => void` | No | Callback fired before SPA navigation |
 
 **Usage:**
 
 ```jsx
 <Link to="/about" label="About" />
-<Link to="/users/1" label="Alice" class="nav-link" />
+<Link to="/about">About</Link>
+<Link to="/users/1" class="nav-link">Alice</Link>
+<Link to="/external" target="_blank" rel="noopener">Docs</Link>
 ```
 
 **Behavior:**
 
-- Renders `<a href="/about">About</a>` with a click handler that calls `router.navigate(to)`.
-- Modifier keys (Cmd, Ctrl, Shift, Alt) are detected — the browser's native behavior (open in new tab, etc.) is preserved.
+- Renders `<a href="/about">About</a>` with a click handler that calls `router.push(to)`.
+- Only intercepts left-clicks without modifier keys (Cmd, Ctrl, Shift, Alt). Modified clicks and non-left-button clicks pass through to the browser.
 - The `href` attribute is always set, so right-click → "Open in new tab" works, and the URL is visible on hover.
 
 ### Full Example
@@ -1234,6 +1272,78 @@ class MyView extends View {
 | `NavBar`         | Top navigation bar                                               |
 | `PullToRefresh`  | Pull-down-to-refresh pattern                                     |
 | `InfiniteScroll` | Load more content on scroll                                      |
+
+---
+
+## Drag and Drop
+
+`@geajs/ui` provides a pointer-event-based DnD system. Import `dndManager` (singleton) or use the wrapper components.
+
+### Data Attribute Approach
+
+Add `data-draggable-id` to draggable elements and `data-droppable-id` to containers:
+
+```tsx
+import { dndManager } from '@geajs/ui'
+
+export default class Board extends Component {
+  created() {
+    dndManager.onDragEnd = (result) => {
+      store.moveItem(result.draggableId, result.destination.droppableId, result.destination.index)
+    }
+  }
+
+  dispose() {
+    dndManager.onDragEnd = null
+    super.dispose()
+  }
+
+  template() {
+    return (
+      <div>
+        <div data-droppable-id="column-1">
+          {items.map(item => (
+            <div key={item.id} data-draggable-id={item.id}>{item.title}</div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+}
+```
+
+### Component Approach
+
+```tsx
+import { DragDropContext, Droppable, Draggable } from '@geajs/ui'
+
+<DragDropContext onDragEnd={(r) => this.handleDragEnd(r)}>
+  <Droppable droppableId="list">
+    {items.map(item => (
+      <Draggable key={item.id} draggableId={item.id}>{item.title}</Draggable>
+    ))}
+  </Droppable>
+</DragDropContext>
+```
+
+### DragResult
+
+```ts
+interface DragResult {
+  draggableId: string
+  source: { droppableId: string; index: number }
+  destination: { droppableId: string; index: number }
+}
+```
+
+### Key behaviors
+
+- 5px drag threshold before drag starts (clicks still work)
+- Escape cancels the drag
+- Animated placeholders show drop position
+- Real DOM element is moved on drop
+- Use `Store.silent()` when reordering store arrays in `onDragEnd` to avoid redundant DOM patches
+- Style the placeholder with `.gea-dnd-placeholder`
 
 ---
 

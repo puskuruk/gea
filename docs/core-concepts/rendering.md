@@ -47,6 +47,22 @@ The `key` prop is **required** for efficient list diffing. Gea uses `applyListCh
 
 Only the DOM nodes that actually changed are touched — unchanged items stay in place.
 
+The `key` value defaults to `item.id` when present. You can use any property as the key:
+
+```jsx
+{options.map(option => (
+  <li key={option.value}>{option.label}</li>
+))}
+```
+
+When the items themselves are primitives (strings, numbers), use the item directly as the key:
+
+```jsx
+{tags.map(tag => (
+  <span key={tag}>{tag}</span>
+))}
+```
+
 Callbacks inside `.map()` use event delegation. The framework resolves which array item was targeted using `data-gea-item-id` attributes that the Vite plugin generates automatically.
 
 ## Initial Rendering

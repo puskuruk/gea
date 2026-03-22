@@ -85,10 +85,22 @@ Backed by Zag.js state machines — full keyboard navigation, ARIA attributes, a
 | [Toast](interactive-components.md#toast) | Temporary notification messages |
 | [Tree View](interactive-components.md#tree-view) | Hierarchical tree |
 
+### Drag and Drop
+
+A pointer-event-based drag-and-drop system that moves real DOM elements across containers.
+
+| Export | Purpose |
+| --- | --- |
+| [dndManager](drag-and-drop.md) | Singleton that manages all drag interactions |
+| [DragDropContext](drag-and-drop.md#dragdropcontext) | Wrapper component that owns the drag lifecycle |
+| [Droppable](drag-and-drop.md#droppable) | Drop target container |
+| [Draggable](drag-and-drop.md#draggable) | Draggable item wrapper |
+
 ## Next Steps
 
 - [Getting Started](getting-started.md) — Tailwind CSS setup and configuration
 - [Styled Components](styled-components.md) — Button, Card, Input, and more
 - [Interactive Components](interactive-components.md) — Dialog, Tabs, Select, and more
+- [Drag and Drop](drag-and-drop.md) — Sortable lists and kanban boards
 - [Theming](theming.md) — CSS variables, dark mode, and custom styling
 - [Architecture](architecture.md) — How `ZagComponent` bridges Zag.js and Gea

@@ -70,12 +70,25 @@ export default defineConfig({
         ],
       },
       {
+        text: 'Gea Router',
+        items: [
+          { text: 'Overview', link: '/gea-router/overview' },
+          { text: 'Getting Started', link: '/gea-router/getting-started' },
+          { text: 'Route Configuration', link: '/gea-router/route-config' },
+          { text: 'Navigation', link: '/gea-router/navigation' },
+          { text: 'Layouts', link: '/gea-router/layouts' },
+          { text: 'Guards', link: '/gea-router/guards' },
+          { text: 'Type Safety', link: '/gea-router/type-safety' },
+        ],
+      },
+      {
         text: 'Gea UI',
         items: [
           { text: 'Overview', link: '/gea-ui/overview' },
           { text: 'Getting Started', link: '/gea-ui/getting-started' },
           { text: 'Styled Components', link: '/gea-ui/styled-components' },
           { text: 'Interactive Components', link: '/gea-ui/interactive-components' },
+          { text: 'Drag and Drop', link: '/gea-ui/drag-and-drop' },
           { text: 'Theming', link: '/gea-ui/theming' },
           { text: 'Architecture', link: '/gea-ui/architecture' },
           { text: 'Component Showcase', link: '/gea-ui/showcase' },

@@ -129,6 +129,19 @@ unsubscribe()
 
 **Returns:** `() => void` — call to unsubscribe.
 
+## silent(fn)
+
+Executes a function that may mutate the store without triggering any observers. Pending changes are discarded after the function returns. Normal reactivity resumes for mutations made after `silent()` completes.
+
+```ts
+store.silent(() => {
+  store.items.splice(fromIndex, 1)
+  store.items.splice(toIndex, 0, draggedItem)
+})
+```
+
+This is useful for drag-and-drop reordering, bulk imports, or any scenario where you handle the DOM updates yourself and don't want the framework to patch the DOM redundantly.
+
 ## Multiple Stores
 
 Split state into domain-specific stores when different concerns are independent:

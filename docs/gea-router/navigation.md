@@ -33,6 +33,14 @@ router.replace({
 })
 ```
 
+### navigate
+
+Alias for `push`. Use whichever reads better in context.
+
+```ts
+router.navigate('/projects/42')
+```
+
 ### back, forward, go
 
 ```ts
@@ -51,13 +59,26 @@ These map directly to `history.back()`, `history.forward()`, and `history.go()`.
 
 ## Link Component
 
-`Link` renders an `<a>` tag with the correct `href`. It intercepts clicks and calls `router.push`. Modifier-key clicks (ctrl, meta, shift) and external URLs pass through to the browser.
+`Link` renders an `<a>` tag with the correct `href`. It intercepts left-clicks and calls `router.push` (or `router.replace` with the `replace` prop). Modifier-key clicks (ctrl, meta, shift, alt), non-left-button clicks, and external URLs (`http://`, `https://`) pass through to the browser.
 
 ```tsx
 import { Link } from '@geajs/core'
 
 <Link to="/dashboard">Dashboard</Link>
 ```
+
+### Props
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `to` | `string` | Target path (required) |
+| `label` | `string` | Text content (alternative to children) |
+| `children` | `string` | Inner HTML: `<Link to="/about">About</Link>` |
+| `class` | `string` | CSS class(es) |
+| `replace` | `boolean` | Use `router.replace()` instead of `router.push()` |
+| `target` | `string` | Link target (e.g. `_blank`) |
+| `rel` | `string` | Link relationship (e.g. `noopener`) |
+| `onNavigate` | `(e: MouseEvent) => void` | Callback fired before SPA navigation |
 
 ### replace
 
@@ -67,12 +88,20 @@ Use the `replace` prop to call `router.replace` instead of `router.push`.
 <Link to="/login" replace>Sign in</Link>
 ```
 
-### Styling
+### External links
 
-`Link` is a plain `<a>` tag. Pass any attribute you'd put on an anchor.
+Use `target` and `rel` for links that should open in a new tab:
 
 ```tsx
-<Link to="/about" class="nav-link" id="about-link">About</Link>
+<Link to="https://docs.example.com" target="_blank" rel="noopener">Docs</Link>
+```
+
+### Styling
+
+`Link` is a plain `<a>` tag. Pass `class` for styling.
+
+```tsx
+<Link to="/about" class="nav-link">About</Link>
 ```
 
 ### Recommendations
