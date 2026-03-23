@@ -185,7 +185,8 @@ export class Router<T extends RouteMap = RouteMap> extends Store {
   }
 
   isActive(path: string): boolean {
-    return this.path.startsWith(path)
+    if (path === '/') return this.path === '/'
+    return this.path === path || this.path.startsWith(path + '/')
   }
 
   isExact(path: string): boolean {

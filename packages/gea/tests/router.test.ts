@@ -192,8 +192,8 @@ describe('GeaRouter', () => {
     router.dispose()
   })
 
-  // 6. isActive() returns true for prefix match
-  it('isActive() returns true for prefix match', async () => {
+  // 6. isActive() uses segment-aware prefix match
+  it('isActive() uses segment-aware prefix match', async () => {
     const { GeaRouter } = await loadModules()
 
     const routes = {
@@ -206,6 +206,12 @@ describe('GeaRouter', () => {
     assert.equal(router.isActive('/users'), true)
     assert.equal(router.isActive('/users/42'), true)
     assert.equal(router.isActive('/about'), false)
+    // "/" must not match everything — only exact "/"
+    assert.equal(router.isActive('/'), false)
+
+    router.push('/')
+    assert.equal(router.isActive('/'), true)
+    assert.equal(router.isActive('/users'), false)
     router.dispose()
   })
 

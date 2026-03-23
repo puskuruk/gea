@@ -17,7 +17,7 @@ export default class App extends Component {
     return (
       <div class="app">
         <nav class="nav">
-          <Link to="/" label="Home" exact class={router.isExact('/') ? 'nav-link active' : 'nav-link'} />
+          <Link to="/" label="Home" exact class={router.isActive('/') ? 'nav-link active' : 'nav-link'} />
           <Link to="/about" label="About" class={router.isActive('/about') ? 'nav-link active' : 'nav-link'} />
           <Link to="/users/1" label="Alice" class={router.isActive('/users/1') ? 'nav-link active' : 'nav-link'} />
           <Link to="/users/2" label="Bob" class={router.isActive('/users/2') ? 'nav-link active' : 'nav-link'} />

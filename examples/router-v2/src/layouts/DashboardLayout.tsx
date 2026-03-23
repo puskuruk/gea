@@ -10,7 +10,7 @@ export default class DashboardLayout extends Component {
             <Link
               to="/dashboard"
               label="Overview"
-              class={router.isExact('/dashboard') ? 'sidebar-link active' : 'sidebar-link'}
+              class={router.isActive('/dashboard') ? 'sidebar-link active' : 'sidebar-link'}
             />
             <Link
               to="/dashboard/projects"

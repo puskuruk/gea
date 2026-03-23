@@ -115,8 +115,8 @@ test.describe('router-simple navigation and surgical DOM updates', () => {
     }
   })
 
-  test('router.isActive and router.isExact toggle active classes correctly', async ({ page }) => {
-    // At /, Home link must be active (uses isExact)
+  test('router.isActive toggles active classes correctly for all routes including /', async ({ page }) => {
+    // At /, Home link must be active (isActive uses segment-aware matching)
     await expect(page.locator('.nav a.active')).toHaveText('Home')
 
     // Navigate to /users/1 — Alice link must be active
