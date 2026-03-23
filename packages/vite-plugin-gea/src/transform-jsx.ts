@@ -309,7 +309,15 @@ function expressionMayBeFalsy(expr: t.Expression): boolean {
 /** True if expression can evaluate to boolean at runtime (so we need === false check). */
 function canBeBoolean(expr: t.Expression): boolean {
   if (t.isNumericLiteral(expr) || t.isStringLiteral(expr) || t.isTemplateLiteral(expr)) return false
+  if (t.isConditionalExpression(expr)) return canBeBoolean(expr.consequent) || canBeBoolean(expr.alternate)
   return true
+}
+
+/** True if expression is guaranteed to never produce null, undefined, or false at runtime. */
+function isAlwaysTruthy(expr: t.Expression): boolean {
+  if (t.isStringLiteral(expr) || t.isNumericLiteral(expr) || t.isTemplateLiteral(expr)) return true
+  if (t.isConditionalExpression(expr)) return isAlwaysTruthy(expr.consequent) && isAlwaysTruthy(expr.alternate)
+  return false
 }
 
 /** Build condition to skip attribute when value is null, undefined, or false. */
@@ -318,6 +326,9 @@ function buildAttrSkipCondition(expr: t.Expression, rawExpr: t.Expression): t.Ex
     return rawExpr.value ? t.booleanLiteral(false) : t.booleanLiteral(true)
   }
   if (t.isNumericLiteral(rawExpr) || t.isStringLiteral(rawExpr)) {
+    return t.booleanLiteral(false)
+  }
+  if (isAlwaysTruthy(rawExpr)) {
     return t.booleanLiteral(false)
   }
   const needsFalseCheck = canBeBoolean(rawExpr)
@@ -872,10 +883,12 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
     (attr) => t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name) && attr.name.name === 'id',
   )
   let html = `<${effectiveTag}`
+  let hasBindingId = false
   if (ctx.isRoot) {
     parts.push({ type: 'string', value: html + ' id="' })
     parts.push({ type: 'expression', value: t.memberExpression(t.thisExpression(), t.identifier('id')) })
     html = '"'
+    hasBindingId = true
   } else {
     const rawPathKey = elementPath.join(' > ')
     const pathKey = ctx.elementPathPrefix ? ctx.elementPathPrefix + ' > ' + rawPathKey : rawPathKey
@@ -891,6 +904,7 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
         ),
       })
       html = '"'
+      hasBindingId = true
     }
   }
   if (ctx.inMapCallback && elementPath.length === 0 && ctx.mapItemVariable) {
@@ -935,6 +949,7 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
     if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name)) return
     const attrName = attr.name.name
     if (attrName === 'key') return
+    if (attrName === 'id' && hasBindingId) return
     if (attrName === 'ref') {
       const attrValue = attr.value
       if (
@@ -1111,21 +1126,28 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
         const skipCondition = buildAttrSkipCondition(expr, rawExpr)
         const templateExpr =
           propAttrName === 'class' ? t.callExpression(t.memberExpression(expr, t.identifier('trim')), []) : expr
-        parts.push({
-          type: 'expression',
-          value: t.conditionalExpression(
-            skipCondition,
-            t.stringLiteral(''),
-            t.templateLiteral(
-              [
-                t.templateElement({ raw: ` ${propAttrName}="`, cooked: ` ${propAttrName}="` }, false),
-                t.templateElement({ raw: '"', cooked: '"' }, true),
-              ],
-              [templateExpr],
+        if (t.isBooleanLiteral(skipCondition) && !skipCondition.value) {
+          // Attribute is always present — inline it without a conditional wrapper
+          parts.push({ type: 'string', value: ` ${propAttrName}="` })
+          parts.push({ type: 'expression', value: templateExpr })
+          html = '"'
+        } else {
+          parts.push({
+            type: 'expression',
+            value: t.conditionalExpression(
+              skipCondition,
+              t.stringLiteral(''),
+              t.templateLiteral(
+                [
+                  t.templateElement({ raw: ` ${propAttrName}="`, cooked: ` ${propAttrName}="` }, false),
+                  t.templateElement({ raw: '"', cooked: '"' }, true),
+                ],
+                [templateExpr],
+              ),
             ),
-          ),
-        })
-        html = ''
+          })
+          html = ''
+        }
       }
     } else if (t.isStringLiteral(attrValue)) {
       html += ` ${propAttrName}="${attrValue.value}"`

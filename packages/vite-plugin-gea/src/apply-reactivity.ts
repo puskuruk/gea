@@ -576,6 +576,24 @@ export function applyStaticReactivity(
             })
           }
 
+          // Deduplicate: when a store key has both stateOnly and non-stateOnly
+          // bindings for the same element (selector + type), keep only the
+          // stateOnly ones.  The non-stateOnly derived bindings already handle
+          // prop changes via __onPropChange; including them here would produce
+          // duplicate DOM-patch blocks inside the store observer method.
+          for (const [, bindings] of storeKeyToBindings) {
+            const hasStateOnly = [...bindings].some((b) => b.stateOnly)
+            if (!hasStateOnly) continue
+            for (const pb of bindings) {
+              if (pb.stateOnly) continue
+              // A stateOnly counterpart covers this element — drop the duplicate.
+              const dup = [...bindings].some(
+                (b) => b.stateOnly && b.selector === pb.selector && b.type === pb.type,
+              )
+              if (dup) bindings.delete(pb)
+            }
+          }
+
           handlers.forEach((method, observeKey) => {
             mergeObserveMethod(observeKey, method)
           })
@@ -2058,22 +2076,33 @@ export function applyStaticReactivity(
               })
             })
 
+            // Consolidate map sync observers: when multiple observers for the
+            // same delegate+store combination exist, keep only the shortest
+            // path prefix.  The store's notification system walks down the path
+            // tree, so observing ["tasks"] already fires on any descendant
+            // change (e.g. tasks.*.title).  Registering deeper paths is
+            // redundant work — extra observer nodes, extra handler invocations,
+            // all calling the same __geaSyncMap delegate.
+            const consolidatedMapSync = new Map<string, typeof mapSyncObservers[0]>()
             for (const obs of mapSyncObservers) {
-              // If the observed path is a store getter, observe its dependencies instead
-              // so that mutations to the underlying data trigger the map sync
+              // Resolve getters to their underlying dep paths first
+              let resolvedPaths: PathParts[] = [obs.pathParts]
               if (obs.pathParts.length === 1) {
                 const storeRef = stateRefs.get(obs.storeVar)
                 const getterDepPaths = storeRef?.getterDeps?.get(obs.pathParts[0])
                 if (getterDepPaths && getterDepPaths.length > 0) {
-                  for (const depPath of getterDepPaths) {
-                    ensureStoreGroup(obs.storeVar).observeHandlers.set(
-                      `__mapSync_${obs.delegateName}_dep_${depPath.join('_')}`,
-                      { pathParts: depPath, methodName: obs.delegateName },
-                    )
-                  }
-                  continue
+                  resolvedPaths = getterDepPaths
                 }
               }
+              for (const rp of resolvedPaths) {
+                const groupKey = `${obs.storeVar}:${obs.delegateName}`
+                const existing = consolidatedMapSync.get(groupKey)
+                if (!existing || rp.length < existing.pathParts.length) {
+                  consolidatedMapSync.set(groupKey, { ...obs, pathParts: rp })
+                }
+              }
+            }
+            for (const obs of consolidatedMapSync.values()) {
               ensureStoreGroup(obs.storeVar).observeHandlers.set(
                 `__mapSync_${obs.delegateName}_${obs.pathParts.join('_')}`,
                 { pathParts: obs.pathParts, methodName: obs.delegateName },
@@ -2139,7 +2168,8 @@ export function applyStaticReactivity(
                   generateLocalStateObserverSetup(Array.from(localObserveHandlers.values())),
                 )
               }
-              ensureObserverDispose(classPath.node.body)
+              // Observer cleanup is handled by the parent Component.dispose(),
+              // so we no longer generate a redundant ensureObserverDispose here.
             }
           }
         },
@@ -3110,6 +3140,30 @@ function injectMapItemAttrsIntoTemplate(
 
       const rootTL = findRootTemplateLiteral(t.isBlockStatement(fn.body) ? fn.body : fn.body)
       if (!rootTL) return
+
+      // Strip any existing data-gea-item-id from the template literal (the JSX
+      // transform may have added one with a different item-id expression).
+      // Pattern in quasis: `... data-gea-item-id="` ${expr} `"...`
+      for (let qi = 0; qi < rootTL.quasis.length; qi++) {
+        const raw = rootTL.quasis[qi].value.raw
+        const attrIdx = raw.indexOf(' data-gea-item-id="')
+        if (attrIdx === -1) continue
+        // Strip the attribute suffix from this quasi
+        const before = raw.substring(0, attrIdx)
+        // The next quasi starts with `"` — strip that prefix
+        const nextRaw = rootTL.quasis[qi + 1]?.value.raw
+        if (nextRaw !== undefined && nextRaw.startsWith('"')) {
+          const after = nextRaw.substring(1)
+          rootTL.quasis[qi] = t.templateElement(
+            { raw: before + after, cooked: before + after },
+            rootTL.quasis[qi + 1].tail,
+          )
+          rootTL.quasis.splice(qi + 1, 1)
+          rootTL.expressions.splice(qi, 1)
+        }
+        break
+      }
+
       const first = rootTL.quasis[0].value.raw
       const tagMatch = first.match(/^(<[\w-]+)/)
       if (!tagMatch) return

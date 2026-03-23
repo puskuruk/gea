@@ -160,7 +160,10 @@ test('ref attribute generates data-gea-ref marker and __setupRefs method', () =>
   assert.match(output, /data-gea-ref="ref0"/, 'Should emit data-gea-ref marker attribute')
   assert.match(output, /__setupRefs/, 'Should generate __setupRefs method')
   assert.match(output, /querySelector.*data-gea-ref/, 'Should query for data-gea-ref elements in __setupRefs')
-  assert.ok(!/ ref="[^"]*"/.test(output.replace(/data-gea-ref="[^"]*"/g, '')), 'ref should not be emitted as a bare HTML attribute')
+  assert.ok(
+    !/ ref="[^"]*"/.test(output.replace(/data-gea-ref="[^"]*"/g, '')),
+    'ref should not be emitted as a bare HTML attribute',
+  )
 })
 
 test('multiple ref attributes get unique IDs', () => {
@@ -213,4 +216,32 @@ test('HMR runtime skips accessor properties during state snapshot', () => {
     /__desc\.get\s*\|\|\s*__desc\.set|__desc\s*&&\s*\(__desc\.get\s*\|\|\s*__desc\.set\)/,
     'HMR runtime should skip properties with get/set descriptors',
   )
+})
+
+test('plugin skips HMR injection for build transforms', async () => {
+  const plugin = geaPlugin()
+  const configResolved =
+    typeof plugin.configResolved === 'function' ? plugin.configResolved : plugin.configResolved?.handler
+  await configResolved?.call({} as never, { command: 'build' } as never)
+  const transform = typeof plugin.transform === 'function' ? plugin.transform : plugin.transform?.handler
+
+  const result = await transform?.call(
+    {} as never,
+    `
+      import { Component } from '@geajs/core'
+
+      export default class App extends Component {
+        template() {
+          return <div>Hello</div>
+        }
+      }
+    `,
+    '/virtual/build-app.jsx',
+  )
+  const output = typeof result === 'string' ? result : result?.code
+
+  assert.ok(output, 'component should still be transformed during build')
+  assert.doesNotMatch(output!, /virtual:gea-hmr/, 'build output should not import the HMR runtime')
+  assert.doesNotMatch(output!, /import\.meta\.hot/, 'build output should not include HMR guards')
+  assert.doesNotMatch(output!, /import\.meta\.url/, 'build output should not retain HMR module URLs')
 })

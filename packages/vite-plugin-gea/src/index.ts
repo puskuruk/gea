@@ -1,18 +1,19 @@
-import type { Plugin } from 'vite'
+import type { Plugin, ResolvedConfig } from 'vite'
+import babelGenerator from '@babel/generator'
+import babelTraverse from '@babel/traverse'
 import { parseSource } from './parse.ts'
 import { injectHMR } from './hmr.ts'
 import { transformComponentFile, transformNonComponentJSX } from './transform-component.ts'
 import { convertFunctionalToClass } from './transform-functional.ts'
 import { isComponentTag } from './utils.ts'
-import { createRequire } from 'module'
 import { dirname, relative, resolve } from 'node:path'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-const require = createRequire(import.meta.url)
 const pluginDir = dirname(fileURLToPath(import.meta.url))
-const traverse = require('@babel/traverse').default
-const generate = require('@babel/generator').default
+const traverse = typeof (babelTraverse as any).default === 'function' ? (babelTraverse as any).default : babelTraverse
+const generate =
+  typeof (babelGenerator as any).default === 'function' ? (babelGenerator as any).default : babelGenerator
 
 const RECONCILE_ID = 'virtual:gea-reconcile'
 const RESOLVED_RECONCILE_ID = '\0' + RECONCILE_ID
@@ -252,6 +253,7 @@ function isComponentImportSource(source: string): boolean {
 export function geaPlugin(): Plugin {
   const storeModules = new Set<string>()
   const componentModules = new Set<string>()
+  let isServeCommand = true
 
   const resolveImportPath = (importer: string, source: string): string | null => {
     const base = resolve(dirname(importer), source)
@@ -318,6 +320,9 @@ export function geaPlugin(): Plugin {
   return {
     name: 'gea-plugin',
     enforce: 'pre',
+    configResolved(config: ResolvedConfig) {
+      isServeCommand = config.command === 'serve'
+    },
     config(config) {
       if (!existsSync(envPath)) return
       const cwd = process.cwd()
@@ -467,15 +472,17 @@ export function geaPlugin(): Plugin {
           }
         }
 
-        const hmrAdded = injectHMR(
-          ast,
-          componentClassName,
-          componentImports,
-          componentImportsUsedAsTags,
-          isDefaultExport,
-          HMR_RUNTIME_ID,
-        )
-        if (hmrAdded) transformed = true
+        if (isServeCommand) {
+          const hmrAdded = injectHMR(
+            ast,
+            componentClassName,
+            componentImports,
+            componentImportsUsedAsTags,
+            isDefaultExport,
+            HMR_RUNTIME_ID,
+          )
+          if (hmrAdded) transformed = true
+        }
 
         if (!transformed) return null
         const output = generate(ast, { sourceMaps: true, sourceFileName: cleanId }, code)

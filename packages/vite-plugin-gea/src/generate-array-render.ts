@@ -136,12 +136,31 @@ function buildValueUnwrapHelper(): t.VariableDeclaration {
   ` as t.VariableDeclaration
 }
 
+/** True when an AST node is a known-primitive literal (string, number,
+ *  boolean, null, undefined) that can never be a proxy-wrapped object. */
+function isKnownPrimitive(node: t.Expression): boolean {
+  return (
+    t.isStringLiteral(node) ||
+    t.isNumericLiteral(node) ||
+    t.isBooleanLiteral(node) ||
+    t.isNullLiteral(node) ||
+    t.isTemplateLiteral(node) ||
+    (t.isIdentifier(node) && node.name === 'undefined') ||
+    (t.isUnaryExpression(node) && node.operator === '-' && t.isNumericLiteral(node.argument))
+  )
+}
+
+function wrapWithV(node: t.Expression): t.Expression {
+  if (isKnownPrimitive(node)) return node
+  return t.callExpression(t.identifier('__v'), [node])
+}
+
 function unwrapComparisonOperands(node: t.Expression): t.Expression {
   if (t.isBinaryExpression(node) && ['===', '==', '!==', '!='].includes(node.operator)) {
     return t.binaryExpression(
       node.operator,
-      t.callExpression(t.identifier('__v'), [unwrapComparisonOperands(node.left as t.Expression)]),
-      t.callExpression(t.identifier('__v'), [unwrapComparisonOperands(node.right as t.Expression)]),
+      wrapWithV(unwrapComparisonOperands(node.left as t.Expression)),
+      wrapWithV(unwrapComparisonOperands(node.right as t.Expression)),
     )
   }
   if (t.isConditionalExpression(node)) {
@@ -244,13 +263,31 @@ export function generateRenderItemMethod(
   if (arrayMap.indexVariable) {
     baseMethod.params.push(t.identifier(arrayMap.indexVariable))
   }
+
+  // Only emit the __v helper if it's actually referenced in the output.
+  const returnStmt = t.returnStatement(wrapped)
+  function containsVCall(node: t.Node): boolean {
+    if (t.isCallExpression(node) && t.isIdentifier(node.callee) && node.callee.name === '__v') return true
+    for (const key of t.VISITOR_KEYS[node.type] || []) {
+      const child = (node as any)[key]
+      if (Array.isArray(child)) {
+        for (const c of child) {
+          if (c && typeof c === 'object' && 'type' in c && containsVCall(c)) return true
+        }
+      } else if (child && typeof child === 'object' && 'type' in child) {
+        if (containsVCall(child)) return true
+      }
+    }
+    return false
+  }
+  const needsUnwrapHelper = [...rewrittenCallbackBody, returnStmt].some((stmt) => containsVCall(stmt))
   const method = appendToBody(
     baseMethod,
     ...rewrittenSetup,
-    buildValueUnwrapHelper(),
+    ...(needsUnwrapHelper ? [buildValueUnwrapHelper()] : []),
     ...rewrittenCallbackBody,
     ...handlerRegStmts,
-    t.returnStatement(wrapped),
+    returnStmt,
   )
 
   if (handlerPropsInMap.length > 0 && classBody) {
