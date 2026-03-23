@@ -1,0 +1,58 @@
+{
+  "name": "@geajs/pwa",
+  "version": "1.0.0",
+  "description": "Progressive Web App support for Gea framework — Workbox-powered service worker, reactive PwaStore, offline-aware FetchStore",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Armagan Amcalar <armagan@amcalar.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dashersw/gea.git"
+  },
+  "keywords": ["gea", "pwa", "service-worker", "workbox", "offline"],
+  "bugs": {
+    "url": "https://github.com/dashersw/gea/issues"
+  },
+  "homepage": "https://github.com/dashersw/gea#readme",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "test": "tsx --test 'tests/**/*.test.ts'"
+  },
+  "dependencies": {
+    "workbox-build": "^7.3.0"
+  },
+  "peerDependencies": {
+    "@geajs/core": "^1.0.0",
+    "vite": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@geajs/core": "file:../gea",
+    "@types/node": "^25.5.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0"
+  }
+}
