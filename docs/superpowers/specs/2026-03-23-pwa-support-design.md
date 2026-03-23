@@ -147,7 +147,7 @@ export class PwaStore extends Store {
       // Reload after the new SW takes control, not immediately
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         window.location.reload()
-      })
+      }, { once: true })
     }
   }
 
@@ -216,23 +216,26 @@ export class FetchStore<T = unknown> extends Store {
     this.isLoading = true
     this.error = null
     try {
-      const response = await fetch(url, options)
+      const request = new Request(url, options)
+      const response = await fetch(request)
       const cloned = response.clone()
-      this.data = await response.json()
+      const result: T = await response.json()
+      this.data = result
       this.isFromCache = false
       // Cache successful responses for offline fallback
       const cache = await caches.open('gea-api')
-      await cache.put(url, cloned)
-      return this.data as T
+      await cache.put(request, cloned)
+      return result
     } catch (err) {
       // When offline, try cache
       if (!navigator.onLine) {
         const cache = await caches.open('gea-api')
         const cached = await cache.match(url)
         if (cached) {
-          this.data = await cached.json()
+          const result: T = await cached.json()
+          this.data = result
           this.isFromCache = true
-          return this.data as T
+          return result
         }
       }
       this.error = err instanceof Error ? err.message : String(err)
