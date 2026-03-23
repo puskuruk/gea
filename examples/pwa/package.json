@@ -1,0 +1,17 @@
+{
+  "name": "pwa-gea",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@geajs/core": "file:../../packages/gea",
+    "@geajs/pwa": "file:../../packages/gea-pwa"
+  },
+  "devDependencies": {
+    "vite": "^8.0.0"
+  }
+}

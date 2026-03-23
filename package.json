@@ -35,6 +35,7 @@
     "example:mobile-showcase": "vite dev --config examples/mobile-showcase/vite.config.ts",
     "example:router-simple": "vite dev examples/router-simple",
     "example:router-v2": "vite dev examples/router-v2",
+    "example:pwa": "vite dev examples/pwa",
     "example:todo": "vite dev examples/todo",
     "test:e2e": "npx playwright test --config=tests/e2e/playwright.config.ts"
   },
