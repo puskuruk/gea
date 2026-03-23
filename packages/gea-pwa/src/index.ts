@@ -1,2 +1,3 @@
-// @geajs/pwa — public API
-// Will export PwaStore, FetchStore, and types
+export { PwaStore } from './store.ts'
+export { FetchStore } from './fetch.ts'
+export type { GeaPwaPluginOptions, PresetName, WebAppManifest } from './types.ts'
