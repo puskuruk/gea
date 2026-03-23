@@ -33,7 +33,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
-    "test": "tsx --test 'tests/**/*.test.ts'"
+    "test": "tsx --import ./tests/preload.mjs --test 'tests/**/*.test.ts'"
   },
   "dependencies": {
     "workbox-build": "^7.3.0"
@@ -50,6 +50,7 @@
   "devDependencies": {
     "@geajs/core": "file:../gea",
     "@types/node": "^25.5.0",
+    "jsdom": "^29.0.0",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
