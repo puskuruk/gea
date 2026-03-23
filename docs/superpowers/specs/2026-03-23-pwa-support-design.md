@@ -20,7 +20,7 @@ A separate, opt-in package (`@geajs/pwa`) that adds Progressive Web App support 
 packages/gea-pwa/
 ├── package.json          # @geajs/pwa
 ├── tsconfig.json
-├── tsup.config.ts        # CJS + ESM dual build (matches other packages)
+├── tsdown.config.ts      # ESM build (matches @geajs/core)
 ├── src/
 │   ├── index.ts          # Public API re-exports (PwaStore, FetchStore, types)
 │   ├── plugin.ts         # geaPwaPlugin() — Vite plugin export
@@ -95,11 +95,12 @@ Extends `Store` from `@geajs/core`. Follows the same patterns as Router (browser
 import { Store } from '@geajs/core'
 
 export class PwaStore extends Store {
-  // Reactive state
-  isOnline = navigator.onLine
+  // Reactive state (initialized safely in constructor for SSR/test compat)
+  isOnline = false
   isInstallable = false
-  isInstalled = window.matchMedia('(display-mode: standalone)').matches
+  isInstalled = false
   hasUpdate = false
+  registrationError: string | null = null
 
   // Non-reactive internals
   _deferredPrompt: BeforeInstallPromptEvent | null = null
@@ -107,12 +108,26 @@ export class PwaStore extends Store {
 
   constructor() {
     super()
+    if (typeof window === 'undefined') return
+
+    // Initialize from browser state
+    this.isOnline = navigator.onLine
+    this.isInstalled = window.matchMedia('(display-mode: standalone)').matches
+
+    // Listen for online/offline
     window.addEventListener('online', () => { this.isOnline = true })
     window.addEventListener('offline', () => { this.isOnline = false })
+
+    // Listen for install prompt
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault()
       this._deferredPrompt = e
       this.isInstallable = true
+    })
+
+    // Track display-mode changes (e.g. user installs during session)
+    window.matchMedia('(display-mode: standalone)').addEventListener('change', (e) => {
+      this.isInstalled = e.matches
     })
   }
 
@@ -129,7 +144,10 @@ export class PwaStore extends Store {
     const waiting = this._registration?.waiting
     if (waiting) {
       waiting.postMessage({ type: 'SKIP_WAITING' })
-      window.location.reload()
+      // Reload after the new SW takes control, not immediately
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload()
+      })
     }
   }
 
@@ -145,6 +163,8 @@ export class PwaStore extends Store {
           }
         })
       })
+    }).catch((err) => {
+      this.registrationError = err instanceof Error ? err.message : String(err)
     })
   }
 }
@@ -186,31 +206,36 @@ A Store subclass that users extend per API concern:
 ```ts
 import { Store } from '@geajs/core'
 
-export class FetchStore extends Store {
-  data: any = null
+export class FetchStore<T = unknown> extends Store {
+  data: T | null = null
   error: string | null = null
   isLoading = false
   isFromCache = false
 
-  async fetch(url: string, options?: RequestInit): Promise<any> {
+  async fetch(url: string, options?: RequestInit): Promise<T> {
     this.isLoading = true
     this.error = null
     try {
       const response = await fetch(url, options)
+      const cloned = response.clone()
       this.data = await response.json()
       this.isFromCache = false
-      return this.data
+      // Cache successful responses for offline fallback
+      const cache = await caches.open('gea-api')
+      await cache.put(url, cloned)
+      return this.data as T
     } catch (err) {
+      // When offline, try cache
       if (!navigator.onLine) {
-        const cache = await caches.open('api-cache')
+        const cache = await caches.open('gea-api')
         const cached = await cache.match(url)
         if (cached) {
           this.data = await cached.json()
           this.isFromCache = true
-          return this.data
+          return this.data as T
         }
       }
-      this.error = (err as Error).message
+      this.error = err instanceof Error ? err.message : String(err)
       throw err
     } finally {
       this.isLoading = false
@@ -222,7 +247,7 @@ export class FetchStore extends Store {
 **Usage:**
 
 ```ts
-class TasksApi extends FetchStore {
+class TasksApi extends FetchStore<Task[]> {
   tasks: Task[] = []
 
   async loadTasks() {
@@ -238,10 +263,10 @@ export default new TasksApi()
 | Scenario | Behavior |
 |----------|----------|
 | No `serviceWorker` in navigator | `register()` is a no-op, reactive state stays at defaults |
-| SW registration fails | `_registration` stays null, `hasUpdate` never flips |
+| SW registration fails | `registrationError` set with message, `_registration` stays null |
 | `beforeinstallprompt` not fired | `isInstallable` stays false, `promptInstall()` returns false |
 | User dismisses install prompt | `isInstallable` set to false, `_deferredPrompt` cleared |
-| SSR context (no `window`) | Guard with `typeof window !== 'undefined'` in constructor |
+| SSR context (no `window`) | Constructor early-returns; all fields stay at safe defaults (`false`, `null`) |
 | Dev mode (no SW) | Plugin skips SW generation; `PwaStore` works but `register()` finds no SW |
 
 ## Testing Strategy
