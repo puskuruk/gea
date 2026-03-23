@@ -20,13 +20,12 @@ A separate, opt-in package (`@geajs/pwa`) that adds Progressive Web App support 
 packages/gea-pwa/
 ├── package.json          # @geajs/pwa
 ├── tsconfig.json
-├── tsdown.config.ts      # ESM build (matches @geajs/core)
+├── tsup.config.ts        # ESM build + DTS (matches @geajs/vite-plugin)
 ├── src/
 │   ├── index.ts          # Public API re-exports (PwaStore, FetchStore, types)
 │   ├── plugin.ts         # geaPwaPlugin() — Vite plugin export
 │   ├── presets.ts         # Caching strategy presets
-│   ├── register.ts       # SW registration + update lifecycle
-│   ├── store.ts          # PwaStore extends Store
+│   ├── store.ts          # PwaStore extends Store (includes SW registration)
 │   ├── fetch.ts          # FetchStore — offline-aware fetch
 │   └── types.ts          # Shared TypeScript interfaces
 └── tests/
