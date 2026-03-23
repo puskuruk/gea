@@ -23,6 +23,7 @@ const DASHBOARD_PORT = 5304
 const FORMS_PORT = 5305
 const SHOWCASE_PORT = 5306
 const DOCS_PORT = 5307
+const PWA_PORT = 5308
 
 export default defineConfig({
   testDir: '.',
@@ -124,6 +125,11 @@ export default defineConfig({
       name: 'docs',
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${DOCS_PORT}` },
       testMatch: 'docs.spec.ts',
+    },
+    {
+      name: 'pwa',
+      use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PWA_PORT}` },
+      testMatch: 'pwa.spec.ts',
     },
   ],
   webServer: [
@@ -275,6 +281,15 @@ export default defineConfig({
       command: `npx vite dev --port ${DOCS_PORT}`,
       cwd: resolve(EXAMPLES_ROOT, 'docs'),
       url: `http://localhost:${DOCS_PORT}`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      stdout: 'ignore',
+      stderr: 'pipe',
+    },
+    {
+      command: `npx vite dev --port ${PWA_PORT}`,
+      cwd: resolve(EXAMPLES_ROOT, 'pwa'),
+      url: `http://localhost:${PWA_PORT}`,
       reuseExistingServer: false,
       timeout: 120_000,
       stdout: 'ignore',
