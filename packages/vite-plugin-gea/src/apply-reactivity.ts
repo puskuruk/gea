@@ -76,7 +76,7 @@ function generateCreatedHooks(
   stores: Array<{
     storeVar: string
     captureExpression: t.Expression
-    observeHandlers: Array<{ pathParts: PathParts; methodName: string }>
+    observeHandlers: Array<{ pathParts: PathParts; methodName: string; isVia?: boolean; rereadExpr?: t.Expression }>
   }>,
   hasArrayConfigs: boolean,
 ): t.ClassMethod {
@@ -86,31 +86,80 @@ function generateCreatedHooks(
     body.push(js`this.__ensureArrayConfigs();`)
   }
 
-  const observeExprs: t.Expression[] = []
   for (const store of stores) {
-    for (const observeHandler of store.observeHandlers) {
-      observeExprs.push(
-        jsExpr`
-          ${t.cloneNode(store.captureExpression, true)}.observe(
-            ${t.arrayExpression(observeHandler.pathParts.map((part) => t.stringLiteral(part)))},
-            this.${id(observeHandler.methodName)}.bind(this)
-          )
-        `,
-      )
+    // Group handlers by path to merge duplicate observers
+    const byPath = new Map<string, Array<{ methodName: string; isVia?: boolean; rereadExpr?: t.Expression }>>()
+    for (const handler of store.observeHandlers) {
+      const pathKey = JSON.stringify(handler.pathParts)
+      if (!byPath.has(pathKey)) byPath.set(pathKey, [])
+      byPath.get(pathKey)!.push({ methodName: handler.methodName, isVia: handler.isVia, rereadExpr: handler.rereadExpr })
     }
-  }
-  if (observeExprs.length > 0) {
-    body.push(
-      t.expressionStatement(
-        t.callExpression(
-          t.memberExpression(
-            t.memberExpression(t.thisExpression(), t.identifier('__observer_removers__')),
-            t.identifier('push'),
+
+    // The store variable expression (e.g. `storeVar` identifier)
+    const storeVarExpr = t.identifier(store.storeVar)
+
+    for (const [pathKey, handlers] of byPath) {
+      const pathParts: PathParts = JSON.parse(pathKey)
+      const pathArray = t.arrayExpression(pathParts.map((part) => t.stringLiteral(part)))
+
+      if (handlers.length === 1 && !handlers[0].isVia) {
+        // Single handler — direct method reference
+        body.push(
+          t.expressionStatement(
+            t.callExpression(
+              t.memberExpression(t.thisExpression(), t.identifier('__observe')),
+              [
+                storeVarExpr,
+                pathArray,
+                t.memberExpression(t.thisExpression(), t.identifier(handlers[0].methodName)),
+              ],
+            ),
           ),
-          observeExprs,
-        ),
-      ),
-    )
+        )
+      } else {
+        // Multiple handlers or via handlers — merged arrow function
+        const vParam = t.identifier('__v')
+        const cParam = t.identifier('__c')
+        const callStmts: t.Statement[] = []
+        for (const h of handlers) {
+          if (h.isVia && h.rereadExpr) {
+            // Inline re-read: call target method with re-read value
+            callStmts.push(
+              t.expressionStatement(
+                t.callExpression(
+                  t.memberExpression(t.thisExpression(), t.identifier(h.methodName)),
+                  [t.cloneNode(h.rereadExpr, true), t.nullLiteral()],
+                ),
+              ),
+            )
+          } else {
+            callStmts.push(
+              t.expressionStatement(
+                t.callExpression(
+                  t.memberExpression(t.thisExpression(), t.identifier(h.methodName)),
+                  [vParam, cParam],
+                ),
+              ),
+            )
+          }
+        }
+        body.push(
+          t.expressionStatement(
+            t.callExpression(
+              t.memberExpression(t.thisExpression(), t.identifier('__observe')),
+              [
+                storeVarExpr,
+                pathArray,
+                t.arrowFunctionExpression(
+                  [vParam, cParam],
+                  t.blockStatement(callStmts),
+                ),
+              ],
+            ),
+          ),
+        )
+      }
+    }
   }
 
   const method = jsMethod`${id('createdHooks')}() {}`
@@ -129,26 +178,16 @@ function generateLocalStateObserverSetup(
   }
   body.push(js`if (!${localStore}) { return; }`)
 
-  const observeExprs: t.Expression[] = []
-  observeHandlers.forEach((observeHandler) => {
-    observeExprs.push(
-      jsExpr`
-        ${localStore}.observe(
-          ${t.arrayExpression(observeHandler.pathParts.map((part) => t.stringLiteral(part)))},
-          this.${id(observeHandler.methodName)}.bind(this)
-        )
-      `,
-    )
-  })
-  if (observeExprs.length > 0) {
+  for (const observeHandler of observeHandlers) {
     body.push(
       t.expressionStatement(
         t.callExpression(
-          t.memberExpression(
-            t.memberExpression(t.thisExpression(), t.identifier('__observer_removers__')),
-            t.identifier('push'),
-          ),
-          observeExprs,
+          t.memberExpression(t.thisExpression(), t.identifier('__observe')),
+          [
+            t.thisExpression(),
+            t.arrayExpression(observeHandler.pathParts.map((part) => t.stringLiteral(part))),
+            t.memberExpression(t.thisExpression(), t.identifier(observeHandler.methodName)),
+          ],
         ),
       ),
     )
@@ -1980,11 +2019,12 @@ export function applyStaticReactivity(
           }
 
           if (applied) {
+            type ObserverEntry = { pathParts: PathParts; methodName: string; isVia?: boolean; rereadExpr?: t.Expression }
             const importedStores = new Map<
               string,
               {
                 captureExpression: t.Expression
-                observeHandlers: Map<string, { pathParts: PathParts; methodName: string }>
+                observeHandlers: Map<string, ObserverEntry>
               }
             >()
             const localObserveHandlers = new Map<string, { pathParts: PathParts; methodName: string }>()
@@ -1994,13 +2034,11 @@ export function applyStaticReactivity(
                 const captureExpression = t.memberExpression(t.identifier(storeVar), t.identifier('__store'))
                 importedStores.set(storeVar, {
                   captureExpression,
-                  observeHandlers: new Map<string, { pathParts: PathParts; methodName: string }>(),
+                  observeHandlers: new Map<string, ObserverEntry>(),
                 })
               }
               return importedStores.get(storeVar)!
             }
-
-            const prevValueInits: t.Statement[] = []
 
             addedMethods.forEach((_method, observeKey) => {
               const { parts, storeVar } = parseObserveKey(observeKey)
@@ -2010,43 +2048,16 @@ export function applyStaticReactivity(
                   const compGetterDeps = componentGetterStoreDeps.get(parts[0])
                   if (compGetterDeps && compGetterDeps.length > 0) {
                     const originalMethodName = getObserveMethodName(parts)
-                    const wrapperMethodName = `${originalMethodName}__via`
-                    if (
-                      !classPath.node.body.body.some(
-                        (m) => t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name === wrapperMethodName,
-                      )
-                    ) {
-                      classPath.node.body.body.push(
-                        t.classMethod(
-                          'method',
-                          t.identifier(wrapperMethodName),
-                          [t.identifier('_v'), t.identifier('change')],
-                          t.blockStatement([
-                            t.expressionStatement(
-                              t.callExpression(
-                                t.memberExpression(t.thisExpression(), t.identifier(originalMethodName)),
-                                [
-                                  t.memberExpression(t.thisExpression(), t.identifier(parts[0])),
-                                  t.nullLiteral(),
-                                ],
-                              ),
-                            ),
-                          ]),
-                        ),
-                      )
-                    }
+                    // Inline via: register observer entries with re-read expression
                     for (const dep of compGetterDeps) {
                       const depKey = buildObserveKey(dep.pathParts, dep.storeVar) + `__getter_${parts[0]}`
                       ensureStoreGroup(dep.storeVar).observeHandlers.set(depKey, {
                         pathParts: dep.pathParts,
-                        methodName: wrapperMethodName,
+                        methodName: originalMethodName,
+                        isVia: true,
+                        rereadExpr: t.memberExpression(t.thisExpression(), t.identifier(parts[0])),
                       })
                     }
-                    // Initialize __geaPrev_ for component getter via pattern
-                    const compPrevProp = `__geaPrev_${originalMethodName}`
-                    prevValueInits.push(
-                      js`try { this.${id(compPrevProp)} = this.${id(parts[0])}; } catch(_e) {}`,
-                    )
                   }
                   return
                 }
@@ -2058,40 +2069,16 @@ export function applyStaticReactivity(
                 const getterDepPaths = storeRef?.getterDeps?.get(parts[0])
                 if (getterDepPaths && getterDepPaths.length > 0) {
                   const originalMethodName = getObserveMethodName(parts, storeVar)
-                  const wrapperMethodName = `${originalMethodName}__via`
-                  if (
-                    !classPath.node.body.body.some(
-                      (m) => t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name === wrapperMethodName,
-                    )
-                  ) {
-                    classPath.node.body.body.push(
-                      t.classMethod(
-                        'method',
-                        t.identifier(wrapperMethodName),
-                        [t.identifier('_v'), t.identifier('change')],
-                        t.blockStatement([
-                          t.expressionStatement(
-                            t.callExpression(t.memberExpression(t.thisExpression(), t.identifier(originalMethodName)), [
-                              t.memberExpression(t.identifier(storeVar), t.identifier(parts[0])),
-                              t.nullLiteral(),
-                            ]),
-                          ),
-                        ]),
-                      ),
-                    )
-                  }
+                  // Inline via: register observer entries with re-read expression
                   for (const depPath of getterDepPaths) {
                     const depKey = buildObserveKey(depPath, storeVar) + `__getter_${parts[0]}`
                     ensureStoreGroup(storeVar).observeHandlers.set(depKey, {
                       pathParts: depPath,
-                      methodName: wrapperMethodName,
+                      methodName: originalMethodName,
+                      isVia: true,
+                      rereadExpr: t.memberExpression(t.identifier(storeVar), t.identifier(parts[0])),
                     })
                   }
-                  // Initialize __geaPrev_ so the first flush doesn't spuriously trigger __geaRequestRender
-                  const prevProp = `__geaPrev_${originalMethodName}`
-                  prevValueInits.push(
-                    js`try { this.${id(prevProp)} = ${t.memberExpression(t.identifier(storeVar), t.identifier(parts[0]))}; } catch(_e) {}`,
-                  )
                   return
                 }
               }
@@ -2172,9 +2159,11 @@ export function applyStaticReactivity(
               const storeConfigs = Array.from(importedStores.entries()).map(([storeVar, config]) => ({
                 storeVar,
                 captureExpression: config.captureExpression,
-                observeHandlers: Array.from(config.observeHandlers.values()).map(({ pathParts, methodName }) => ({
+                observeHandlers: Array.from(config.observeHandlers.values()).map(({ pathParts, methodName, isVia, rereadExpr }) => ({
                   pathParts,
                   methodName,
+                  isVia,
+                  rereadExpr,
                 })),
               }))
 
@@ -2182,9 +2171,6 @@ export function applyStaticReactivity(
                 const createdHooksMethod = generateCreatedHooks(storeConfigs, htmlArrayMaps.length > 0)
                 if (mapRegistrations.length > 0) {
                   createdHooksMethod.body.body.push(...mapRegistrations)
-                }
-                if (prevValueInits.length > 0) {
-                  createdHooksMethod.body.body.push(...prevValueInits)
                 }
                 classPath.node.body.body.push(createdHooksMethod)
               }
