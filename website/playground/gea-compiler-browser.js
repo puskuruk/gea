@@ -51614,19 +51614,31 @@ function generateCreatedHooks(stores, hasArrayConfigs) {
   if (hasArrayConfigs) {
     body.push(js`this.__ensureArrayConfigs();`);
   }
+  const observeExprs = [];
   for (const store of stores) {
     for (const observeHandler of store.observeHandlers) {
-      body.push(
-        js`
-          this.__observer_removers__.push(
-            ${libExports.cloneNode(store.captureExpression, true)}.observe(
-              ${libExports.arrayExpression(observeHandler.pathParts.map((part) => libExports.stringLiteral(part)))},
-              (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) { console.error(_e) } }
-            )
-          );
+      observeExprs.push(
+        jsExpr`
+          ${libExports.cloneNode(store.captureExpression, true)}.observe(
+            ${libExports.arrayExpression(observeHandler.pathParts.map((part) => libExports.stringLiteral(part)))},
+            this.${id(observeHandler.methodName)}.bind(this)
+          )
         `
       );
     }
+  }
+  if (observeExprs.length > 0) {
+    body.push(
+      libExports.expressionStatement(
+        libExports.callExpression(
+          libExports.memberExpression(
+            libExports.memberExpression(libExports.thisExpression(), libExports.identifier("__observer_removers__")),
+            libExports.identifier("push")
+          ),
+          observeExprs
+        )
+      )
+    );
   }
   const method = jsMethod`${id("createdHooks")}() {}`;
   method.body.body.push(...body);
@@ -51639,18 +51651,30 @@ function generateLocalStateObserverSetup(observeHandlers, hasArrayConfigs) {
     body.push(js`this.__ensureArrayConfigs();`);
   }
   body.push(js`if (!${localStore}) { return; }`);
+  const observeExprs = [];
   observeHandlers.forEach((observeHandler) => {
-    body.push(
-      js`
-        this.__observer_removers__.push(
-          ${localStore}.observe(
-            ${libExports.arrayExpression(observeHandler.pathParts.map((part) => libExports.stringLiteral(part)))},
-            (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) { console.error(_e) } }
-          )
-        );
+    observeExprs.push(
+      jsExpr`
+        ${localStore}.observe(
+          ${libExports.arrayExpression(observeHandler.pathParts.map((part) => libExports.stringLiteral(part)))},
+          this.${id(observeHandler.methodName)}.bind(this)
+        )
       `
     );
   });
+  if (observeExprs.length > 0) {
+    body.push(
+      libExports.expressionStatement(
+        libExports.callExpression(
+          libExports.memberExpression(
+            libExports.memberExpression(libExports.thisExpression(), libExports.identifier("__observer_removers__")),
+            libExports.identifier("push")
+          ),
+          observeExprs
+        )
+      )
+    );
+  }
   const method = jsMethod`${id("__setupLocalStateObservers")}() {}`;
   method.body.body.push(...body);
   return method;

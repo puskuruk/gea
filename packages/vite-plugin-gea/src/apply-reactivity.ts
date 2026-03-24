@@ -86,19 +86,31 @@ function generateCreatedHooks(
     body.push(js`this.__ensureArrayConfigs();`)
   }
 
+  const observeExprs: t.Expression[] = []
   for (const store of stores) {
     for (const observeHandler of store.observeHandlers) {
-      body.push(
-        js`
-          this.__observer_removers__.push(
-            ${t.cloneNode(store.captureExpression, true)}.observe(
-              ${t.arrayExpression(observeHandler.pathParts.map((part) => t.stringLiteral(part)))},
-              (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) { console.error(_e) } }
-            )
-          );
+      observeExprs.push(
+        jsExpr`
+          ${t.cloneNode(store.captureExpression, true)}.observe(
+            ${t.arrayExpression(observeHandler.pathParts.map((part) => t.stringLiteral(part)))},
+            this.${id(observeHandler.methodName)}.bind(this)
+          )
         `,
       )
     }
+  }
+  if (observeExprs.length > 0) {
+    body.push(
+      t.expressionStatement(
+        t.callExpression(
+          t.memberExpression(
+            t.memberExpression(t.thisExpression(), t.identifier('__observer_removers__')),
+            t.identifier('push'),
+          ),
+          observeExprs,
+        ),
+      ),
+    )
   }
 
   const method = jsMethod`${id('createdHooks')}() {}`
@@ -117,18 +129,30 @@ function generateLocalStateObserverSetup(
   }
   body.push(js`if (!${localStore}) { return; }`)
 
+  const observeExprs: t.Expression[] = []
   observeHandlers.forEach((observeHandler) => {
-    body.push(
-      js`
-        this.__observer_removers__.push(
-          ${localStore}.observe(
-            ${t.arrayExpression(observeHandler.pathParts.map((part) => t.stringLiteral(part)))},
-            (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) { console.error(_e) } }
-          )
-        );
+    observeExprs.push(
+      jsExpr`
+        ${localStore}.observe(
+          ${t.arrayExpression(observeHandler.pathParts.map((part) => t.stringLiteral(part)))},
+          this.${id(observeHandler.methodName)}.bind(this)
+        )
       `,
     )
   })
+  if (observeExprs.length > 0) {
+    body.push(
+      t.expressionStatement(
+        t.callExpression(
+          t.memberExpression(
+            t.memberExpression(t.thisExpression(), t.identifier('__observer_removers__')),
+            t.identifier('push'),
+          ),
+          observeExprs,
+        ),
+      ),
+    )
+  }
 
   const method = jsMethod`${id('__setupLocalStateObservers')}() {}`
   method.body.body.push(...body)
