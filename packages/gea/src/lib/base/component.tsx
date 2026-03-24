@@ -679,6 +679,28 @@ export default class Component extends Store {
     })
   }
 
+  /**
+   * Force-reconcile a list config by re-reading the getter value through the
+   * store proxy.  Used by compiler-generated delegates when a getter-backed
+   * array map's underlying dependency changes (e.g. activePlaylistId changes
+   * causing filteredTracks to return different items).
+   */
+  __refreshList(pathKey: string): void {
+    const configs = (this as any).__geaListConfigs
+    if (!configs) return
+    for (const { store: s, path: p, config: c } of configs) {
+      if (p.join('.') !== pathKey) continue
+      if (!c.items && c.itemsKey) c.items = (this as any)[c.itemsKey]
+      if (!c.items) continue
+      // Read through the proxy (not __store) so getters are evaluated
+      const arr = p.reduce((obj: any, key: string) => obj?.[key], s) ?? []
+      const newItems = this.__reconcileList(c.items, arr, c.container(), c.Ctor, c.props, c.key)
+      c.items.length = 0
+      c.items.push(...newItems)
+      c.onchange?.()
+    }
+  }
+
   __geaSwapChild(markerId: string, newChild: Component | false | null | undefined) {
     const marker = document.getElementById(this.id_ + '-' + markerId)
     if (!marker) return

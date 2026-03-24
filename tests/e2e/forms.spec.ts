@@ -90,7 +90,7 @@ test.describe('forms settings page', () => {
     const deleteBtn = page.locator('[data-scope="tags-input"] [data-part="item-delete-trigger"]').first()
     await deleteBtn.click()
 
-    await expect(page.getByText('192.168.1.1')).not.toBeVisible()
+    await expect(page.locator('[data-scope="tags-input"] [data-part="item-preview"]', { hasText: '192.168.1.1' })).toHaveCount(0)
     await expect(page.getByText('10.0.0.1')).toBeVisible()
   })
 

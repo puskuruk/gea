@@ -2007,6 +2007,38 @@ export function applyStaticReactivity(
             }
           }
 
+          // For component array maps backed by store getters, generate delegate
+          // observers on each getter dependency that call __refreshList to
+          // reconcile the list with re-evaluated getter values.
+          for (const arrayMap of componentArrayMaps) {
+            if (!arrayMap.storeVar || arrayMap.arrayPathParts.length !== 1) continue
+            const storeRef = stateRefs.get(arrayMap.storeVar)
+            const getterDepPaths = storeRef?.getterDeps?.get(arrayMap.arrayPathParts[0])
+            if (!getterDepPaths || getterDepPaths.length === 0) continue
+
+            const pathKey = arrayMap.arrayPathParts[0]
+            for (const depPath of getterDepPaths) {
+              const depObserveKey = buildObserveKey(depPath, arrayMap.storeVar)
+              const depMethodName = getObserveMethodName(depPath, arrayMap.storeVar)
+              // Generate: __observe_store_dep(__v, __c) { this.__refreshList('filteredTracks'); }
+              const delegateBody = t.blockStatement([
+                t.expressionStatement(
+                  t.callExpression(
+                    t.memberExpression(t.thisExpression(), t.identifier('__refreshList')),
+                    [t.stringLiteral(pathKey)],
+                  ),
+                ),
+              ])
+              const delegateMethod = t.classMethod(
+                'method',
+                t.identifier(depMethodName),
+                [t.identifier('__v'), t.identifier('__c')],
+                delegateBody,
+              )
+              mergeObserveMethod(depObserveKey, delegateMethod)
+            }
+          }
+
           const renderEventHandlers: EventHandler[] = []
           htmlArrayMaps.forEach((arrayMap) => {
             const { method, needsUnwrapHelper } = generateRenderItemMethod(

@@ -49139,6 +49139,7 @@ function injectChildComponents(ast, componentInstances, directForwardingChildren
   const childComponents = Array.from(componentInstances.values()).flat();
   const constructionOrder = [...childComponents].sort((a, b) => (b.dfsIndex ?? 0) - (a.dfsIndex ?? 0));
   const instanceStatements = buildInstanceStatements(constructionOrder, directForwardingChildren);
+  const lazyChildren = constructionOrder.filter((child) => child.lazy);
   let injected = false;
   traverse$9(ast, {
     ClassDeclaration(path) {
@@ -49157,6 +49158,55 @@ function injectChildComponents(ast, componentInstances, directForwardingChildren
         );
         path.node.body.body.unshift(ctor);
         injected = true;
+      }
+      for (const child of lazyChildren) {
+        const isDirect = directForwardingChildren?.has(child.instanceVar);
+        const noProps = childHasNoProps(child);
+        const hasPropsBuilder = !isDirect && !noProps;
+        const backingField = `__lazy${child.instanceVar}`;
+        let propsArg;
+        if (hasPropsBuilder) {
+          propsArg = libExports.callExpression(
+            libExports.memberExpression(libExports.thisExpression(), libExports.identifier(getPropsBuilderMethodName(child))),
+            []
+          );
+        } else if (child.directMappings && child.directMappings.length > 0) {
+          propsArg = libExports.objectExpression(
+            child.directMappings.map(
+              (m) => libExports.objectProperty(
+                libExports.identifier(m.childPropName),
+                libExports.memberExpression(
+                  libExports.memberExpression(libExports.thisExpression(), libExports.identifier("props")),
+                  libExports.identifier(m.parentPropName)
+                )
+              )
+            )
+          );
+        } else {
+          propsArg = libExports.objectExpression([]);
+        }
+        const getter = libExports.classMethod(
+          "get",
+          libExports.identifier(child.instanceVar),
+          [],
+          libExports.blockStatement([
+            libExports.ifStatement(
+              libExports.unaryExpression("!", libExports.memberExpression(libExports.thisExpression(), libExports.identifier(backingField))),
+              libExports.expressionStatement(
+                libExports.assignmentExpression(
+                  "=",
+                  libExports.memberExpression(libExports.thisExpression(), libExports.identifier(backingField)),
+                  libExports.callExpression(libExports.memberExpression(libExports.thisExpression(), libExports.identifier("__child")), [
+                    libExports.identifier(child.tagName),
+                    propsArg
+                  ])
+                )
+              )
+            ),
+            libExports.returnStatement(libExports.memberExpression(libExports.thisExpression(), libExports.identifier(backingField)))
+          ])
+        );
+        path.node.body.body.push(getter);
       }
       childComponents.forEach((child) => {
         const isDirect = directForwardingChildren?.has(child.instanceVar);
@@ -49187,6 +49237,7 @@ function injectComponentRegistrations(ast, componentInstances) {
 function buildInstanceStatements(instances, directForwardingChildren) {
   const stmts = [];
   instances.forEach((child) => {
+    if (child.lazy) return;
     let propsArg;
     const isDirect = directForwardingChildren?.has(child.instanceVar);
     const noProps = childHasNoProps(child);
@@ -51494,6 +51545,10 @@ function generateCreatedHooks(stores, hasArrayConfigs, observeListConfigs = []) 
           libExports.memberExpression(libExports.thisExpression(), libExports.identifier(itemsName))
         ),
         libExports.objectProperty(
+          libExports.identifier("itemsKey"),
+          libExports.stringLiteral(itemsName)
+        ),
+        libExports.objectProperty(
           libExports.identifier("container"),
           libExports.arrowFunctionExpression(
             [],
@@ -52664,6 +52719,8 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
               if (conditionalSlotIndices.length > 0) continue;
               if (analysis.conditionalSlotScopedStoreKeys?.has(observeKey)) continue;
               mergeObserveMethod(observeKey, generateRerenderObserver(propPath, storeVar, guardStateKeys.has(observeKey)));
+            } else if (guardStateKeys.has(observeKey)) {
+              mergeObserveMethod(observeKey, generateRerenderObserver(propPath, storeVar, true));
             }
           }
           const childrenWithResolvedMap = /* @__PURE__ */ new Set();
@@ -52970,6 +53027,32 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
               applied = true;
             }
           }
+          for (const arrayMap of componentArrayMaps) {
+            if (!arrayMap.storeVar || arrayMap.arrayPathParts.length !== 1) continue;
+            const storeRef = stateRefs.get(arrayMap.storeVar);
+            const getterDepPaths = storeRef?.getterDeps?.get(arrayMap.arrayPathParts[0]);
+            if (!getterDepPaths || getterDepPaths.length === 0) continue;
+            const pathKey = arrayMap.arrayPathParts[0];
+            for (const depPath of getterDepPaths) {
+              const depObserveKey = buildObserveKey(depPath, arrayMap.storeVar);
+              const depMethodName = getObserveMethodName(depPath, arrayMap.storeVar);
+              const delegateBody = libExports.blockStatement([
+                libExports.expressionStatement(
+                  libExports.callExpression(
+                    libExports.memberExpression(libExports.thisExpression(), libExports.identifier("__refreshList")),
+                    [libExports.stringLiteral(pathKey)]
+                  )
+                )
+              ]);
+              const delegateMethod = libExports.classMethod(
+                "method",
+                libExports.identifier(depMethodName),
+                [libExports.identifier("__v"), libExports.identifier("__c")],
+                delegateBody
+              );
+              mergeObserveMethod(depObserveKey, delegateMethod);
+            }
+          }
           const renderEventHandlers = [];
           htmlArrayMaps.forEach((arrayMap) => {
             const { method, needsUnwrapHelper } = generateRenderItemMethod(
@@ -53211,6 +53294,29 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
               ensureStoreGroup(obs.storeVar).observeHandlers.set(`__storeCompArray_${obs.refreshMethodName}`, {
                 pathParts: obs.pathParts,
                 methodName: obs.refreshMethodName
+              });
+            }
+            if (guardStateKeys.size > 0) {
+              addedMethods.forEach((method, observeKey) => {
+                const { parts, storeVar: sv } = parseObserveKey(observeKey);
+                if (!sv || parts.length < 2) return;
+                for (let prefixLen = 1; prefixLen < parts.length; prefixLen++) {
+                  const prefixKey = buildObserveKey(parts.slice(0, prefixLen), sv);
+                  if (guardStateKeys.has(prefixKey)) {
+                    const guardCheck = libExports.ifStatement(
+                      libExports.binaryExpression(
+                        "==",
+                        libExports.memberExpression(libExports.identifier(sv), libExports.identifier(parts[prefixLen - 1])),
+                        libExports.nullLiteral()
+                      ),
+                      libExports.returnStatement()
+                    );
+                    if (libExports.isBlockStatement(method.body)) {
+                      method.body.body.unshift(guardCheck);
+                    }
+                    break;
+                  }
+                }
               });
             }
             if (importedStores.size > 0 || localObserveHandlers.size > 0 || mapRegistrations.length > 0) {
