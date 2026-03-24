@@ -15,7 +15,79 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: read
+    outputs:
+      skip: ${{ steps.decide.outputs.skip }}
+      projects: ${{ steps.decide.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          list-files: json
+          filters: |
+            framework:
+              - 'packages/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig*.json'
+              - 'tests/e2e/**'
+            examples:
+              - 'examples/**'
+            shared:
+              - 'examples/shared/**'
+            website:
+              - 'website/**'
+      - name: Decide which projects to test
+        id: decide
+        env:
+          EXAMPLES_FILES: ${{ steps.filter.outputs.examples_files }}
+        run: |
+          # If framework, test infra, or shared example code changed, run all
+          if [ "${{ steps.filter.outputs.framework }}" == "true" ] || \
+             [ "${{ steps.filter.outputs.shared }}" == "true" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "projects=all" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # If website changed, include playground
+          website_projects="[]"
+          if [ "${{ steps.filter.outputs.website }}" == "true" ]; then
+            website_projects='["playground"]'
+          fi
+
+          # If examples changed, extract unique example directory names
+          example_projects="[]"
+          if [ "${{ steps.filter.outputs.examples }}" == "true" ]; then
+            example_projects=$(echo "$EXAMPLES_FILES" \
+              | jq -r '.[]' \
+              | sed -n 's|^examples/\([^/]*\)/.*|\1|p' \
+              | grep -v '^shared$' \
+              | sort -u \
+              | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          fi
+
+          # Merge website + example projects
+          projects=$(jq -n -c --argjson a "$website_projects" --argjson b "$example_projects" '$a + $b | unique')
+
+          if [ "$projects" == "[]" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "projects=[]" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "projects=$projects" >> "$GITHUB_OUTPUT"
+          fi
+
   discover:
+    needs: [changes]
+    if: |
+      always() &&
+      !(needs.changes.result == 'success' && needs.changes.outputs.skip == 'true')
     runs-on: ubuntu-latest
     outputs:
       projects: ${{ steps.find.outputs.projects }}
@@ -27,13 +99,34 @@ jobs:
       - name: Find e2e test projects
         id: find
         run: |
-          projects=$(find tests/e2e -maxdepth 1 -name '*.spec.ts' -printf '%f\n' \
+          # Get all available spec files
+          all_projects=$(find tests/e2e -maxdepth 1 -name '*.spec.ts' -printf '%f\n' \
             | sed 's/\.spec\.ts$//' \
             | jq -R -s -c 'split("\n") | map(select(. != ""))')
-          echo "projects=$projects" >> "$GITHUB_OUTPUT"
-          echo "Discovered projects: $projects"
+
+          requested='${{ needs.changes.outputs.projects }}'
+
+          # Push/dispatch (changes job skipped) or framework change → run all
+          if [ -z "$requested" ] || [ "$requested" == "all" ]; then
+            echo "projects=$all_projects" >> "$GITHUB_OUTPUT"
+          else
+            # Normalize underscores to hyphens, then intersect with available specs
+            projects=$(jq -n -c \
+              --argjson all "$all_projects" \
+              --argjson req "$requested" \
+              '$req | map(gsub("_"; "-")) | map(select(. as $r | $all | index($r))) | unique')
+            if [ "$projects" == "[]" ]; then
+              echo "projects=[]" >> "$GITHUB_OUTPUT"
+            else
+              echo "projects=$projects" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+          echo "Will test: $(cat "$GITHUB_OUTPUT" | grep projects)"
 
   build:
+    needs: [discover]
+    if: needs.discover.outputs.projects != '[]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +145,7 @@ jobs:
 
   e2e-tests:
     needs: [discover, build]
+    if: needs.discover.outputs.projects != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
