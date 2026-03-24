@@ -418,7 +418,8 @@ function applyPropChanges(container, items, changes, config) {
 	return handledAny;
 }
 function applyListChanges(container, array, changes, config) {
-	const items = Array.isArray(array) ? array : [];
+	const proxiedItems = Array.isArray(array) ? array : [];
+	const items = proxiedItems && proxiedItems.__getTarget ? proxiedItems.__getTarget : proxiedItems;
 	if (!changes || changes.length === 0) {
 		rerenderListInPlace(container, items, config.create);
 		return;
@@ -1556,6 +1557,30 @@ var Component = class Component extends Store {
 		this.instantiateChildComponents_();
 		this.setupEventDirectives_();
 		if (typeof this.__setupRefs === "function") this.__setupRefs();
+		if (this.__geaListConfigs) for (const { store: s, path: p, config: c } of this.__geaListConfigs) {
+			if (!c.items && c.itemsKey) c.items = this[c.itemsKey];
+			if (!c.items) continue;
+			const arr = p.reduce((obj, key) => obj?.[key], s.__store) ?? [];
+			if (arr.length === c.items.length) continue;
+			const oldByKey = /* @__PURE__ */ new Map();
+			for (const item of c.items) if (item.__geaItemKey != null) oldByKey.set(item.__geaItemKey, item);
+			const next = arr.map((data) => {
+				const key = String(c.key(data));
+				const existing = oldByKey.get(key);
+				if (existing) {
+					existing.__geaUpdateProps(c.props(data));
+					oldByKey.delete(key);
+					return existing;
+				}
+				return this.__child(c.Ctor, c.props(data), key);
+			});
+			c.items.length = 0;
+			c.items.push(...next);
+			const container = c.container();
+			if (container) {
+				for (const item of next) if (!item.rendered_) item.render(container);
+			}
+		}
 		if (shouldRestoreFocus) {
 			const focusTarget = (focusedId ? document.getElementById(focusedId) || null : null) || (restoreRootFocus ? this.element_ : null);
 			if (focusTarget && this.element_.contains(focusTarget) && typeof focusTarget.focus === "function") {
@@ -1730,7 +1755,15 @@ var Component = class Component extends Store {
 		return next;
 	}
 	__observeList(store, path, config) {
+		if (!this.__geaListConfigs) this.__geaListConfigs = [];
+		this.__geaListConfigs.push({
+			store,
+			path,
+			config
+		});
 		this.__observe(store, path, (_value, changes) => {
+			if (!config.items && config.itemsKey) config.items = this[config.itemsKey];
+			if (!config.items) return;
 			const storeData = store.__store;
 			const arr = path.reduce((obj, key) => obj?.[key], storeData) ?? [];
 			if (changes.every((c) => c.isArrayItemPropUpdate)) for (const c of changes) {
@@ -1753,6 +1786,26 @@ var Component = class Component extends Store {
 			}
 			config.onchange?.();
 		});
+	}
+	/**
+	* Force-reconcile a list config by re-reading the getter value through the
+	* store proxy.  Used by compiler-generated delegates when a getter-backed
+	* array map's underlying dependency changes (e.g. activePlaylistId changes
+	* causing filteredTracks to return different items).
+	*/
+	__refreshList(pathKey) {
+		const configs = this.__geaListConfigs;
+		if (!configs) return;
+		for (const { store: s, path: p, config: c } of configs) {
+			if (p.join(".") !== pathKey) continue;
+			if (!c.items && c.itemsKey) c.items = this[c.itemsKey];
+			if (!c.items) continue;
+			const arr = p.reduce((obj, key) => obj?.[key], s) ?? [];
+			const newItems = this.__reconcileList(c.items, arr, c.container(), c.Ctor, c.props, c.key);
+			c.items.length = 0;
+			c.items.push(...newItems);
+			c.onchange?.();
+		}
 	}
 	__geaSwapChild(markerId, newChild) {
 		const marker = document.getElementById(this.id_ + "-" + markerId);
@@ -2997,3 +3050,4 @@ const gea = {
 //#endregion
 export { Component, ComponentManager, Link, Outlet, Router, RouterView, Store, applyListChanges, createRouter, gea as default, h, isInternalProp, matchRoute, router };
 
+//# sourceMappingURL=index.mjs.map

@@ -23,6 +23,7 @@ const DASHBOARD_PORT = 5304
 const FORMS_PORT = 5305
 const SHOWCASE_PORT = 5306
 const DOCS_PORT = 5307
+const PLAYGROUND_PORT = 5308
 
 export default defineConfig({
   testDir: '.',
@@ -124,6 +125,11 @@ export default defineConfig({
       name: 'docs',
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${DOCS_PORT}` },
       testMatch: 'docs.spec.ts',
+    },
+    {
+      name: 'playground',
+      use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PLAYGROUND_PORT}` },
+      testMatch: 'playground.spec.ts',
     },
   ],
   webServer: [
@@ -277,6 +283,15 @@ export default defineConfig({
       url: `http://localhost:${DOCS_PORT}`,
       reuseExistingServer: false,
       timeout: 120_000,
+      stdout: 'ignore',
+      stderr: 'pipe',
+    },
+    {
+      command: `python3 -m http.server ${PLAYGROUND_PORT}`,
+      cwd: resolve(REPO_ROOT, 'website'),
+      url: `http://localhost:${PLAYGROUND_PORT}`,
+      reuseExistingServer: false,
+      timeout: 30_000,
       stdout: 'ignore',
       stderr: 'pipe',
     },
