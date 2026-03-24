@@ -2812,10 +2812,7 @@ function ensureOnPropChangeMethod(
   const patchCalls = Array.from(inlinePatchBodies.entries()).map(([propName, bodyStmts]) =>
     t.ifStatement(
       t.binaryExpression('===', t.identifier('key'), t.stringLiteral(propName)),
-      t.tryStatement(
-        t.blockStatement(bodyStmts.map((s) => t.cloneNode(s, true) as t.Statement)),
-        loggingCatchClause(),
-      ),
+      t.blockStatement(bodyStmts.map((s) => t.cloneNode(s, true) as t.Statement)),
     ),
   )
 

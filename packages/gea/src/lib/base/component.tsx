@@ -211,7 +211,11 @@ export default class Component extends Store {
         target[prop] = value
         if (typeof (component as any).__onPropChange === 'function') {
           if (value !== prev || (typeof prev === 'object' && prev !== null)) {
-            ;(component as any).__onPropChange(prop, value)
+            try {
+              ;(component as any).__onPropChange(prop, value)
+            } catch (err) {
+              console.error(err)
+            }
           }
         }
         return true

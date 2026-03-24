@@ -53845,10 +53845,7 @@ function ensureOnPropChangeMethod(classBody, inlinePatchBodies, compiledChildren
   const patchCalls = Array.from(inlinePatchBodies.entries()).map(
     ([propName, bodyStmts]) => libExports.ifStatement(
       libExports.binaryExpression("===", libExports.identifier("key"), libExports.stringLiteral(propName)),
-      libExports.tryStatement(
-        libExports.blockStatement(bodyStmts.map((s) => libExports.cloneNode(s, true))),
-        loggingCatchClause()
-      )
+      libExports.blockStatement(bodyStmts.map((s) => libExports.cloneNode(s, true)))
     )
   );
   const unresolvedMapRefreshCalls = unresolvedMapPropRefreshDeps.map((dep) => {
