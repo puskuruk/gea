@@ -521,6 +521,67 @@ export default class Component extends Store {
     this.__observer_removers__.push(remover)
   }
 
+  __reorderChildren(container: HTMLElement | null, items: Component[]): void {
+    if (!container || !this.rendered_) return
+    for (const item of items) {
+      if (!item.rendered_) {
+        if (!this.__childComponents.includes(item)) {
+          this.__childComponents.push(item)
+        }
+        item.render(container)
+      }
+    }
+    let cursor = container.firstChild
+    for (const item of items) {
+      let el = item.element_
+      if (!el) continue
+      while (el.parentElement && el.parentElement !== container) el = el.parentElement
+      if (el !== cursor) {
+        container.insertBefore(el, cursor || null)
+      } else {
+        cursor = cursor.nextSibling
+      }
+    }
+  }
+
+  __reconcileList(
+    oldItems: Component[],
+    newData: any[],
+    container: HTMLElement | null,
+    Ctor: new (props: any) => Component,
+    propsFactory: (item: any) => any,
+    keyExtractor: (item: any) => any,
+  ): Component[] {
+    const oldByKey = new Map<string, Component>()
+    for (const item of oldItems) {
+      if (item.__geaItemKey != null) oldByKey.set(item.__geaItemKey, item)
+    }
+
+    const next = newData.map(data => {
+      const key = String(keyExtractor(data))
+      const existing = oldByKey.get(key)
+      if (existing) {
+        existing.__geaUpdateProps(propsFactory(data))
+        oldByKey.delete(key)
+        return existing
+      }
+      return this.__child(Ctor, propsFactory(data), key)
+    })
+
+    for (const removed of oldByKey.values()) {
+      removed.dispose?.()
+    }
+
+    this.__reorderChildren(container, next)
+
+    // Clean up __childComponents
+    this.__childComponents = this.__childComponents.filter(
+      child => !oldItems.includes(child) || next.includes(child)
+    )
+
+    return next
+  }
+
   __geaSwapChild(markerId: string, newChild: Component | false | null | undefined) {
     const marker = document.getElementById(this.id_ + '-' + markerId)
     if (!marker) return

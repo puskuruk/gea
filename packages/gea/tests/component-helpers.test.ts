@@ -297,3 +297,110 @@ describe('Component.__observe', () => {
     assert.deepEqual(values, [5]) // No new value
   })
 })
+
+describe('Component.__reconcileList', () => {
+  let restoreDom: () => void
+  let Component: Awaited<ReturnType<typeof loadModules>>['Component']
+
+  beforeEach(async () => {
+    restoreDom = installDom()
+    const mods = await loadModules()
+    Component = mods.Component
+  })
+
+  afterEach(() => {
+    restoreDom()
+  })
+
+  it('removes disposed items and keeps survivors', async () => {
+    class Parent extends Component {
+      template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
+    }
+    class Item extends Component {
+      template() { return `<li id="${this.id}">${this.props.text}</li>` }
+    }
+    const parent = new Parent()
+    document.body.innerHTML = ''
+    parent.render(document.body)
+
+    const items = [
+      parent.__child(Item, { text: 'a' }, 1),
+      parent.__child(Item, { text: 'b' }, 2),
+      parent.__child(Item, { text: 'c' }, 3),
+    ]
+    const list = parent.__el('list')
+    items.forEach(item => item.render(list))
+
+    // Remove item with key "2"
+    const newData = [{ id: 1, text: 'a' }, { id: 3, text: 'c' }]
+    const result = parent.__reconcileList(
+      items, newData, list, Item,
+      d => ({ text: d.text }),
+      d => d.id,
+    )
+    assert.equal(result.length, 2)
+    assert.equal(result[0], items[0]) // reused
+    assert.equal(result[1], items[2]) // reused
+  })
+
+  it('adds new items for new keys', async () => {
+    class Parent extends Component {
+      template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
+    }
+    class Item extends Component {
+      template() { return `<li id="${this.id}">${this.props.text}</li>` }
+    }
+    const parent = new Parent()
+    document.body.innerHTML = ''
+    parent.render(document.body)
+
+    const items = [
+      parent.__child(Item, { text: 'a' }, 1),
+    ]
+    const list = parent.__el('list')
+    items.forEach(item => item.render(list))
+
+    const newData = [{ id: 1, text: 'a' }, { id: 2, text: 'b' }]
+    const result = parent.__reconcileList(
+      items, newData, list, Item,
+      d => ({ text: d.text }),
+      d => d.id,
+    )
+    assert.equal(result.length, 2)
+    assert.equal(result[0], items[0]) // reused
+    assert.notEqual(result[1], items[0]) // new component
+    assert.equal(result[1].__geaItemKey, '2')
+  })
+
+  it('reorders items to match new data order', async () => {
+    class Parent extends Component {
+      template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
+    }
+    class Item extends Component {
+      template() { return `<li id="${this.id}">${this.props.text}</li>` }
+    }
+    const parent = new Parent()
+    document.body.innerHTML = ''
+    parent.render(document.body)
+
+    const items = [
+      parent.__child(Item, { text: 'a' }, 1),
+      parent.__child(Item, { text: 'b' }, 2),
+      parent.__child(Item, { text: 'c' }, 3),
+    ]
+    const list = parent.__el('list')
+    items.forEach(item => item.render(list))
+
+    // Reverse the order
+    const newData = [{ id: 3, text: 'c' }, { id: 1, text: 'a' }, { id: 2, text: 'b' }]
+    const result = parent.__reconcileList(
+      items, newData, list, Item,
+      d => ({ text: d.text }),
+      d => d.id,
+    )
+    assert.equal(result.length, 3)
+    assert.equal(result[0], items[2]) // was third, now first
+    assert.equal(result[1], items[0]) // was first, now second
+    assert.equal(result[2], items[1]) // was second, now third
+  })
+})
