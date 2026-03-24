@@ -43,6 +43,7 @@
     "build": "tsup src/index.ts --format esm --dts --clean --external vite",
     "test": "tsx --test 'tests/**/*.test.ts'",
     "test:e2e": "npx playwright test --config=../../tests/e2e/playwright.config.ts",
+    "build:browser": "rollup -c rollup.browser.config.js",
     "test:coverage": "c8 --reporter=text --reporter=lcov tsx --test 'tests/**/*.test.ts'"
   },
   "dependencies": {
@@ -54,10 +55,15 @@
     "eszter": "^0.3.0"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "@types/node": "^25.4.0",
     "c8": "^11.0.0",
     "cssstyle": "^6.2.0",
     "jsdom": "^28.1.0",
+    "rollup": "^4.60.0",
+    "rollup-plugin-esbuild": "^6.2.1",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
