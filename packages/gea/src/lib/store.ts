@@ -83,7 +83,13 @@ function proxyIterate(
 }
 
 function isNumericIndex(value: string): boolean {
-  return typeof value === 'string' && /^\d+$/.test(value)
+  const len = value.length
+  if (len === 0) return false
+  for (let i = 0; i < len; i++) {
+    const c = value.charCodeAt(i)
+    if (c < 48 || c > 57) return false
+  }
+  return true
 }
 
 function samePathParts(a: string[], b: string[]): boolean {
@@ -428,7 +434,12 @@ export class Store {
     let allSameArray = true
     for (let i = 1; i < batch.length; i++) {
       const change = batch[i]
-      if (!change.isArrayItemPropUpdate || !samePathParts(change.arrayPathParts!, arrayPathParts!)) {
+      // Use reference equality first (interned paths share the same array object),
+      // then fall back to element-wise comparison
+      if (
+        !change.isArrayItemPropUpdate ||
+        (change.arrayPathParts !== arrayPathParts && !samePathParts(change.arrayPathParts!, arrayPathParts!))
+      ) {
         allSameArray = false
         break
       }
@@ -685,13 +696,31 @@ export class Store {
           return native.call(arr, raw, fromIndex)
         }
       }
+      case 'findIndex':
+        return (cb: Function, thisArg?: any) => {
+          for (let i = 0; i < arr.length; i++) {
+            if (cb.call(thisArg, arr[i], i, arr)) return i
+          }
+          return -1
+        }
+      case 'some':
+        return (cb: Function, thisArg?: any) => {
+          for (let i = 0; i < arr.length; i++) {
+            if (cb.call(thisArg, arr[i], i, arr)) return true
+          }
+          return false
+        }
+      case 'every':
+        return (cb: Function, thisArg?: any) => {
+          for (let i = 0; i < arr.length; i++) {
+            if (!cb.call(thisArg, arr[i], i, arr)) return false
+          }
+          return true
+        }
       case 'forEach':
       case 'map':
       case 'filter':
-      case 'some':
-      case 'every':
       case 'find':
-      case 'findIndex':
         return (cb: Function, thisArg?: any) => proxyIterate(arr, basePath, baseParts, mkProxy, method, cb, thisArg)
       case 'reduce':
         return function (cb: Function, init?: any) {
@@ -723,24 +752,39 @@ export class Store {
     const store = this // eslint-disable-line @typescript-eslint/no-this-alias
     let cachedArrayMeta: { arrayPathParts: string[]; arrayIndex: number; baseTail: string[] } | null = null
     for (let i = baseParts.length - 1; i >= 0; i--) {
-      if (!/^\d+$/.test(baseParts[i])) continue
-      const internKey = baseParts.slice(0, i).join('\0')
-      let interned = store._internedArrayPaths.get(internKey)
-      if (!interned) {
-        interned = baseParts.slice(0, i)
-        store._internedArrayPaths.set(internKey, interned)
+      if (!isNumericIndex(baseParts[i])) continue
+      // Fast path for common case: baseParts = ["prop", "N"]
+      let internKey: string
+      let interned: string[]
+      if (i === 1) {
+        internKey = baseParts[0]
+        interned = store._internedArrayPaths.get(internKey)!
+        if (!interned) {
+          interned = [baseParts[0]]
+          store._internedArrayPaths.set(internKey, interned)
+        }
+      } else {
+        internKey = baseParts.slice(0, i).join('\0')
+        interned = store._internedArrayPaths.get(internKey)!
+        if (!interned) {
+          interned = baseParts.slice(0, i)
+          store._internedArrayPaths.set(internKey, interned)
+        }
       }
       cachedArrayMeta = {
         arrayPathParts: interned,
         arrayIndex: Number(baseParts[i]),
-        baseTail: baseParts.slice(i + 1),
+        baseTail: i + 1 < baseParts.length ? baseParts.slice(i + 1) : [],
       }
       break
     }
-    const pathCache = new Map<string, string[]>()
-    const leafCache = new Map<string, string[]>()
+    // Defer Map creation until actually needed (saves allocation for read-only items)
+    let pathCache: Map<string, string[]> | undefined
+    let leafCache: Map<string, string[]> | undefined
+    let methodCache: Map<string, Function> | undefined
 
     function getCachedPathParts(propStr: string): string[] {
+      if (!pathCache) pathCache = new Map()
       let pp = pathCache.get(propStr)
       if (!pp) {
         pp = baseParts.length > 0 ? [...baseParts, propStr] : [propStr]
@@ -754,11 +798,15 @@ export class Store {
     const proxy = new Proxy(target, {
       get(obj: any, prop: string | symbol) {
         if (typeof prop === 'symbol') return obj[prop]
-        if (prop === '__getTarget') return obj
-        if (prop === '__raw') return obj
-        if (prop === '__isProxy') return true
-        if (prop === '__getPath') return basePath
-        if (prop === '__store') return store._selfProxy || store
+        // Meta property checks (used by framework internals)
+        // charCode 95 = '_', fast pre-check to skip for normal properties
+        if ((prop as string).charCodeAt(0) === 95 && (prop as string).charCodeAt(1) === 95) {
+          if (prop === '__getTarget') return obj
+          if (prop === '__isProxy') return true
+          if (prop === '__raw') return obj
+          if (prop === '__getPath') return basePath
+          if (prop === '__store') return store._selfProxy || store
+        }
 
         const value = obj[prop]
         if (value === null || value === undefined) return value
@@ -768,35 +816,46 @@ export class Store {
 
         if (Array.isArray(obj) && valType === 'function') {
           if (prop === 'constructor') return value
-          const intercepted = store._interceptArrayMethod(obj, prop, basePath, baseParts)
-          if (intercepted) return intercepted
-          const iterProxy = store._interceptArrayIterator(obj, prop, basePath, baseParts, createProxy)
-          if (iterProxy) return iterProxy
-          return value.bind(obj)
+          // Cache intercepted methods to avoid switch dispatch on repeated calls
+          if (!methodCache) methodCache = new Map()
+          let cached = methodCache.get(prop)
+          if (cached !== undefined) return cached
+          cached = store._interceptArrayMethod(obj, prop, basePath, baseParts)
+            || store._interceptArrayIterator(obj, prop, basePath, baseParts, createProxy)
+            || value.bind(obj)
+          methodCache.set(prop, cached)
+          return cached
         }
 
         if (valType === 'object') {
+          // Fast path: check array index cache before getPrototypeOf
+          if (Array.isArray(obj) && isNumericIndex(prop as string)) {
+            const indexCache = store._arrayIndexProxyCache.get(obj)
+            if (indexCache) {
+              const cached = indexCache.get(prop)
+              if (cached) return cached
+            }
+          } else {
+            const cached = store._proxyCache.get(value)
+            if (cached) return cached
+          }
           const proto = Object.getPrototypeOf(value)
           if (proto !== Object.prototype && !Array.isArray(value)) return value
-          if (Array.isArray(obj) && /^\d+$/.test(prop as string)) {
+          if (Array.isArray(obj) && isNumericIndex(prop as string)) {
             let indexCache = store._arrayIndexProxyCache.get(obj)
             if (!indexCache) {
               indexCache = new Map()
               store._arrayIndexProxyCache.set(obj, indexCache)
             }
-            let cached = indexCache.get(prop)
-            if (cached) return cached
             const currentPath = basePath ? `${basePath}.${prop}` : (prop as string)
-            cached = createProxy(value, currentPath, getCachedPathParts(prop as string))
-            indexCache.set(prop, cached)
-            return cached
+            const created = createProxy(value, currentPath, getCachedPathParts(prop as string))
+            indexCache.set(prop, created)
+            return created
           }
-          let cached = store._proxyCache.get(value)
-          if (cached) return cached
           const currentPath = basePath ? `${basePath}.${prop}` : (prop as string)
-          cached = createProxy(value, currentPath, getCachedPathParts(prop as string))
-          store._proxyCache.set(value, cached)
-          return cached
+          const created = createProxy(value, currentPath, getCachedPathParts(prop as string))
+          store._proxyCache.set(value, created)
+          return created
         }
 
         if (prop === 'constructor') return value
@@ -808,7 +867,50 @@ export class Store {
           obj[prop] = value
           return true
         }
-        if (value && typeof value === 'object' && value.__isProxy) {
+
+        const oldValue = obj[prop]
+        if (oldValue === value) return true
+
+        // Fast path for primitive values (most common: string, number, boolean)
+        const valType = typeof value
+        if (valType !== 'object' || value === null) {
+          const isNew = !(prop in obj)
+          if (!isNew && oldValue && typeof oldValue === 'object') {
+            store._proxyCache.delete(oldValue)
+            store._clearArrayIndexCache(oldValue)
+          }
+          obj[prop] = value
+
+          const change: StoreChange = {
+            type: isNew ? 'add' : 'update',
+            property: prop,
+            target: obj,
+            pathParts: getCachedPathParts(prop),
+            newValue: value,
+            previousValue: oldValue,
+          }
+          if (cachedArrayMeta) {
+            if (!leafCache) leafCache = new Map()
+            let lp = leafCache.get(prop)
+            if (!lp) {
+              lp = cachedArrayMeta.baseTail.length > 0 ? [...cachedArrayMeta.baseTail, prop] : [prop]
+              leafCache.set(prop, lp)
+            }
+            change.arrayPathParts = cachedArrayMeta.arrayPathParts
+            change.arrayIndex = cachedArrayMeta.arrayIndex
+            change.leafPathParts = lp
+            change.isArrayItemPropUpdate = true
+          }
+          store._pendingChanges.push(change)
+          if (!store._flushScheduled) {
+            store._flushScheduled = true
+            queueMicrotask(store._flushChanges)
+          }
+          return true
+        }
+
+        // Object value path (less common)
+        if (value.__isProxy) {
           const raw = value.__getTarget
           if (raw !== undefined) value = raw
         }
@@ -817,11 +919,9 @@ export class Store {
           obj[prop] = value
           return true
         }
-        const oldValue = obj[prop]
-        if (oldValue === value) return true
 
         const isNew = !Object.prototype.hasOwnProperty.call(obj, prop)
-        if (Array.isArray(obj) && /^\d+$/.test(prop)) store._clearArrayIndexCache(obj)
+        if (Array.isArray(obj) && isNumericIndex(prop)) store._clearArrayIndexCache(obj)
         if (oldValue && typeof oldValue === 'object') {
           store._proxyCache.delete(oldValue)
           store._clearArrayIndexCache(oldValue)
@@ -853,6 +953,7 @@ export class Store {
               newValue: value.slice(start),
             }
             if (cachedArrayMeta) {
+              if (!leafCache) leafCache = new Map()
               let lp = leafCache.get(prop)
               if (!lp) {
                 lp = cachedArrayMeta.baseTail.length > 0 ? [...cachedArrayMeta.baseTail, prop] : [prop]
@@ -881,6 +982,7 @@ export class Store {
           previousValue: oldValue,
         }
         if (cachedArrayMeta) {
+          if (!leafCache) leafCache = new Map()
           let lp = leafCache.get(prop)
           if (!lp) {
             lp = cachedArrayMeta.baseTail.length > 0 ? [...cachedArrayMeta.baseTail, prop] : [prop]
@@ -905,7 +1007,7 @@ export class Store {
           return true
         }
         const oldValue = obj[prop]
-        if (Array.isArray(obj) && /^\d+$/.test(prop)) store._clearArrayIndexCache(obj)
+        if (Array.isArray(obj) && isNumericIndex(prop)) store._clearArrayIndexCache(obj)
         if (oldValue && typeof oldValue === 'object') {
           store._proxyCache.delete(oldValue)
           store._clearArrayIndexCache(oldValue)
@@ -919,6 +1021,7 @@ export class Store {
           previousValue: oldValue,
         }
         if (cachedArrayMeta) {
+          if (!leafCache) leafCache = new Map()
           let lp = leafCache.get(prop)
           if (!lp) {
             lp = cachedArrayMeta.baseTail.length > 0 ? [...cachedArrayMeta.baseTail, prop] : [prop]
