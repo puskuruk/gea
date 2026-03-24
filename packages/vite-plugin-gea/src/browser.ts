@@ -80,7 +80,7 @@ export function compileForBrowser(files: Record<string, string>): CompileResult 
       let { componentClassNames, functionalComponentInfo, hasJSX } = parsed
 
       if (!hasJSX) {
-        const output = generate(ast, { retainLines: true })
+        const output = generate(ast)
         compiledModules[filename] = output.code
         continue
       }
@@ -89,7 +89,7 @@ export function compileForBrowser(files: Record<string, string>): CompileResult 
         convertFunctionalToClass(ast, functionalComponentInfo, imports)
         componentClassName = functionalComponentInfo.name
         componentClassNames = [functionalComponentInfo.name]
-        const freshCode = generate(ast, { retainLines: true }).code
+        const freshCode = generate(ast).code
         const freshParsed = parseSource(freshCode)
         if (freshParsed) {
           ast = freshParsed.ast
@@ -132,7 +132,8 @@ export function compileForBrowser(files: Record<string, string>): CompileResult 
                 storeImports.set(spec.local.name, source)
               }
               const importedName = spec.imported?.name ?? spec.local.name
-              if (source === '@geajs/core' && isComponentTag(importedName)) {
+              const geaCoreBaseClasses = ['Component', 'Store']
+              if (source === '@geajs/core' && isComponentTag(importedName) && !geaCoreBaseClasses.includes(importedName)) {
                 knownComponentImports.add(spec.local.name)
               }
             }
@@ -174,7 +175,7 @@ export function compileForBrowser(files: Record<string, string>): CompileResult 
       }
 
       if (transformed) {
-        const output = generate(ast, { retainLines: true })
+        const output = generate(ast)
         compiledModules[filename] = output.code
       } else {
         compiledModules[filename] = code

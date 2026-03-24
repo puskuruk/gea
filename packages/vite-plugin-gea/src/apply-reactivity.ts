@@ -37,6 +37,7 @@ import {
   replacePropRefsInStatements,
   resolvePath,
   pruneUnusedSetupDestructuring,
+  loggingCatchClause,
 } from './utils.ts'
 import type { StateRefMeta } from './parse.ts'
 import { collectExpressionDependencies } from './transform-attributes.ts'
@@ -77,30 +78,22 @@ function generateCreatedHooks(
     captureExpression: t.Expression
     observeHandlers: Array<{ pathParts: PathParts; methodName: string }>
   }>,
+  hasArrayConfigs: boolean,
 ): t.ClassMethod {
-  const body: t.Statement[] = jsBlockBody`
-    if (!this.__observer_removers__) { this.__observer_removers__ = []; }
-    if (!this.__stores) { this.__stores = {}; }
-    this.__observer_removers__.forEach(fn => fn());
-    this.__observer_removers__ = [];
-    if (this.__ensureArrayConfigs) { this.__ensureArrayConfigs(); }
-  `
+  const body: t.Statement[] = []
+
+  if (hasArrayConfigs) {
+    body.push(js`this.__ensureArrayConfigs();`)
+  }
 
   for (const store of stores) {
-    const storeRef = t.memberExpression(
-      t.memberExpression(t.thisExpression(), t.identifier('__stores')),
-      t.identifier(store.storeVar),
-    )
-
-    body.push(js`${storeRef} = ${t.cloneNode(store.captureExpression, true)};`)
-
     for (const observeHandler of store.observeHandlers) {
       body.push(
         js`
           this.__observer_removers__.push(
-            ${storeRef}.observe(
+            ${t.cloneNode(store.captureExpression, true)}.observe(
               ${t.arrayExpression(observeHandler.pathParts.map((part) => t.stringLiteral(part)))},
-              (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) {} }
+              (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) { console.error(_e) } }
             )
           );
         `,
@@ -115,12 +108,14 @@ function generateCreatedHooks(
 
 function generateLocalStateObserverSetup(
   observeHandlers: Array<{ pathParts: PathParts; methodName: string }>,
+  hasArrayConfigs: boolean,
 ): t.ClassMethod {
   const localStore = t.memberExpression(t.thisExpression(), t.identifier('__store'))
-  const body: t.Statement[] = [
-    js`if (this.__ensureArrayConfigs) { this.__ensureArrayConfigs(); }`,
-    js`if (!${localStore}) { return; }`,
-  ]
+  const body: t.Statement[] = []
+  if (hasArrayConfigs) {
+    body.push(js`this.__ensureArrayConfigs();`)
+  }
+  body.push(js`if (!${localStore}) { return; }`)
 
   observeHandlers.forEach((observeHandler) => {
     body.push(
@@ -128,7 +123,7 @@ function generateLocalStateObserverSetup(
         this.__observer_removers__.push(
           ${localStore}.observe(
             ${t.arrayExpression(observeHandler.pathParts.map((part) => t.stringLiteral(part)))},
-            (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) {} }
+            (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) { console.error(_e) } }
           )
         );
       `,
@@ -2151,7 +2146,7 @@ export function applyStaticReactivity(
               }))
 
               if (storeConfigs.length > 0 || mapRegistrations.length > 0) {
-                const createdHooksMethod = generateCreatedHooks(storeConfigs)
+                const createdHooksMethod = generateCreatedHooks(storeConfigs, htmlArrayMaps.length > 0)
                 if (mapRegistrations.length > 0) {
                   createdHooksMethod.body.body.push(...mapRegistrations)
                 }
@@ -2162,7 +2157,7 @@ export function applyStaticReactivity(
               }
               if (localObserveHandlers.size > 0) {
                 classPath.node.body.body.push(
-                  generateLocalStateObserverSetup(Array.from(localObserveHandlers.values())),
+                  generateLocalStateObserverSetup(Array.from(localObserveHandlers.values()), htmlArrayMaps.length > 0),
                 )
               }
               // Observer cleanup is handled by the parent Component.dispose(),
@@ -2795,7 +2790,7 @@ function ensureOnPropChangeMethod(
       t.binaryExpression('===', t.identifier('key'), t.stringLiteral(propName)),
       t.tryStatement(
         t.blockStatement(bodyStmts.map((s) => t.cloneNode(s, true) as t.Statement)),
-        t.catchClause(null, t.blockStatement([])),
+        loggingCatchClause(),
       ),
     ),
   )
@@ -3039,7 +3034,7 @@ function generateConditionalPatchMethods(
   const initBody: t.Statement[] =
     evalStatements.length > 0
       ? [
-          t.tryStatement(t.blockStatement(evalStatements), t.catchClause(null, t.blockStatement([]))),
+          t.tryStatement(t.blockStatement(evalStatements), loggingCatchClause()),
           ...registerCondCalls,
         ]
       : registerCondCalls

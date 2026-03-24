@@ -1,3 +1,5 @@
+var process = { env: { NODE_ENV: "production" } };
+
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
 function getDefaultExportFromCjs (x) {
@@ -45383,6 +45385,17 @@ function replacePropRefsInNode(node, propNames, wholeParamName, propDefaults) {
   }
   return node;
 }
+function loggingCatchClause(extra = []) {
+  return libExports.catchClause(
+    libExports.identifier("__err"),
+    libExports.blockStatement([
+      libExports.expressionStatement(
+        libExports.callExpression(libExports.memberExpression(libExports.identifier("console"), libExports.identifier("error")), [libExports.identifier("__err")])
+      ),
+      ...extra
+    ])
+  );
+}
 
 function resolvePropRef(expr, propsParamName, destructuredPropNames) {
   if (libExports.isIdentifier(expr) && destructuredPropNames?.has(expr.name)) return expr.name;
@@ -49257,8 +49270,7 @@ function buildPropsBuilderMethod(child) {
   );
   if (hasPropsDestructure) {
     const tryBlock = libExports.blockStatement([...prunedSetup, returnStmt]);
-    const catchBlock = libExports.blockStatement([libExports.returnStatement(libExports.objectExpression([]))]);
-    const tryCatch = libExports.tryStatement(tryBlock, libExports.catchClause(null, catchBlock));
+    const tryCatch = libExports.tryStatement(tryBlock, loggingCatchClause([libExports.returnStatement(libExports.objectExpression([]))]));
     return appendToBody(jsMethod`${id(getPropsBuilderMethodName(child))}() {}`, tryCatch);
   }
   return appendToBody(jsMethod`${id(getPropsBuilderMethodName(child))}() {}`, ...prunedSetup, returnStmt);
@@ -49397,8 +49409,8 @@ function buildValueExpression(textExpr, stateRefs) {
   if (textExpr.isImportedState && textExpr.storeVar) {
     return buildMemberChainFromParts(
       libExports.memberExpression(
-        libExports.memberExpression(libExports.thisExpression(), libExports.identifier("__stores")),
-        libExports.identifier(textExpr.storeVar)
+        libExports.identifier(textExpr.storeVar),
+        libExports.identifier("__store")
       ),
       textExpr.pathParts
     );
@@ -49419,10 +49431,11 @@ function rewriteStateRefs(expr, stateRefs) {
       } else {
         path.replaceWith(
           libExports.memberExpression(
-            libExports.memberExpression(libExports.thisExpression(), libExports.identifier("__stores")),
-            libExports.identifier(path.node.name)
+            libExports.identifier(path.node.name),
+            libExports.identifier("__store")
           )
         );
+        path.skip();
       }
     }
   });
@@ -49977,7 +49990,7 @@ function generateCreateItemMethod(arrayMap, templatePropNames, wholeParamName, t
   body.push(
     libExports.ifStatement(
       libExports.unaryExpression("!", libExports.memberExpression(cVar, libExports.identifier("__geaTpl"))),
-      libExports.blockStatement([libExports.tryStatement(libExports.blockStatement(tplInit), libExports.catchClause(null, libExports.blockStatement([])))])
+      libExports.blockStatement([libExports.tryStatement(libExports.blockStatement(tplInit), loggingCatchClause())])
     )
   );
   if (arrayMap.containerBindingId) {
@@ -50705,8 +50718,8 @@ function generateArrayConditionalPatchObserver(arrayMap, bindings, methodName) {
   const containerRef = libExports.memberExpression(libExports.thisExpression(), libExports.identifier(containerName));
   const proxiedArr = arrayMap.isImportedState ? buildMemberChain(
     libExports.memberExpression(
-      libExports.memberExpression(libExports.thisExpression(), libExports.identifier("__stores")),
-      libExports.identifier(arrayMap.storeVar || "store")
+      libExports.identifier(arrayMap.storeVar || "store"),
+      libExports.identifier("__store")
     ),
     arrayPath
   ) : buildMemberChain(libExports.thisExpression(), arrayPath);
@@ -50766,8 +50779,8 @@ function generateArrayConditionalRerenderObserver(arrayMap, methodName) {
   const configRef = libExports.memberExpression(libExports.thisExpression(), libExports.identifier(getArrayConfigPropName(arrayMap)));
   const proxiedArr = arrayMap.isImportedState ? buildMemberChain(
     libExports.memberExpression(
-      libExports.memberExpression(libExports.thisExpression(), libExports.identifier("__stores")),
-      libExports.identifier(arrayMap.storeVar || "store")
+      libExports.identifier(arrayMap.storeVar || "store"),
+      libExports.identifier("__store")
     ),
     arrayPath
   ) : buildMemberChain(libExports.thisExpression(), arrayPath);
@@ -51596,27 +51609,19 @@ const BOOLEAN_HTML_ATTRS = /* @__PURE__ */ new Set([
   "defer",
   "async"
 ]);
-function generateCreatedHooks(stores) {
-  const body = jsBlockBody`
-    if (!this.__observer_removers__) { this.__observer_removers__ = []; }
-    if (!this.__stores) { this.__stores = {}; }
-    this.__observer_removers__.forEach(fn => fn());
-    this.__observer_removers__ = [];
-    if (this.__ensureArrayConfigs) { this.__ensureArrayConfigs(); }
-  `;
+function generateCreatedHooks(stores, hasArrayConfigs) {
+  const body = [];
+  if (hasArrayConfigs) {
+    body.push(js`this.__ensureArrayConfigs();`);
+  }
   for (const store of stores) {
-    const storeRef = libExports.memberExpression(
-      libExports.memberExpression(libExports.thisExpression(), libExports.identifier("__stores")),
-      libExports.identifier(store.storeVar)
-    );
-    body.push(js`${storeRef} = ${libExports.cloneNode(store.captureExpression, true)};`);
     for (const observeHandler of store.observeHandlers) {
       body.push(
         js`
           this.__observer_removers__.push(
-            ${storeRef}.observe(
+            ${libExports.cloneNode(store.captureExpression, true)}.observe(
               ${libExports.arrayExpression(observeHandler.pathParts.map((part) => libExports.stringLiteral(part)))},
-              (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) {} }
+              (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) { console.error(_e) } }
             )
           );
         `
@@ -51627,19 +51632,20 @@ function generateCreatedHooks(stores) {
   method.body.body.push(...body);
   return method;
 }
-function generateLocalStateObserverSetup(observeHandlers) {
+function generateLocalStateObserverSetup(observeHandlers, hasArrayConfigs) {
   const localStore = libExports.memberExpression(libExports.thisExpression(), libExports.identifier("__store"));
-  const body = [
-    js`if (this.__ensureArrayConfigs) { this.__ensureArrayConfigs(); }`,
-    js`if (!${localStore}) { return; }`
-  ];
+  const body = [];
+  if (hasArrayConfigs) {
+    body.push(js`this.__ensureArrayConfigs();`);
+  }
+  body.push(js`if (!${localStore}) { return; }`);
   observeHandlers.forEach((observeHandler) => {
     body.push(
       js`
         this.__observer_removers__.push(
           ${localStore}.observe(
             ${libExports.arrayExpression(observeHandler.pathParts.map((part) => libExports.stringLiteral(part)))},
-            (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) {} }
+            (__v, __c) => { try { this.${id(observeHandler.methodName)}(__v, __c) } catch(_e) { console.error(_e) } }
           )
         );
       `
@@ -53323,7 +53329,7 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
                 }))
               }));
               if (storeConfigs.length > 0 || mapRegistrations.length > 0) {
-                const createdHooksMethod = generateCreatedHooks(storeConfigs);
+                const createdHooksMethod = generateCreatedHooks(storeConfigs, htmlArrayMaps.length > 0);
                 if (mapRegistrations.length > 0) {
                   createdHooksMethod.body.body.push(...mapRegistrations);
                 }
@@ -53334,7 +53340,7 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
               }
               if (localObserveHandlers.size > 0) {
                 classPath.node.body.body.push(
-                  generateLocalStateObserverSetup(Array.from(localObserveHandlers.values()))
+                  generateLocalStateObserverSetup(Array.from(localObserveHandlers.values()), htmlArrayMaps.length > 0)
                 );
               }
             }
@@ -53817,7 +53823,7 @@ function ensureOnPropChangeMethod(classBody, inlinePatchBodies, compiledChildren
       libExports.binaryExpression("===", libExports.identifier("key"), libExports.stringLiteral(propName)),
       libExports.tryStatement(
         libExports.blockStatement(bodyStmts.map((s) => libExports.cloneNode(s, true))),
-        libExports.catchClause(null, libExports.blockStatement([]))
+        loggingCatchClause()
       )
     )
   );
@@ -54023,7 +54029,7 @@ function generateConditionalPatchMethods(classBody, slots, templatePropNames, wh
   }
   const evalStatements = [...initSetup, ...condAssignments];
   const initBody = evalStatements.length > 0 ? [
-    libExports.tryStatement(libExports.blockStatement(evalStatements), libExports.catchClause(null, libExports.blockStatement([]))),
+    libExports.tryStatement(libExports.blockStatement(evalStatements), loggingCatchClause()),
     ...registerCondCalls
   ] : registerCondCalls;
   inlineIntoConstructor(classBody, initBody);
@@ -55172,7 +55178,7 @@ function compileForBrowser(files) {
       let { ast, componentClassName, imports } = parsed;
       let { componentClassNames, functionalComponentInfo, hasJSX } = parsed;
       if (!hasJSX) {
-        const output = generate(ast, { retainLines: true });
+        const output = generate(ast);
         compiledModules[filename] = output.code;
         continue;
       }
@@ -55180,7 +55186,7 @@ function compileForBrowser(files) {
         convertFunctionalToClass(ast, functionalComponentInfo, imports);
         componentClassName = functionalComponentInfo.name;
         componentClassNames = [functionalComponentInfo.name];
-        const freshCode = generate(ast, { retainLines: true }).code;
+        const freshCode = generate(ast).code;
         const freshParsed = parseSource$1(freshCode);
         if (freshParsed) {
           ast = freshParsed.ast;
@@ -55216,7 +55222,8 @@ function compileForBrowser(files) {
                 storeImports.set(spec.local.name, source);
               }
               const importedName = spec.imported?.name ?? spec.local.name;
-              if (source === "@geajs/core" && isComponentTag(importedName)) {
+              const geaCoreBaseClasses = ["Component", "Store"];
+              if (source === "@geajs/core" && isComponentTag(importedName) && !geaCoreBaseClasses.includes(importedName)) {
                 knownComponentImports.add(spec.local.name);
               }
             }
@@ -55250,7 +55257,7 @@ function compileForBrowser(files) {
         transformed = transformNonComponentJSX(ast, imports);
       }
       if (transformed) {
-        const output = generate(ast, { retainLines: true });
+        const output = generate(ast);
         compiledModules[filename] = output.code;
       } else {
         compiledModules[filename] = code;

@@ -428,8 +428,10 @@ export function geaPlugin(): Plugin {
                     storeImports.set(spec.local.name, source)
                   }
                   // Recognize PascalCase exports from @geajs/core as components
+                  // (exclude base classes — they're not child component tags)
                   const importedName = spec.imported?.name ?? spec.local.name
-                  if (source === '@geajs/core' && isComponentTag(importedName)) {
+                  const geaCoreBaseClasses = ['Component', 'Store']
+                  if (source === '@geajs/core' && isComponentTag(importedName) && !geaCoreBaseClasses.includes(importedName)) {
                     knownComponentImports.add(spec.local.name)
                   }
                 }

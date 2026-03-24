@@ -64,8 +64,8 @@ export function buildValueExpression(textExpr: TextExpression, stateRefs: Map<st
   if (textExpr.isImportedState && textExpr.storeVar) {
     return buildMemberChainFromParts(
       t.memberExpression(
-        t.memberExpression(t.thisExpression(), t.identifier('__stores')),
         t.identifier(textExpr.storeVar),
+        t.identifier('__store'),
       ),
       textExpr.pathParts,
     )
@@ -87,10 +87,11 @@ function rewriteStateRefs(expr: t.Expression, stateRefs: Map<string, StateRefMet
       } else {
         path.replaceWith(
           t.memberExpression(
-            t.memberExpression(t.thisExpression(), t.identifier('__stores')),
             t.identifier(path.node.name),
+            t.identifier('__store'),
           ),
         )
+        path.skip()
       }
     },
   })

@@ -562,3 +562,15 @@ function replacePropRefsInNode(
   }
   return node
 }
+
+export function loggingCatchClause(extra: t.Statement[] = []): t.CatchClause {
+  return t.catchClause(
+    t.identifier('__err'),
+    t.blockStatement([
+      t.expressionStatement(
+        t.callExpression(t.memberExpression(t.identifier('console'), t.identifier('error')), [t.identifier('__err')]),
+      ),
+      ...extra,
+    ]),
+  )
+}

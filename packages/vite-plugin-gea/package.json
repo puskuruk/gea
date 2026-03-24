@@ -44,6 +44,7 @@
     "test": "tsx --test 'tests/**/*.test.ts'",
     "test:e2e": "npx playwright test --config=../../tests/e2e/playwright.config.ts",
     "build:browser": "rollup -c rollup.browser.config.js",
+    "build:codemirror": "rollup -c rollup.codemirror.config.js",
     "test:coverage": "c8 --reporter=text --reporter=lcov tsx --test 'tests/**/*.test.ts'"
   },
   "dependencies": {
@@ -55,6 +56,12 @@
     "eszter": "^0.3.0"
   },
   "devDependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/language": "^6.12.2",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.40.0",
+    "@lezer/highlight": "^1.2.3",
     "@rollup/plugin-commonjs": "^29.0.2",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",

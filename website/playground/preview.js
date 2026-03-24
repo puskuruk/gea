@@ -1,13 +1,21 @@
 // website/playground/preview.js
 
-const GEA_CORE_VERSION = '1.0.3'
-const GEA_CORE_CDN_URL = `https://esm.sh/@geajs/core@${GEA_CORE_VERSION}`
+let geaCoreBlobUrl = null
 
-function rewriteImports(code, blobUrlMap) {
+async function ensureGeaCoreBlob() {
+  if (geaCoreBlobUrl) return geaCoreBlobUrl
+  const resp = await fetch('./playground/gea-core.js')
+  const code = await resp.text()
+  const blob = new Blob([code], { type: 'application/javascript' })
+  geaCoreBlobUrl = URL.createObjectURL(blob)
+  return geaCoreBlobUrl
+}
+
+function rewriteImports(code, blobUrlMap, coreUrl) {
   return code
     .replace(
       /from\s+['"]@geajs\/core['"]/g,
-      `from '${GEA_CORE_CDN_URL}'`
+      `from '${coreUrl}'`
     )
     .replace(
       /from\s+['"](\.[^'"]+)['"]/g,
@@ -24,13 +32,13 @@ function rewriteImports(code, blobUrlMap) {
     )
 }
 
-function createBlobModules(compiledModules, fileOrder) {
+function createBlobModules(compiledModules, fileOrder, coreUrl) {
   const blobUrls = {}
 
   for (const filename of fileOrder) {
     const code = compiledModules[filename]
     if (!code) continue
-    const rewritten = rewriteImports(code, blobUrls)
+    const rewritten = rewriteImports(code, blobUrls, coreUrl)
     const blob = new Blob([rewritten], { type: 'application/javascript' })
     blobUrls[filename] = URL.createObjectURL(blob)
   }
@@ -38,21 +46,14 @@ function createBlobModules(compiledModules, fileOrder) {
   return blobUrls
 }
 
-function generateSrcdoc(entryBlobUrl) {
+function generateSrcdoc(entryBlobUrl, previewCSS) {
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <style>
   body { font-family: system-ui, sans-serif; color: #e0dff5; margin: 16px; }
-  .counter { display: flex; align-items: center; gap: 12px; }
-  .counter span { font-size: 2rem; min-width: 3ch; text-align: center; }
-  .counter button {
-    font-size: 1.5rem; padding: 8px 16px; cursor: pointer;
-    background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.3);
-    color: #00e5ff; border-radius: 6px;
-  }
-  .counter button:hover { background: rgba(0, 229, 255, 0.2); }
+  ${previewCSS || ''}
 </style>
 </head>
 <body>
@@ -82,7 +83,7 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-export function renderPreview(iframe, compiledModules, fileOrder, errors) {
+export async function renderPreview(iframe, compiledModules, fileOrder, errors, previewCSS) {
   if (iframe._blobUrls) {
     Object.values(iframe._blobUrls).forEach(url => URL.revokeObjectURL(url))
   }
@@ -92,11 +93,12 @@ export function renderPreview(iframe, compiledModules, fileOrder, errors) {
     return
   }
 
-  const blobUrls = createBlobModules(compiledModules, fileOrder)
+  const coreUrl = await ensureGeaCoreBlob()
+  const blobUrls = createBlobModules(compiledModules, fileOrder, coreUrl)
   iframe._blobUrls = blobUrls
 
   const entryFile = fileOrder[fileOrder.length - 1]
   const entryUrl = blobUrls[entryFile]
 
-  iframe.srcdoc = generateSrcdoc(entryUrl)
+  iframe.srcdoc = generateSrcdoc(entryUrl, previewCSS)
 }

@@ -31,8 +31,8 @@ test('static reactivity wires subscriptions for every imported store used by a c
     }
   `)
 
-  assert.match(output, /this\.__stores\.counterStore = counterStore\.__store/)
-  assert.match(output, /this\.__stores\.filterStore = filterStore\.__store/)
+  assert.match(output, /counterStore\.__store\.observe/)
+  assert.match(output, /filterStore\.__store\.observe/)
 })
 
 test('static reactivity detects default Store imports across files', async () => {
@@ -65,7 +65,7 @@ export default class DashboardStore extends Store {
     )
 
     assert.ok(output)
-    assert.match(output, /this\.__stores\.store = store/)
+    assert.match(output, /store\.__store\.observe/)
     assert.match(output, /observe\(\["count"\]/)
   } finally {
     await rm(dir, { recursive: true, force: true })
@@ -191,9 +191,8 @@ test('wildcard observers resolve imported array paths correctly', () => {
     const methodSource = generate(method).code
     const harness = createObserveHarness(
       methodSource,
-      `
-      this.__stores = { storeState: { todos: [{ id: 1, label: 'before' }] } };
-      `,
+      '',
+      { storeState: { __store: { todos: [{ id: 1, label: 'before' }] } } },
     )
     harness.root = document.createElement('div')
     harness.root.innerHTML = '<div class="item" data-gea-item-id="0"><span class="label">before</span></div>'

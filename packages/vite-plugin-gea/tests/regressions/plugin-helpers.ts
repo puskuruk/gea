@@ -265,7 +265,7 @@ export async function transformWithPlugin(source: string, id: string): Promise<s
   return typeof result === 'string' ? result : result.code
 }
 
-export function createObserveHarness(methodSource: string, setupSource = '') {
+export function createObserveHarness(methodSource: string, setupSource = '', scopeVars: Record<string, any> = {}) {
   const source = `
     class Harness {
       constructor() {
@@ -278,7 +278,9 @@ export function createObserveHarness(methodSource: string, setupSource = '') {
     }
     return Harness;
   `
-  const Harness = new Function(source)() as new () => {
+  const paramNames = Object.keys(scopeVars)
+  const paramValues = Object.values(scopeVars)
+  const Harness = new Function(...paramNames, source)(...paramValues) as new () => {
     root: HTMLElement
     props?: Record<string, unknown>
   } & Record<string, any>

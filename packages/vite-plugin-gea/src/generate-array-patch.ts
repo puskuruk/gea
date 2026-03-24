@@ -2,7 +2,7 @@ import * as t from '@babel/types'
 import { appendToBody, id, js, jsMethod } from 'eszter'
 import type { NodePath } from '@babel/traverse'
 import type { ArrayMapBinding } from './ir.ts'
-import { normalizePathParts, pathPartsToString, replacePropRefsInExpression, isComponentTag, getJSXTagName, camelToKebab } from './utils.ts'
+import { normalizePathParts, pathPartsToString, replacePropRefsInExpression, isComponentTag, getJSXTagName, camelToKebab, loggingCatchClause } from './utils.ts'
 import { ITEM_IS_KEY } from './analyze-helpers.ts'
 import { createRequire } from 'module'
 
@@ -478,7 +478,7 @@ export function generateCreateItemMethod(
   body.push(
     t.ifStatement(
       t.unaryExpression('!', t.memberExpression(cVar, t.identifier('__geaTpl'))),
-      t.blockStatement([t.tryStatement(t.blockStatement(tplInit), t.catchClause(null, t.blockStatement([])))]),
+      t.blockStatement([t.tryStatement(t.blockStatement(tplInit), loggingCatchClause())]),
     ),
   )
 

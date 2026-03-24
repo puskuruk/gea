@@ -2,7 +2,7 @@ import * as t from '@babel/types'
 import { appendToBody, id, js, jsMethod } from 'eszter'
 import type { NodePath } from '@babel/traverse'
 import type { ChildComponent } from './ir.ts'
-import { pruneUnusedSetupDestructuring } from './utils.ts'
+import { pruneUnusedSetupDestructuring, loggingCatchClause } from './utils.ts'
 
 export function childHasNoProps(child: ChildComponent): boolean {
   return t.isObjectExpression(child.propsExpression) && child.propsExpression.properties.length === 0
@@ -200,8 +200,7 @@ function buildPropsBuilderMethod(child: ChildComponent): t.ClassMethod {
 
   if (hasPropsDestructure) {
     const tryBlock = t.blockStatement([...prunedSetup, returnStmt])
-    const catchBlock = t.blockStatement([t.returnStatement(t.objectExpression([]))])
-    const tryCatch = t.tryStatement(tryBlock, t.catchClause(null, catchBlock))
+    const tryCatch = t.tryStatement(tryBlock, loggingCatchClause([t.returnStatement(t.objectExpression([]))]))
     return appendToBody(jsMethod`${id(getPropsBuilderMethodName(child))}() {}`, tryCatch)
   }
 

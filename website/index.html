@@ -397,10 +397,19 @@
         display: flex;
         gap: 0;
         margin-bottom: 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+
+      .code-tabs::-webkit-scrollbar {
+        display: none;
       }
 
       .code-tab {
         padding: 0.75rem 1.8rem;
+        white-space: nowrap;
+        flex-shrink: 0;
         background: rgba(0, 229, 255, 0.04);
         border: 1px solid rgba(0, 229, 255, 0.1);
         border-bottom: none;
@@ -420,6 +429,67 @@
 
       .code-tab:hover:not(.active) {
         color: var(--text);
+      }
+
+      .tab-mode-toggle {
+        display: none;
+        font-size: 0.65rem;
+        margin-left: 6px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        background: rgba(0, 229, 255, 0.1);
+        color: rgba(0, 229, 255, 0.6);
+        vertical-align: middle;
+        cursor: pointer;
+      }
+
+      .code-tab.active .tab-mode-toggle {
+        display: inline;
+      }
+
+      .code-tab.compiled .tab-mode-toggle {
+        background: rgba(233, 30, 255, 0.15);
+        color: #e91eff;
+      }
+
+      .example-selector {
+        display: flex;
+        gap: 0;
+        margin-right: 12px;
+        border-right: 1px solid rgba(0, 229, 255, 0.1);
+        padding-right: 12px;
+        flex-shrink: 0;
+      }
+
+      .example-btn {
+        padding: 0.5rem 1rem;
+        background: none;
+        border: 1px solid rgba(0, 229, 255, 0.1);
+        color: var(--text-dim);
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .example-btn:first-child {
+        border-radius: 6px 0 0 6px;
+      }
+
+      .example-btn:last-child {
+        border-radius: 0 6px 6px 0;
+        border-left: none;
+      }
+
+      .example-btn.active {
+        background: rgba(0, 229, 255, 0.1);
+        color: var(--cyan);
+        border-color: rgba(0, 229, 255, 0.3);
+      }
+
+      .code-tab.compiled {
+        border-color: rgba(233, 30, 255, 0.3);
+        color: #e91eff;
       }
 
       .code-panels {
@@ -833,40 +903,8 @@
         }
       }
       /* ── Playground ── */
-      .playground-trigger {
-        display: flex;
-        justify-content: center;
-        margin-top: 1.5rem;
-      }
-
-      .playground-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1.5rem;
-        background: rgba(0, 229, 255, 0.08);
-        border: 1px solid rgba(0, 229, 255, 0.2);
-        border-radius: 8px;
-        color: var(--cyan);
-        font-family: 'Exo 2', sans-serif;
-        font-size: 0.9rem;
-        cursor: pointer;
-        transition: all 0.3s;
-      }
-
-      .playground-btn:hover {
-        background: rgba(0, 229, 255, 0.15);
-        box-shadow: var(--glow-cyan);
-      }
-
-      .playground-btn.loading {
-        opacity: 0.6;
-        cursor: wait;
-      }
-
       .playground-container {
         display: none;
-        margin-top: 1rem;
       }
 
       .playground-container.active {
@@ -1035,6 +1073,10 @@
       </p>
 
       <div class="code-tabs">
+        <div class="example-selector">
+          <button class="example-btn active" data-example="counter">Counter</button>
+          <button class="example-btn" data-example="todo">Todo</button>
+        </div>
         <button class="code-tab active" data-tab="store">store.ts</button>
         <button class="code-tab" data-tab="component">Counter.tsx</button>
         <button class="code-tab" data-tab="app">app.tsx</button>
@@ -1074,11 +1116,6 @@
 <span class="kw">const</span> <span class="fn">app</span> <span class="op">=</span> <span class="kw">new</span> <span class="cls">Counter</span>()
 <span class="fn">app</span>.<span class="fn">render</span>(document.<span class="fn">getElementById</span>(<span class="str">'app'</span>))</pre>
         </div>
-      </div>
-      <div class="playground-trigger">
-        <button class="playground-btn" id="playground-activate">
-          Explore interactively
-        </button>
       </div>
       <div class="playground-container" id="playground-container">
         <div class="playground-editor" id="playground-editor"></div>
@@ -1439,90 +1476,181 @@
       )
       document.querySelectorAll('.benchmark-container').forEach((el) => benchObserver.observe(el))
 
-    // ── Playground ──
-    const playgroundFiles = {
-      'store.ts': `import { Store } from '@geajs/core'\n\nclass CounterStore extends Store {\n  count = 0\n\n  increment() { this.count++ }\n  decrement() { this.count-- }\n}\n\nexport default new CounterStore()`,
-      'Counter.tsx': `import { Component } from '@geajs/core'\nimport store from './store'\n\nexport default class Counter extends Component {\n  template() {\n    return (\n      <div class="counter">\n        <span>{store.count}</span>\n        <button click={store.increment}>+</button>\n        <button click={store.decrement}>-</button>\n      </div>\n    )\n  }\n}`,
-      'app.tsx': `import Counter from './Counter'\n\nconst app = new Counter()\napp.render(document.getElementById('app'))`,
-    }
-    const fileOrder = ['store.ts', 'Counter.tsx', 'app.tsx']
-    const tabToFile = { store: 'store.ts', component: 'Counter.tsx', app: 'app.tsx' }
-
-    let playgroundReady = false
-    let playgroundModules = null
-    let editorInstance = null
-    let compileTimer = null
-
-    // Preload playground assets after page load
-    window.addEventListener('load', () => {
-      Promise.all([
-        import('./playground/gea-compiler-browser.js'),
-        import('./playground/editor.js'),
-        import('./playground/preview.js'),
-      ]).then(([compiler, editor, preview]) => {
-        playgroundModules = { compiler, editor, preview }
-        playgroundReady = true
-        // Remove loading state if button was already clicked
-        const btn = document.getElementById('playground-activate')
-        if (btn.classList.contains('loading')) {
-          activatePlayground()
-        }
-      }).catch(err => {
-        console.error('Failed to preload playground:', err)
-      })
-    })
-
-    async function activatePlayground() {
-      if (!playgroundModules) return
-      const { compiler, editor, preview } = playgroundModules
-
-      const btn = document.getElementById('playground-activate')
-      const container = document.getElementById('playground-container')
-      const editorEl = document.getElementById('playground-editor')
-      const iframe = document.getElementById('playground-preview')
-
-      // Hide static code panels, show playground
-      document.querySelector('.code-panels').style.display = 'none'
-      btn.style.display = 'none'
-      container.classList.add('active')
-
-      // Create editor
-      const activeTab = document.querySelector('.code-tab.active')
-      const activeFile = tabToFile[activeTab?.dataset.tab || 'store']
-
-      editorInstance = await editor.createEditor(editorEl, playgroundFiles, activeFile, (files) => {
-        // Debounced recompile
-        clearTimeout(compileTimer)
-        compileTimer = setTimeout(() => compileAndPreview(files, compiler, preview, iframe), 300)
-      })
-
-      // Wire tab clicks to editor
-      document.querySelectorAll('.code-tab').forEach((tab) => {
-        tab.addEventListener('click', () => {
-          if (editorInstance) {
-            editorInstance.setActiveFile(tabToFile[tab.dataset.tab])
-          }
-        })
-      })
-
-      // Initial compile
-      compileAndPreview(playgroundFiles, compiler, preview, iframe)
-    }
-
-    function compileAndPreview(files, compiler, preview, iframe) {
-      const result = compiler.compileForBrowser(files)
-      preview.renderPreview(iframe, result.compiledModules, fileOrder, result.errors)
-    }
-
-    document.getElementById('playground-activate').addEventListener('click', () => {
-      const btn = document.getElementById('playground-activate')
-      if (playgroundReady) {
-        activatePlayground()
-      } else {
-        btn.classList.add('loading')
-        btn.textContent = 'Loading...'
+      // ── Playground ──
+      const examples = {
+        counter: {
+          files: {
+            'store.ts': `import { Store } from '@geajs/core'\n\nclass CounterStore extends Store {\n  count = 0\n\n  increment() { this.count++ }\n  decrement() { this.count-- }\n}\n\nexport default new CounterStore()`,
+            'Counter.tsx': `import { Component } from '@geajs/core'\nimport store from './store'\n\nexport default class Counter extends Component {\n  template() {\n    return (\n      <div class="counter">\n        <span>{store.count}</span>\n        <button click={store.increment}>+</button>\n        <button click={store.decrement}>-</button>\n      </div>\n    )\n  }\n}`,
+            'app.tsx': `import Counter from './Counter'\n\nconst app = new Counter()\napp.render(document.getElementById('app'))`,
+          },
+          fileOrder: ['store.ts', 'Counter.tsx', 'app.tsx'],
+          compiledFile: 'Counter.tsx',
+          previewCSS: `.counter { display: flex; align-items: center; gap: 12px; }
+  .counter span { font-size: 2rem; min-width: 3ch; text-align: center; }
+  .counter button { font-size: 1.5rem; padding: 8px 16px; cursor: pointer; background: rgba(0,229,255,0.1); border: 1px solid rgba(0,229,255,0.3); color: #00e5ff; border-radius: 6px; }
+  .counter button:hover { background: rgba(0,229,255,0.2); }`,
+        },
+        todo: {
+          files: {
+            'todo-store.ts': `import { Store } from '@geajs/core'\n\nclass TodoStore extends Store {\n  todos = []\n  draft = ''\n\n  setDraft(e) { this.draft = e.target.value }\n\n  add() {\n    const text = this.draft.trim()\n    if (!text) return\n    this.todos.push({ id: Date.now(), text, done: false })\n    this.draft = ''\n  }\n\n  toggle(id) {\n    const todo = this.todos.find(t => t.id === id)\n    if (todo) todo.done = !todo.done\n  }\n\n  remove(id) {\n    this.todos = this.todos.filter(t => t.id !== id)\n  }\n\n  get activeCount() {\n    return this.todos.filter(t => !t.done).length\n  }\n\n  get completedCount() {\n    return this.todos.filter(t => t.done).length\n  }\n}\n\nexport default new TodoStore()`,
+            'TodoInput.tsx': `export default function TodoInput({ draft, onInput, onAdd }) {\n  return (\n    <div class="input-row">\n      <input\n        type="text"\n        value={draft}\n        input={onInput}\n        keydown={(e) => e.key === 'Enter' && onAdd()}\n        placeholder="What needs to be done?"\n      />\n      <button click={onAdd}>Add</button>\n    </div>\n  )\n}`,
+            'TodoItem.tsx': `export default function TodoItem({ todo, onToggle, onRemove }) {\n  return (\n    <li class={todo.done ? 'done' : ''}>\n      <input type="checkbox" checked={todo.done} change={onToggle} />\n      <span>{todo.text}</span>\n      <button class="remove" click={onRemove}>\u00d7</button>\n    </li>\n  )\n}`,
+            'TodoApp.tsx': `import { Component } from '@geajs/core'\nimport store from './todo-store'\nimport TodoInput from './TodoInput'\nimport TodoItem from './TodoItem'\n\nexport default class TodoApp extends Component {\n  template() {\n    return (\n      <div class="todo-app">\n        <h2>Todos</h2>\n        <TodoInput\n          draft={store.draft}\n          onInput={store.setDraft}\n          onAdd={() => store.add()}\n        />\n        <ul class="todo-list">\n          {store.todos.map(todo => (\n            <TodoItem\n              key={todo.id}\n              todo={todo}\n              onToggle={() => store.toggle(todo.id)}\n              onRemove={() => store.remove(todo.id)}\n            />\n          ))}\n        </ul>\n        <p class="count">{store.activeCount} active, {store.completedCount} completed</p>\n      </div>\n    )\n  }\n}`,
+            'app.tsx': `import TodoApp from './TodoApp'\n\nconst app = new TodoApp()\napp.render(document.getElementById('app'))`,
+          },
+          fileOrder: ['todo-store.ts', 'TodoApp.tsx', 'TodoInput.tsx', 'TodoItem.tsx', 'app.tsx'],
+          compileOrder: ['todo-store.ts', 'TodoInput.tsx', 'TodoItem.tsx', 'TodoApp.tsx', 'app.tsx'],
+          compiledFile: 'TodoApp.tsx',
+          previewCSS: `.todo-app h2 { margin: 0 0 12px; font-size: 1.4rem; }
+  .input-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .input-row input { flex: 1; padding: 8px 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(0,229,255,0.2); border-radius: 6px; color: #e0dff5; font-size: 0.9rem; outline: none; }
+  .input-row input:focus { border-color: rgba(0,229,255,0.5); }
+  .input-row button { padding: 8px 16px; background: rgba(0,229,255,0.15); border: 1px solid rgba(0,229,255,0.3); color: #00e5ff; border-radius: 6px; cursor: pointer; }
+  .input-row button:hover { background: rgba(0,229,255,0.25); }
+  .todo-list { list-style: none; padding: 0; margin: 0; }
+  .todo-list li { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .todo-list li.done span { text-decoration: line-through; opacity: 0.4; }
+  .todo-list li input[type=checkbox] { accent-color: #00e5ff; }
+  .todo-list li span { flex: 1; }
+  .todo-list li .remove { background: none; border: none; color: rgba(255,100,100,0.6); cursor: pointer; font-size: 1.2rem; padding: 0 4px; }
+  .todo-list li .remove:hover { color: #ff6b6b; }
+  .count { color: rgba(200,182,255,0.4); font-size: 0.8rem; margin-top: 12px; }`,
+        },
       }
-    })
+
+      let activeExample = 'counter'
+      let playgroundReady = false
+      let playgroundModules = null
+      let editorInstance = null
+      let compileTimer = null
+
+      let showingCompiled = false
+      let compiledModulesCache = {}
+      let activeFile = ''
+
+      function buildTabs(example) {
+        const tabsEl = document.querySelector('.code-tabs')
+        const selector = tabsEl.querySelector('.example-selector')
+        tabsEl.innerHTML = ''
+        if (selector) tabsEl.appendChild(selector)
+
+        example.fileOrder.forEach((filename, i) => {
+          const btn = document.createElement('button')
+          btn.className = 'code-tab' + (i === 0 ? ' active' : '')
+          btn.dataset.file = filename
+          btn.innerHTML = `<span class="tab-name">${filename}</span><span class="tab-mode-toggle">original</span>`
+          tabsEl.appendChild(btn)
+        })
+
+        activeFile = example.fileOrder[0]
+        showingCompiled = false
+
+        tabsEl.querySelectorAll('.code-tab').forEach((tab) => {
+          tab.addEventListener('click', () => {
+            if (!editorInstance) return
+            if (tab.classList.contains('active')) {
+              // Click active tab → toggle compiled
+              showingCompiled = !showingCompiled
+              tab.classList.toggle('compiled', showingCompiled)
+              tab.querySelector('.tab-mode-toggle').textContent = showingCompiled ? 'compiled' : 'original'
+              if (showingCompiled) {
+                editorInstance.showCompiled(compiledModulesCache[activeFile] || '')
+                editorInstance.setCompiledView()
+              } else {
+                editorInstance.setActiveFile(activeFile)
+              }
+            } else {
+              // Click different tab → switch file, reset to source
+              tabsEl.querySelectorAll('.code-tab').forEach((t) => {
+                t.classList.remove('active')
+                t.classList.remove('compiled')
+                t.querySelector('.tab-mode-toggle').textContent = 'original'
+              })
+              tab.classList.add('active')
+              activeFile = tab.dataset.file
+              showingCompiled = false
+              editorInstance.setActiveFile(activeFile)
+            }
+          })
+        })
+      }
+
+      function switchExample(name) {
+        if (name === activeExample && editorInstance) return
+        activeExample = name
+        const example = examples[name]
+
+        // Update selector active state
+        document.querySelectorAll('.example-btn').forEach((b) => {
+          b.classList.toggle('active', b.dataset.example === name)
+        })
+
+        buildTabs(example)
+
+        if (editorInstance) {
+          editorInstance.loadFiles(example.files, example.fileOrder[0])
+          compileAndPreview(example.files)
+        }
+      }
+
+      // Preload playground assets after page load
+      window.addEventListener('load', () => {
+        Promise.all([
+          import('./playground/gea-compiler-browser.js'),
+          import('./playground/editor.js'),
+          import('./playground/preview.js'),
+        ])
+          .then(([compiler, editor, preview]) => {
+            playgroundModules = { compiler, editor, preview }
+            playgroundReady = true
+            activatePlayground()
+          })
+          .catch((err) => {
+            console.error('Failed to preload playground:', err)
+          })
+      })
+
+      async function activatePlayground() {
+        if (!playgroundModules) return
+        const { compiler, editor, preview } = playgroundModules
+        const example = examples[activeExample]
+
+        const container = document.getElementById('playground-container')
+        const editorEl = document.getElementById('playground-editor')
+
+        // Hide static code panels, show playground
+        document.querySelector('.code-panels').style.display = 'none'
+        container.classList.add('active')
+
+        buildTabs(example)
+
+        editorInstance = await editor.createEditor(editorEl, example.files, example.fileOrder[0], (files) => {
+          clearTimeout(compileTimer)
+          compileTimer = setTimeout(() => compileAndPreview(files), 300)
+        })
+
+        // Wire example selector
+        document.querySelectorAll('.example-btn').forEach((btn) => {
+          btn.addEventListener('click', () => switchExample(btn.dataset.example))
+        })
+
+        // Initial compile
+        compileAndPreview(example.files)
+      }
+
+      function compileAndPreview(files) {
+        const { compiler, preview } = playgroundModules
+        const example = examples[activeExample]
+        const iframe = document.getElementById('playground-preview')
+        const result = compiler.compileForBrowser(files)
+        compiledModulesCache = result.compiledModules
+        if (editorInstance && showingCompiled) {
+          editorInstance.showCompiled(compiledModulesCache[activeFile] || '')
+        }
+        const blobOrder = example.compileOrder || example.fileOrder
+        preview.renderPreview(iframe, result.compiledModules, blobOrder, result.errors, example.previewCSS)
+      }
     </script>
   </body>
 </html>

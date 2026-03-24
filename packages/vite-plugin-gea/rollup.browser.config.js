@@ -49,6 +49,7 @@ export default {
     file: '../../website/playground/gea-compiler-browser.js',
     format: 'es',
     inlineDynamicImports: true,
+    intro: 'var process = { env: { NODE_ENV: "production" } };',
   },
   plugins: [
     rewriteCreateRequire(),

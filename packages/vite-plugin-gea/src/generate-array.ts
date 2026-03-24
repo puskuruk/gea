@@ -511,8 +511,8 @@ export function generateArrayConditionalPatchObserver(
   const proxiedArr = arrayMap.isImportedState
     ? buildMemberChain(
         t.memberExpression(
-          t.memberExpression(t.thisExpression(), t.identifier('__stores')),
           t.identifier(arrayMap.storeVar || 'store'),
+          t.identifier('__store'),
         ),
         arrayPath,
       )
@@ -581,8 +581,8 @@ export function generateArrayConditionalRerenderObserver(arrayMap: ArrayMapBindi
   const proxiedArr = arrayMap.isImportedState
     ? buildMemberChain(
         t.memberExpression(
-          t.memberExpression(t.thisExpression(), t.identifier('__stores')),
           t.identifier(arrayMap.storeVar || 'store'),
+          t.identifier('__store'),
         ),
         arrayPath,
       )
