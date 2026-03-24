@@ -441,22 +441,19 @@ describe('Component.__observeList', () => {
       template() { return `<li id="${this.id}">${this.props.text}</li>` }
     }
     class Parent extends Component {
-      _items!: any[]
+      _items: any[] = []
       template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
-      created() { this._items = [] }
-      createdHooks() {
-        this.__observeList(store, ['todos'], {
-          items: this._items,
-          container: () => this.__el('list'),
-          Ctor: Item,
-          props: (todo: any) => ({ text: todo.text }),
-          key: (todo: any) => todo.id,
-        })
-      }
     }
     const parent = new Parent()
     document.body.innerHTML = ''
     parent.render(document.body)
+    parent.__observeList(store, ['todos'], {
+      items: parent._items,
+      container: () => parent.__el('list'),
+      Ctor: Item,
+      props: (todo: any) => ({ text: todo.text }),
+      key: (todo: any) => todo.id,
+    })
 
     store.add('first')
     await new Promise(resolve => setTimeout(resolve, 50))
@@ -469,22 +466,19 @@ describe('Component.__observeList', () => {
       template() { return `<li id="${this.id}">${this.props.done ? 'done' : 'todo'}</li>` }
     }
     class Parent extends Component {
-      _items!: any[]
+      _items: any[] = []
       template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
-      created() { this._items = [] }
-      createdHooks() {
-        this.__observeList(store, ['todos'], {
-          items: this._items,
-          container: () => this.__el('list'),
-          Ctor: Item,
-          props: (todo: any) => ({ text: todo.text, done: todo.done }),
-          key: (todo: any) => todo.id,
-        })
-      }
     }
     const parent = new Parent()
     document.body.innerHTML = ''
     parent.render(document.body)
+    parent.__observeList(store, ['todos'], {
+      items: parent._items,
+      container: () => parent.__el('list'),
+      Ctor: Item,
+      props: (todo: any) => ({ text: todo.text, done: todo.done }),
+      key: (todo: any) => todo.id,
+    })
 
     store.add('task')
     await new Promise(resolve => setTimeout(resolve, 50))
@@ -501,22 +495,19 @@ describe('Component.__observeList', () => {
       template() { return `<li id="${this.id}">${this.props.text}</li>` }
     }
     class Parent extends Component {
-      _items!: any[]
+      _items: any[] = []
       template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
-      created() { this._items = [] }
-      createdHooks() {
-        this.__observeList(store, ['todos'], {
-          items: this._items,
-          container: () => this.__el('list'),
-          Ctor: Item,
-          props: (todo: any) => ({ text: todo.text }),
-          key: (todo: any) => todo.id,
-        })
-      }
     }
     const parent = new Parent()
     document.body.innerHTML = ''
     parent.render(document.body)
+    parent.__observeList(store, ['todos'], {
+      items: parent._items,
+      container: () => parent.__el('list'),
+      Ctor: Item,
+      props: (todo: any) => ({ text: todo.text }),
+      key: (todo: any) => todo.id,
+    })
 
     store.add('first')
     store.add('second')

@@ -365,8 +365,8 @@ export default class App extends Component {
     assert.match(output!, /__geaRegisterCond/, 'should register conditional slots for store-driven conditionals')
     assert.match(output!, /__geaPatchCond/, 'should patch conditional slots reactively')
     // Must register an observer for cartOpen on the store
-    assert.match(output!, /observe\(\["cartOpen"\]/, 'should register observer for cartOpen')
-    assert.match(output!, /observe\(\["checkoutOpen"\]/, 'should register observer for checkoutOpen')
+    assert.match(output!, /__observe\(store, \["cartOpen"\]/, 'should register observer for cartOpen')
+    assert.match(output!, /__observe\(store, \["checkoutOpen"\]/, 'should register observer for checkoutOpen')
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

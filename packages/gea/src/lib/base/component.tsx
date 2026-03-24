@@ -517,7 +517,7 @@ export default class Component extends Store {
   }
 
   __observe(store: any, path: string[], handler: (value: any, changes: any[]) => void): void {
-    const remover = store.__store.observe(path, handler)
+    const remover = store.__store.observe(path, handler.bind(this))
     this.__observer_removers__.push(remover)
   }
 
