@@ -125,7 +125,7 @@ Full documentation is available in the [docs](docs/) directory, covering:
 - [Getting Started](docs/getting-started.md)
 - [Stores](docs/core-concepts/stores.md) and [Components](docs/core-concepts/components.md)
 - [JSX Syntax](docs/core-concepts/jsx-syntax.md)
-- [Router](docs/core-concepts/router.md)
+- [Router](docs/gea-router/overview.md)
 - [Gea UI](docs/gea-ui/overview.md)
 - [Gea Mobile](docs/gea-mobile/overview.md)
 - [API Reference](docs/api-reference.md)

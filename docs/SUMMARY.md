@@ -12,7 +12,7 @@
 - [JSX Syntax](core-concepts/jsx-syntax.md)
 - [Rendering](core-concepts/rendering.md)
 - [Computed Values](core-concepts/computed-values.md)
-- [Router](core-concepts/router.md)
+- [Router](gea-router/overview.md)
 
 ## Gea Router
 

@@ -107,6 +107,6 @@ app.render(document.getElementById('app'))
 - Learn about [Stores](core-concepts/stores.md) and the reactivity system
 - Explore [Components](core-concepts/components.md) — class and function styles
 - Understand [JSX Syntax](core-concepts/jsx-syntax.md) differences from React
-- Add client-side routing with the built-in [Router](core-concepts/router.md)
+- Add client-side routing with the built-in [Router](gea-router/overview.md)
 - Add mobile UI with [Gea Mobile](gea-mobile/overview.md)
 - Use Gea without a build step — [Browser Usage](browser-usage.md)
