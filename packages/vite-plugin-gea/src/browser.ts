@@ -101,17 +101,12 @@ export function compileForBrowser(files: Record<string, string>): CompileResult 
       const storeImports = new Map<string, string>()
       const knownComponentImports = new Set<string>()
       const namedImportSources = new Map<string, string>()
-      const componentImportSet = new Set<string>()
       const componentImportsUsedAsTags = new Set<string>()
 
       traverse(ast, {
         ImportDeclaration(path: any) {
           const source = path.node.source.value
           if (!isComponentImportSource(source)) return
-
-          if (source.startsWith('.')) {
-            componentImportSet.add(source)
-          }
 
           const resolvedName = source.startsWith('.')
             ? resolveVirtualFile(source, files)
@@ -142,6 +137,19 @@ export function compileForBrowser(files: Record<string, string>): CompileResult 
               }
             }
           })
+        },
+        VariableDeclarator(path: any) {
+          const init = path.node.init
+          if (
+            init &&
+            init.type === 'NewExpression' &&
+            init.callee?.type === 'Identifier' &&
+            namedImportSources.has(init.callee.name) &&
+            path.node.id?.type === 'Identifier'
+          ) {
+            const source = namedImportSources.get(init.callee.name)!
+            storeImports.set(path.node.id.name, source)
+          }
         },
       })
 
