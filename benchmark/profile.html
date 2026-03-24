@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Gea Benchmark Profiler</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; background: #0d1117; color: #c9d1d9; padding: 20px; }
+      h1 { color: #58a6ff; margin-bottom: 10px; font-size: 1.4em; }
+      .controls { margin: 15px 0; display: flex; gap: 10px; align-items: center; }
+      button { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.9em; }
+      button:hover { background: #30363d; border-color: #58a6ff; }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      button.primary { background: #238636; border-color: #2ea043; }
+      button.primary:hover { background: #2ea043; }
+      #status { color: #8b949e; font-size: 0.9em; }
+      #output { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; white-space: pre; overflow-x: auto; font-size: 0.82em; line-height: 1.5; margin-top: 15px; min-height: 200px; }
+      #app-container { position: absolute; left: -9999px; top: 0; width: 1000px; visibility: hidden; }
+      .table { width: 100%; }
+      .table td { padding: 2px 4px; }
+      .danger { background: #f33; color: white; }
+    </style>
+    <!-- Minimal bootstrap styles for benchmark rows -->
+    <style>
+      .container { max-width: 100%; }
+      .jumbotron { display: none; }
+      .table-hover tbody tr:hover { background: rgba(255,255,255,0.05); }
+      .col-md-1, .col-md-4, .col-md-6 { display: inline-block; }
+      .col-md-1 { width: 8%; }
+      .col-md-4 { width: 33%; }
+      .col-md-6 { width: 50%; }
+      .glyphicon-remove::before { content: 'x'; }
+    </style>
+  </head>
+  <body>
+    <h1>Gea Benchmark Profiler</h1>
+    <div class="controls">
+      <button id="btn-run" class="primary" onclick="runProfile()">Run Full Profile</button>
+      <button id="btn-run-single" onclick="runSingle()">Run Single Operation</button>
+      <select id="single-op">
+        <option value="create1k">create 1,000 rows</option>
+        <option value="replaceAll">replace all rows</option>
+        <option value="partialUpdate">partial update</option>
+        <option value="selectRow">select row</option>
+        <option value="swapRows">swap rows</option>
+        <option value="removeRow">remove row</option>
+        <option value="create10k">create 10,000 rows</option>
+        <option value="append1k">append 1,000 rows</option>
+        <option value="clearRows">clear rows</option>
+      </select>
+      <span id="status">Ready</span>
+    </div>
+    <div id="output">Click "Run Full Profile" to start instrumentation and profiling.
+
+This will:
+1. Instrument Store proxy traps, change batching, observer routing
+2. Instrument Component DOM operations (list reconciliation, item creation)
+3. Run each benchmark operation multiple times
+4. Report detailed timing breakdowns showing where time is spent
+
+Key areas measured:
+  • store._emitChanges        — proxy trap → change emission
+  • store._flushChanges       — microtask batch flush
+  • store._normalizeBatch     — swap detection in change batches
+  • store._deliverArrayItemPropBatch — fast path for item prop updates
+  • store._collectMatchingObserverNodes — observer tree traversal
+  • store._notifyHandlers     — handler invocation
+  • store._createProxy        — nested proxy creation
+  • component.__observe_store_data — compiled data observer
+  • component.__observe_store_selected — compiled selected observer
+  • component.__applyListChanges — list reconciliation dispatcher
+  • component.createDataItem  — DOM element creation for rows
+  • component.renderDataItem  — HTML string template for rows</div>
+
+    <!-- Hidden app container -->
+    <div id="app-container">
+      <div id="main"></div>
+    </div>
+
+    <script src="dist-profile/main.js"></script>
+    <script src="profiler.js"></script>
+    <script>
+      let profilerReady = false
+
+      function setStatus(msg) {
+        document.getElementById('status').textContent = msg
+      }
+
+      function setOutput(text) {
+        document.getElementById('output').textContent = text
+      }
+
+      function initProfiler() {
+        if (profilerReady) return true
+        const p = window.__geaProfiler
+        if (!p) { setStatus('Error: profiler not loaded'); return false }
+        if (!p.instrument()) { setStatus('Error: instrumentation failed'); return false }
+        profilerReady = true
+        setStatus('Instrumented')
+        return true
+      }
+
+      async function runProfile() {
+        if (!initProfiler()) return
+        const btn = document.getElementById('btn-run')
+        btn.disabled = true
+        setStatus('Running full profile...')
+        setOutput('Running benchmark operations...\nThis may take 30-60 seconds.\n')
+
+        try {
+          const results = await window.__geaProfiler.runAllProfiles()
+          const formatted = window.__geaProfiler.formatResults(results)
+          setOutput(formatted)
+
+          // Also store JSON for programmatic access
+          window.__profileResults = window.__geaProfiler.exportJSON(results)
+          console.log('Profile results (JSON):', window.__profileResults)
+
+          setStatus('Complete — results shown below. JSON in console and window.__profileResults')
+        } catch (err) {
+          setOutput('Error: ' + err.message + '\n' + err.stack)
+          setStatus('Error')
+        } finally {
+          btn.disabled = false
+        }
+      }
+
+      async function runSingle() {
+        if (!initProfiler()) return
+        const op = document.getElementById('single-op').value
+        const store = window.__geaStore
+        const p = window.__geaProfiler
+
+        setStatus(`Running ${op}...`)
+
+        const operations = {
+          create1k: {
+            name: 'create 1,000 rows',
+            setup: (s) => s.clear(),
+            action: (s) => s.run(),
+          },
+          replaceAll: {
+            name: 'replace all rows',
+            setup: (s) => s.run(),
+            action: (s) => s.run(),
+          },
+          partialUpdate: {
+            name: 'partial update (every 10th row)',
+            setup: (s) => s.run(),
+            action: (s) => s.update(),
+          },
+          selectRow: {
+            name: 'select row',
+            setup: (s) => s.run(),
+            action: (s, i) => s.select(i + 1),
+          },
+          swapRows: {
+            name: 'swap rows',
+            setup: (s) => s.run(),
+            action: (s) => s.swapRows(),
+          },
+          removeRow: {
+            name: 'remove row',
+            setup: (s) => s.run(),
+            action: (s) => {
+              const items = s.data.__getTarget || s.data
+              s.remove(items[500]?.id || 500)
+            },
+          },
+          create10k: {
+            name: 'create 10,000 rows',
+            setup: (s) => s.clear(),
+            action: (s) => s.runLots(),
+          },
+          append1k: {
+            name: 'append 1,000 rows',
+            setup: (s) => s.run(),
+            action: (s) => s.add(),
+          },
+          clearRows: {
+            name: 'clear rows',
+            setup: (s) => s.run(),
+            action: (s) => s.clear(),
+          },
+        }
+
+        const config = operations[op]
+        if (!config) { setStatus('Unknown operation'); return }
+
+        try {
+          const result = await p.profileOperation(config.name, config.setup, config.action, 10)
+          const formatted = p.formatResults({ [op]: result })
+          setOutput(formatted)
+          setStatus('Complete')
+        } catch (err) {
+          setOutput('Error: ' + err.message + '\n' + err.stack)
+          setStatus('Error')
+        }
+      }
+    </script>
+  </body>
+</html>

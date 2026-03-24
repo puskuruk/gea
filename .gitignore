@@ -2,6 +2,7 @@ node_modules
 .history
 .DS_Store
 dist
+dist-profile
 coverage
 test-results
 docs/.vitepress/dist
