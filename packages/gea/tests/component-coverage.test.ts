@@ -575,7 +575,7 @@ describe('Component – __geaRegisterMap and __geaSyncMap', () => {
   })
 
   it('re-resolves map container after DOM replacement so sync targets the live tree', () => {
-    let data = ['a', 'b']
+    const data = ['a', 'b']
     class M extends Component {
       template() {
         return '<div><ul id="map-' + this.id_ + '"></ul></div>'

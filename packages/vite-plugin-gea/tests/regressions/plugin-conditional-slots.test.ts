@@ -83,7 +83,7 @@ test('generated observer and buildProps methods include early-return guard from 
     }
   `)
 
-  const buildPropsMatch = output.match(/__buildProps_\w+\([^)]*\)\s*\{[\s\S]*?\n  \}/)
+  const buildPropsMatch = output.match(/__buildProps_\w+\([^)]*\)\s*\{[\s\S]*?\n {2}\}/)
 
   assert.ok(buildPropsMatch, '__buildProps method should be generated')
   assert.match(buildPropsMatch![0], /issue/, 'buildProps method should reference issue')
@@ -115,7 +115,7 @@ test('early-return guard in __buildProps re-derives template-local variable from
     }
   `)
 
-  const buildPropsMatch = output.match(/__buildProps_\w+\([^)]*\)\s*\{[\s\S]*?\n  \}/)
+  const buildPropsMatch = output.match(/__buildProps_\w+\([^)]*\)\s*\{[\s\S]*?\n {2}\}/)
   assert.ok(buildPropsMatch, '__buildProps method should be generated')
 
   const body = buildPropsMatch![0]
@@ -152,7 +152,7 @@ test('early-return guard works with destructured store variables in __buildProps
     }
   `)
 
-  const buildPropsMatch = output.match(/__buildProps_\w+\([^)]*\)\s*\{[\s\S]*?\n  \}/)
+  const buildPropsMatch = output.match(/__buildProps_\w+\([^)]*\)\s*\{[\s\S]*?\n {2}\}/)
   assert.ok(buildPropsMatch, '__buildProps method should be generated')
 
   const body = buildPropsMatch![0]
@@ -186,7 +186,7 @@ test('__buildProps_* omits early-return guard when props do not reference guard 
     }
   `)
 
-  const buildPropsMatch = output.match(/__buildProps_\w+\([^)]*\)\s*\{[\s\S]*?\n  \}/)
+  const buildPropsMatch = output.match(/__buildProps_\w+\([^)]*\)\s*\{[\s\S]*?\n {2}\}/)
   assert.ok(buildPropsMatch, '__buildProps method should be generated')
 
   const body = buildPropsMatch![0]
@@ -449,7 +449,7 @@ test('conditional empty vs store html map: template() must not embed gestureLog.
 
   assert.match(output, /__geaRegisterCond\(/)
   assert.match(output, /__applyListChanges/)
-  const tmpl = output.match(/template\([^)]*\)\s*\{([\s\S]*)\n  \}/)
+  const tmpl = output.match(/template\([^)]*\)\s*\{([\s\S]*)\n {2}\}/)
   assert.ok(tmpl, 'template method should exist')
   assert.doesNotMatch(
     tmpl![1],

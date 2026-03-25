@@ -183,7 +183,7 @@ const project = {
   issues,
 }
 
-let currentUser = users[0]
+const currentUser = users[0]
 let nextIssueId = 9
 let nextCommentId = 4
 

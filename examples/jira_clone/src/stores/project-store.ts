@@ -21,12 +21,8 @@ class ProjectStore extends Store {
   }
 
   async updateProject(fields: any): Promise<void> {
-    try {
-      await api.put('/project', fields)
-      await this.fetchProject()
-    } catch (e) {
-      throw e
-    }
+    await api.put('/project', fields)
+    await this.fetchProject()
   }
 
   updateLocalProjectIssues(issueId: string, fields: any): void {

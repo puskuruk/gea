@@ -541,7 +541,7 @@ test('observer calls __geaUpdateProps when guard-dependent props reference the s
     }
   `)
 
-  const observerMatch = output.match(/__observe_projectStore_project\([^)]*\)\s*\{[\s\S]*?\n  \}/)
+  const observerMatch = output.match(/__observe_projectStore_project\([^)]*\)\s*\{[\s\S]*?\n {2}\}/)
   assert.ok(observerMatch, 'observer for projectStore.project should be generated')
 
   assert.match(
@@ -569,7 +569,7 @@ test('store observer for top-level project guard must NOT call __geaRequestRende
     new Set(['Board']),
   )
 
-  const projectObserver = output.match(/__observe_projectStore_project\([\s\S]*?\n  \}/)?.[0]
+  const projectObserver = output.match(/__observe_projectStore_project\([\s\S]*?\n {2}\}/)?.[0]
   assert.ok(projectObserver, 'must generate __observe_projectStore_project')
   assert.ok(
     projectObserver.includes('__geaRequestRender') || projectObserver.includes('__geaPatchCond'),
@@ -603,7 +603,7 @@ test('store observer for nested project.users must NOT trigger __geaRequestRende
     new Set(['Select']),
   )
 
-  const projectObserver = output.match(/__observe_projectStore_project\b[^_]([\s\S]*?)\n  \}/)?.[0]
+  const projectObserver = output.match(/__observe_projectStore_project\b[^_]([\s\S]*?)\n {2}\}/)?.[0]
   assert.ok(projectObserver, 'must generate __observe_projectStore_project')
   assert.ok(
     !projectObserver.includes('__geaRequestRender'),
@@ -641,7 +641,7 @@ test('store-alias nested field must produce inline patch or rerender observer (s
     'must generate an observer for itemStore issue or issue.status. Output: ' + output.slice(0, 3000),
   )
 
-  const observerMatch = output.match(/__observe_itemStore_issue[^(]*\([^)]*\)\s*\{[\s\S]*?\n  \}/)
+  const observerMatch = output.match(/__observe_itemStore_issue[^(]*\([^)]*\)\s*\{[\s\S]*?\n {2}\}/)
   if (observerMatch) {
     assert.ok(
       observerMatch[0].includes('__patchNode') ||

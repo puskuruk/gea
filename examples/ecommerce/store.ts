@@ -15,10 +15,6 @@ export interface CartItem {
   quantity: number
 }
 
-function uid() {
-  return `p-${Math.random().toString(36).slice(2, 8)}`
-}
-
 export const PRODUCTS: Product[] = [
   {
     id: 'p1',

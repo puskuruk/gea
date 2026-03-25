@@ -63,8 +63,9 @@ export function compileForBrowser(files: Record<string, string>): CompileResult 
         continue
       }
 
-      let { ast, componentClassName, imports } = parsed
-      let { componentClassNames, functionalComponentInfo, hasJSX } = parsed
+      let { ast, imports } = parsed
+      let { componentClassNames } = parsed
+      const { functionalComponentInfo, hasJSX } = parsed
 
       if (!hasJSX) {
         const output = generate(ast)
@@ -74,7 +75,6 @@ export function compileForBrowser(files: Record<string, string>): CompileResult 
 
       if (functionalComponentInfo) {
         convertFunctionalToClass(ast, functionalComponentInfo, imports)
-        componentClassName = functionalComponentInfo.name
         componentClassNames = [functionalComponentInfo.name]
         const freshCode = generate(ast).code
         const freshParsed = parseSource(freshCode)

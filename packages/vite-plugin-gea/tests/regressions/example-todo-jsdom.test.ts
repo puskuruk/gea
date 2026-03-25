@@ -65,7 +65,6 @@ describe('examples/todo app in JSDOM (ported from todo.spec)', { concurrency: fa
   let restoreDom: () => void
   let root: HTMLElement
   let app: { dispose: () => void }
-  let todoStore: { todos: unknown[]; filter: string }
 
   beforeEach(async () => {
     restoreDom = installDom()
@@ -73,7 +72,6 @@ describe('examples/todo app in JSDOM (ported from todo.spec)', { concurrency: fa
     const m = await mountTodoApp(seed)
     app = m.app
     root = m.root
-    todoStore = m.todoStore
   })
 
   afterEach(async () => {

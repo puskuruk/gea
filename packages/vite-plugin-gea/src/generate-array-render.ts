@@ -1,7 +1,7 @@
 import * as t from '@babel/types'
 import { appendToBody, id, js, jsMethod } from 'eszter'
 import type { ArrayMapBinding, EventHandler, HandlerPropInMap } from './ir.ts'
-import { transformJSXToTemplate, transformJSXFragmentToTemplate } from './transform-jsx.ts'
+import { transformJSXToTemplate } from './transform-jsx.ts'
 import {
   normalizePathParts,
   pathPartsToString,

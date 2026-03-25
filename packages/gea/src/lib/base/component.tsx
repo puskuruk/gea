@@ -264,7 +264,6 @@ export default class Component extends Store {
     if (!this.element_ || !this.element_.parentNode) return
 
     const parent = this.element_.parentNode
-    const nextSibling = this.element_.nextSibling
     const activeElement = document.activeElement as HTMLElement | null
     const shouldRestoreFocus = Boolean(activeElement && this.element_.contains(activeElement))
     const focusedId = shouldRestoreFocus ? activeElement?.id || null : null

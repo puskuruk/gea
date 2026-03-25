@@ -5,12 +5,6 @@ import OverviewView from './overview-view'
 import UsersView from './users-view'
 import SettingsView from './settings-view'
 
-const viewToPath: Record<string, string> = {
-  overview: '/',
-  users: '/users',
-  settings: '/settings',
-}
-
 const pathToView: Record<string, string> = {
   '/': 'overview',
   '/users': 'users',

@@ -46,7 +46,7 @@ export default class CommentCreate extends Component {
     }
   }
 
-  template({ issueId }: any) {
+  template() {
     const user = authStore.currentUser
     return (
       <div class="comment-create">

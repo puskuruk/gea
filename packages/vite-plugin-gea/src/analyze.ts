@@ -1107,7 +1107,7 @@ function handleTextBinding(
   rerenderPropNames?: Set<string>,
   rerenderConditions?: Array<{ expression: t.Expression; setupStatements: t.Statement[] }>,
   conditionalSlots?: import('./ir').ConditionalSlot[],
-  hasNestedMapCall: boolean = false,
+  _hasNestedMapCall: boolean = false,
   classBody?: t.ClassBody,
   conditionalSlotNodeMap?: Map<t.Node, string>,
   textNodeIndex?: number,

@@ -25,15 +25,11 @@ import { generateCreateItemMethod } from './generate-array-patch.ts'
 import { ITEM_IS_KEY } from './analyze-helpers.ts'
 import { buildTrimmedClassJoinedExpression, buildTrimmedClassValueExpression } from './utils.ts'
 import {
-  generateComponentArrayMethods,
   generateComponentArrayResult,
-  getComponentArrayBuildMethodName,
   getComponentArrayItemsName,
-  getComponentArrayMountMethodName,
   getComponentArrayRefreshMethodName,
   isUnresolvedMapWithComponentChild,
 } from './generate-array-slot-sync.ts'
-import type { ComponentArrayResult } from './generate-array-slot-sync.ts'
 import { childHasNoProps } from './generate-components.ts'
 import { getHoistableRootEventsForImport } from './component-event-helpers.ts'
 import { appendCompiledEventMethods } from './generate-events.ts'
@@ -886,7 +882,6 @@ export function applyStaticReactivity(
           const unresolvedBindings: Array<{ info: UnresolvedMapInfo; binding: any }> = []
           const componentArrayRefreshDeps: Array<{ methodName: string; propNames: string[] }> = []
           const componentArrayDisposeTargets: string[] = []
-          const componentArrayMountMethods: string[] = []
           const storeComponentArrayObservers: Array<{
             storeVar: string
             refreshMethodName: string
@@ -3168,26 +3163,6 @@ function inlineIntoConstructor(classBody: t.ClassBody, statements: t.Statement[]
   ctor.body.body.push(...statements)
 }
 
-function ensureConstructorCalls(classBody: t.ClassBody, methodName: string): void {
-  let ctor = classBody.body.find(
-    (member) => t.isClassMethod(member) && t.isIdentifier(member.key) && member.key.name === 'constructor',
-  ) as t.ClassMethod | undefined
-
-  if (!ctor) {
-    ctor = appendToBody(
-      jsMethod`${id('constructor')}(...args) {}`,
-      t.expressionStatement(t.callExpression(t.super(), [t.spreadElement(t.identifier('args'))])),
-      t.expressionStatement(t.callExpression(t.memberExpression(t.thisExpression(), t.identifier(methodName)), [])),
-    )
-    classBody.body.unshift(ctor)
-    return
-  }
-
-  ctor.body.body.push(
-    t.expressionStatement(t.callExpression(t.memberExpression(t.thisExpression(), t.identifier(methodName)), [])),
-  )
-}
-
 function ensureDisposeCalls(classBody: t.ClassBody, targets: string[]): void {
   const disposeStatements = targets.map(
     (target) => js`this.${id(target)}?.forEach?.(item => item?.dispose?.());` as t.ExpressionStatement,
@@ -4020,39 +3995,6 @@ function replaceMapInConditionalSlots(
     }
   }
   return replaced
-}
-
-function ensureObserverDispose(classBody: t.ClassBody): void {
-  const statements = jsBlockBody`
-    if (this.__observer_removers__) {
-      this.__observer_removers__.forEach(fn => fn());
-    }
-  `
-
-  const existingDispose = classBody.body.find(
-    (member) => t.isClassMethod(member) && t.isIdentifier(member.key) && member.key.name === 'dispose',
-  ) as t.ClassMethod | undefined
-
-  if (existingDispose) {
-    existingDispose.body.body.unshift(...statements)
-    const hasSuperDispose = existingDispose.body.body.some(
-      (statement) =>
-        t.isExpressionStatement(statement) &&
-        t.isCallExpression(statement.expression) &&
-        t.isMemberExpression(statement.expression.callee) &&
-        t.isSuper(statement.expression.callee.object) &&
-        t.isIdentifier(statement.expression.callee.property) &&
-        statement.expression.callee.property.name === 'dispose',
-    )
-    if (!hasSuperDispose) {
-      existingDispose.body.body.push(js`super.dispose();` as t.ExpressionStatement)
-    }
-    return
-  }
-
-  classBody.body.push(
-    appendToBody(jsMethod`${id('dispose')}() {}`, ...statements, js`super.dispose();` as t.ExpressionStatement),
-  )
 }
 
 function generateStoreInlinePatchObserver(

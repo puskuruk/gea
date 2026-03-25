@@ -18,7 +18,7 @@ import json from '@rollup/plugin-json'
 function rewriteCreateRequire() {
   return {
     name: 'rewrite-create-require',
-    transform(code, id) {
+    transform(code, _id) {
       if (!code.includes('createRequire')) return null
 
       let result = code

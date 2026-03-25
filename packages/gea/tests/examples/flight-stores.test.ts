@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { describe, it, beforeEach } from 'node:test'
+import { describe, it } from 'node:test'
 import { OptionsStore } from '../../../../examples/flight-checkin/src/options-store'
 import { PaymentStore } from '../../../../examples/flight-checkin/src/payment-store'
 import { FlightStore } from '../../../../examples/flight-checkin/src/flight-store'

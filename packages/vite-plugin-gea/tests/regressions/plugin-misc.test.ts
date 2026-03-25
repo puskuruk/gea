@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import test from 'node:test'
-import { tmpdir } from 'node:os'
-import { transformComponentSource, transformWithPlugin, generate, geaPlugin, getJSXTagName, t } from './plugin-helpers'
+import { transformComponentSource, geaPlugin, getJSXTagName, t } from './plugin-helpers'
 
 test('transform creates a distinct child instance for each self-closing component use', () => {
   const output = transformComponentSource(`

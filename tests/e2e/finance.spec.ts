@@ -69,7 +69,6 @@ test.describe('Personal Finance Tracker', () => {
       // Use the type filter select - trigger via the select component
       // We'll test by checking the resulting rows
       // Since gea-ui Select uses dropdown, click the select trigger
-      const selects = page.locator('[data-part="control"]')
       // Find the type filter (second select in filters-row)
       // Let's use a more direct approach and check via data attributes
       // For now verify both selects exist

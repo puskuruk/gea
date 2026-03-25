@@ -41,7 +41,7 @@ export default class CommentItem extends Component {
     await issueStore.deleteComment(this.props.commentId, this.props.issueId)
   }
 
-  template({ commentId, body, userId, createdAt, issueId }: any) {
+  template({ body }: any) {
     return (
       <div class="comment">
         <Avatar src={this.userAvatar} name={this.userName} class="!h-8 !w-8" />

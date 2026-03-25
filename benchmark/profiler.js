@@ -368,7 +368,7 @@
     lines.push('  GEA BENCHMARK PROFILING RESULTS')
     lines.push('═'.repeat(100))
 
-    for (const [key, data] of Object.entries(allResults)) {
+    for (const [, data] of Object.entries(allResults)) {
       lines.push('')
       lines.push(`  ── ${data.name} ${'─'.repeat(Math.max(0, 85 - data.name.length))}`)
 
@@ -402,14 +402,11 @@
       lines.push(`  ${'Category'.padEnd(50)} ${'Avg ms'.padStart(10)} ${'Calls'.padStart(8)} ${'%total'.padStart(8)}`)
       lines.push(`  ${'─'.repeat(50)} ${'─'.repeat(10)} ${'─'.repeat(8)} ${'─'.repeat(8)}`)
 
-      let accountedLeaf = 0
       for (const [cat, info] of sorted) {
         const avgTime = info.total / info.count
         const avgCalls = Math.round(info.calls / info.count)
         const pct = avgTotal > 0 ? (avgTime / avgTotal) * 100 : 0
         const isLeaf = leafCats.has(cat)
-
-        if (isLeaf) accountedLeaf += avgTime
 
         if (avgTime >= 0.005) {
           const marker = isLeaf ? '  ' : '▸ '

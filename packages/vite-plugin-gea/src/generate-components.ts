@@ -1,5 +1,5 @@
 import * as t from '@babel/types'
-import { appendToBody, id, js, jsMethod } from 'eszter'
+import { appendToBody, id, jsMethod } from 'eszter'
 import type { NodePath } from '@babel/traverse'
 import type { ChildComponent } from './ir.ts'
 import { pruneUnusedSetupDestructuring, loggingCatchClause } from './utils.ts'

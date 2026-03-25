@@ -201,10 +201,14 @@ function tryStaticStyleObjectToCSS(expr: t.ObjectExpression): string | null {
     if (!t.isObjectProperty(prop) || prop.computed) return null
     const key = t.isIdentifier(prop.key) ? prop.key.name : t.isStringLiteral(prop.key) ? prop.key.value : null
     if (!key) return null
-    let value: string | null = null
-    if (t.isStringLiteral(prop.value)) value = prop.value.value
-    else if (t.isNumericLiteral(prop.value)) value = prop.value.value === 0 ? '0' : `${prop.value.value}px`
-    else return null
+    const value = t.isStringLiteral(prop.value)
+      ? prop.value.value
+      : t.isNumericLiteral(prop.value)
+        ? prop.value.value === 0
+          ? '0'
+          : `${prop.value.value}px`
+        : null
+    if (value === null) return null
     parts.push(`${camelToKebab(key)}: ${value}`)
   }
   return parts.join('; ')
@@ -312,35 +316,6 @@ function extractChildInstanceRef(expr: t.Expression): { instanceVar: string; gua
 
   const instanceVar = memberExpr.property.name
   return { instanceVar, guardExpr: expr.left as t.Expression }
-}
-
-function expressionMayProduceJSXForCtx(expr: t.Expression): boolean {
-  if (t.isJSXElement(expr) || t.isJSXFragment(expr)) return true
-  if (t.isLogicalExpression(expr)) {
-    return (
-      expressionMayProduceJSXForCtx(expr.left as t.Expression) ||
-      expressionMayProduceJSXForCtx(expr.right as t.Expression)
-    )
-  }
-  if (t.isConditionalExpression(expr)) {
-    return (
-      expressionMayProduceJSXForCtx(expr.consequent as t.Expression) ||
-      expressionMayProduceJSXForCtx(expr.alternate as t.Expression)
-    )
-  }
-  if (t.isParenthesizedExpression(expr)) return expressionMayProduceJSXForCtx(expr.expression as t.Expression)
-  if (t.isCallExpression(expr)) {
-    const callee = expr.callee
-    if (t.isArrowFunctionExpression(callee) || t.isFunctionExpression(callee)) {
-      if (t.isBlockStatement(callee.body)) {
-        return callee.body.body.some(
-          (s) => t.isReturnStatement(s) && !!s.argument && expressionMayProduceJSXForCtx(s.argument),
-        )
-      }
-      return expressionMayProduceJSXForCtx(callee.body as t.Expression)
-    }
-  }
-  return false
 }
 
 /** True if expression can evaluate to false when rendered in template (needs || '' to avoid "false" string). */

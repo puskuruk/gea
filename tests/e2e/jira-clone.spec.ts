@@ -367,8 +367,6 @@ test.describe('jira-clone board and surgical DOM updates', () => {
     await expect(page.locator('.issue-details')).toBeVisible({ timeout: 10000 })
 
     const priorityName = page.locator('.priority-name')
-    const initialPriority = await priorityName.textContent()
-
     await page.locator('.priority-display').click()
     await expect(page.locator('.custom-dropdown')).toBeVisible()
     await page.locator('.custom-dropdown-item', { hasText: 'Highest' }).click()
@@ -401,7 +399,6 @@ test.describe('jira-clone board and surgical DOM updates', () => {
     await expect(page.locator('.issue-details')).toBeVisible({ timeout: 10000 })
 
     const titleText = page.locator('.issue-title-text')
-    const originalTitle = await titleText.textContent()
     await titleText.click()
 
     const titleInput = page.locator('.issue-title-input')
@@ -436,8 +433,6 @@ test.describe('jira-clone board and surgical DOM updates', () => {
   })
 
   test('cancel delete keeps issue', async ({ page }) => {
-    const totalBefore = await page.locator('.issue-card').count()
-
     await page.locator('.issue-card').first().click()
     await expect(page.locator('.issue-details')).toBeVisible({ timeout: 10000 })
 
@@ -605,9 +600,12 @@ test.describe('jira-clone board and surgical DOM updates', () => {
   test.describe('DOM Stability', () => {
     test('surgical DOM updates: opening and closing issue detail preserves card DOM nodes', async ({ page }) => {
       // Mark the first .issue-card with a custom data attribute
-      await page.locator('.issue-card').first().evaluate((el) => {
-        el.setAttribute('data-stability-marker', 'survivor')
-      })
+      await page
+        .locator('.issue-card')
+        .first()
+        .evaluate((el) => {
+          el.setAttribute('data-stability-marker', 'survivor')
+        })
 
       // Open issue detail dialog
       await page.locator('.issue-card').first().click()
@@ -618,9 +616,12 @@ test.describe('jira-clone board and surgical DOM updates', () => {
       await expect(page.locator('.dialog-issue-detail [data-part="content"]')).not.toBeVisible({ timeout: 5000 })
 
       // The marker must survive — proves the DOM node was not recreated
-      const marker = await page.locator('.issue-card').first().evaluate((el) => {
-        return el.getAttribute('data-stability-marker')
-      })
+      const marker = await page
+        .locator('.issue-card')
+        .first()
+        .evaluate((el) => {
+          return el.getAttribute('data-stability-marker')
+        })
       expect(marker).toBe('survivor')
     })
 

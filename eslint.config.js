@@ -7,6 +7,7 @@ export default [
   {
     ignores: [
       '**/dist/**',
+      'benchmark/dist-profile/**',
       '**/node_modules/**',
       '**/*.d.ts',
       '.cursor/**',
@@ -15,6 +16,9 @@ export default [
       'docs/.vitepress/cache/**',
       'docs/public/**',
       'website/docs/**',
+      'website/playground/codemirror-bundle.js',
+      'website/playground/gea-compiler-browser.js',
+      'website/playground/gea-core.js',
     ],
   },
 

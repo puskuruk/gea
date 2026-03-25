@@ -27,7 +27,7 @@ export default class IssueSearch extends Component {
     try {
       const data = await api.get('/issues', { searchTerm: this.searchTerm.trim() })
       this.matchingIssues = data || []
-    } catch (e) {
+    } catch {
       this.matchingIssues = []
     } finally {
       this.isLoading = false

@@ -189,7 +189,7 @@ test('template-scoped prop variables inside .map() are rewritten to this.props',
     }
   `)
 
-  const renderMethod = output.match(/render\w*Item\(opt\)\s*\{([\s\S]*?)\n  \}/)
+  const renderMethod = output.match(/render\w*Item\(opt\)\s*\{([\s\S]*?)\n {2}\}/)
   assert.ok(renderMethod, 'render item method must be generated')
   const renderBody = renderMethod[1]
   assert.match(renderBody, /=\s*this\.props;/, 'map item render must read props from this.props')
@@ -218,7 +218,7 @@ test('map callback render method includes template-local setup statements for fr
     }
   `)
 
-  const renderMethod = output.match(/render\w+Item\(comment\)\s*\{([\s\S]*?)\n  \}/)
+  const renderMethod = output.match(/render\w+Item\(comment\)\s*\{([\s\S]*?)\n {2}\}/)
   assert.ok(renderMethod, 'render item method must be generated')
   const renderBody = renderMethod![1]
   assert.match(renderBody, /issueStore\.issue/, 'render method must re-derive issue from store')

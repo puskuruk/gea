@@ -456,7 +456,7 @@ export default class ProjectStore extends Store {
 
     assert.ok(output)
 
-    const itemPropsMatch = output.match(/__itemProps_\w+\([^)]*\)\s*\{[\s\S]*?\n  \}/)
+    const itemPropsMatch = output.match(/__itemProps_\w+\([^)]*\)\s*\{[\s\S]*?\n {2}\}/)
     assert.ok(itemPropsMatch, '__itemProps method should be generated')
 
     const body = itemPropsMatch![0]

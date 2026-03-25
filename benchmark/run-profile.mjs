@@ -7,7 +7,7 @@
 import { chromium } from 'playwright'
 import { createServer } from 'http'
 import { readFileSync, existsSync } from 'fs'
-import { resolve, join, extname } from 'path'
+import { join, extname } from 'path'
 
 const BENCHMARK_DIR = new URL('.', import.meta.url).pathname
 
@@ -22,7 +22,7 @@ const MIME_TYPES = {
 function startServer(port) {
   return new Promise((resolve_) => {
     const server = createServer((req, res) => {
-      let filePath = join(BENCHMARK_DIR, req.url === '/' ? 'profile.html' : req.url)
+      const filePath = join(BENCHMARK_DIR, req.url === '/' ? 'profile.html' : req.url)
       // Handle /css/currentStyle.css → just serve empty
       if (req.url.startsWith('/css/')) {
         res.writeHead(200, { 'Content-Type': 'text/css' })
@@ -83,7 +83,7 @@ async function main() {
 
   // Also output JSON summary
   console.log('\n── JSON Summary ─────────────────────────────────────────')
-  for (const [key, data] of Object.entries(results.json)) {
+  for (const [, data] of Object.entries(results.json)) {
     console.log(`\n${data.name} (${data.avgTotalMs}ms avg):`)
     const sorted = Object.entries(data.breakdown).sort((a, b) => b[1].avgMs - a[1].avgMs)
     for (const [cat, info] of sorted) {

@@ -191,10 +191,7 @@ test('dndManager discovers draggable elements via data-draggable-id attribute', 
 
     dndManager.registerDroppable('col-1', container)
 
-    let result: any = null
-    dndManager.onDragEnd = (r) => {
-      result = r
-    }
+    dndManager.onDragEnd = () => {}
 
     const rect = item1.getBoundingClientRect()
     const pointerDownEvent = new (globalThis.window as any).PointerEvent('pointerdown', {
@@ -574,10 +571,7 @@ test('dndManager attaches document listener when onDragEnd is set (attribute-dri
       'listener must not be attached before onDragEnd is set',
     )
 
-    let receivedResult: any = null
-    dndManager.onDragEnd = (r) => {
-      receivedResult = r
-    }
+    dndManager.onDragEnd = () => {}
 
     assert.equal((dndManager as any)._docListenerAttached, true, 'listener must be attached after onDragEnd is set')
 
