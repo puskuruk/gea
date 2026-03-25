@@ -158,6 +158,7 @@ export default class Component extends Store {
 
     this.onAfterRender()
     this.onAfterRenderHooks()
+    this.__syncUnrenderedListItems()
 
     requestAnimationFrame(() => this.onAfterRenderAsync())
 
@@ -195,6 +196,22 @@ export default class Component extends Store {
   onAfterRenderAsync() {}
 
   onAfterRenderHooks() {}
+
+  /** Render pre-created list items that weren't mounted during construction
+   *  (e.g. component was a lazy child inside a conditional slot). */
+  __syncUnrenderedListItems(): void {
+    const configs = (this as any).__geaListConfigs
+    if (!configs) return
+    for (const { config: c } of configs) {
+      if (!c.items && c.itemsKey) c.items = (this as any)[c.itemsKey]
+      if (!c.items?.length) continue
+      const container = c.container()
+      if (!container) continue
+      for (const item of c.items) {
+        if (!item.rendered_) item.render(container)
+      }
+    }
+  }
 
   __createPropsProxy(raw: any) {
     const component = this // eslint-disable-line @typescript-eslint/no-this-alias
@@ -519,6 +536,7 @@ export default class Component extends Store {
       child.setupEventDirectives_()
       child.onAfterRender()
       child.onAfterRenderHooks()
+      child.__syncUnrenderedListItems()
       requestAnimationFrame(() => child.onAfterRenderAsync())
     })
   }
