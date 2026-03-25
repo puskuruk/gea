@@ -876,6 +876,10 @@ export function applyStaticReactivity(
             containerBindingId?: string
             itemIdProperty?: string
           }> = []
+          // Static array maps whose .map() wasn't found in the template method
+          // (e.g. inside a child component's children prop) need a __refresh call
+          // in onAfterRenderHooks to populate the container after initial mount.
+          const staticArrayRefreshOnMount: string[] = []
           const mapItemAttrInfos: Array<{
             itemVariable: string
             itemIdProperty?: string
@@ -1114,11 +1118,17 @@ export function applyStaticReactivity(
                   })
                 }
                 componentArrayDisposeTargets.push(getComponentArrayItemsName(arrayPropName))
-                replaceMapWithComponentArrayItems(
+                const wasReplacedInTemplate = replaceMapWithComponentArrayItems(
                   templateMethod,
                   um.computationExpr,
                   getComponentArrayItemsName(arrayPropName),
                 )
+                // When the .map() lives inside a child component's children prop,
+                // it won't be found in the template. Schedule a __refresh call in
+                // createdHooks to populate the DOM container after mount.
+                if (!wasReplacedInTemplate && !storeArrayAccess) {
+                  staticArrayRefreshOnMount.push(getComponentArrayRefreshMethodName(arrayPropName))
+                }
                 applied = true
               }
               return
@@ -1780,8 +1790,8 @@ export function applyStaticReactivity(
                   }
                   return true
                 })
-                .map((child) =>
-                  t.expressionStatement(
+                .map((child) => {
+                  const updateExpr = t.expressionStatement(
                     t.callExpression(
                       t.memberExpression(
                         t.memberExpression(t.thisExpression(), t.identifier(child.instanceVar)),
@@ -1797,8 +1807,16 @@ export function applyStaticReactivity(
                         ),
                       ],
                     ),
-                  ),
-                )
+                  )
+                  if (!child.lazy) return updateExpr
+                  // Guard lazy children (inside conditionals) to prevent the
+                  // getter from eagerly creating the child with stale props.
+                  const backingField = `__lazy${child.instanceVar}`
+                  return t.ifStatement(
+                    t.memberExpression(t.thisExpression(), t.identifier(backingField)),
+                    t.blockStatement([updateExpr]),
+                  )
+                })
               if (existing && t.isBlockStatement(existing.body)) {
                 // Prepend child props updates so they run before any __geaPatchCond
                 // calls that may early-return and render the child with stale props.
@@ -1998,11 +2016,17 @@ export function applyStaticReactivity(
               const mapReplaceExpr = storeArrayAccess
                 ? t.memberExpression(t.identifier(storeArrayAccess.storeVar), t.identifier(storeArrayAccess.propName))
                 : computationExpr
-              replaceMapWithComponentArrayItems(
+              const wasReplaced = replaceMapWithComponentArrayItems(
                 templateMethod,
                 mapReplaceExpr,
                 getComponentArrayItemsName(arrayPropName),
               )
+              // When the .map() lives inside a child component's children prop
+              // (not directly in template), it won't be replaced. Schedule a
+              // __refresh call in createdHooks to populate the container after mount.
+              if (!wasReplaced && !arrayMap.storeVar) {
+                staticArrayRefreshOnMount.push(getComponentArrayRefreshMethodName(arrayPropName))
+              }
               applied = true
             }
           }
@@ -2020,22 +2044,34 @@ export function applyStaticReactivity(
             for (const depPath of getterDepPaths) {
               const depObserveKey = buildObserveKey(depPath, arrayMap.storeVar)
               const depMethodName = getObserveMethodName(depPath, arrayMap.storeVar)
-              // Generate: __observe_store_dep(__v, __c) { this.__refreshList('filteredTracks'); }
-              const delegateBody = t.blockStatement([
-                t.expressionStatement(
-                  t.callExpression(
-                    t.memberExpression(t.thisExpression(), t.identifier('__refreshList')),
-                    [t.stringLiteral(pathKey)],
-                  ),
+              const refreshStmt = t.expressionStatement(
+                t.callExpression(
+                  t.memberExpression(t.thisExpression(), t.identifier('__refreshList')),
+                  [t.stringLiteral(pathKey)],
                 ),
-              ])
-              const delegateMethod = t.classMethod(
-                'method',
-                t.identifier(depMethodName),
-                [t.identifier('__v'), t.identifier('__c')],
-                delegateBody,
               )
-              mergeObserveMethod(depObserveKey, delegateMethod)
+              // If observer already exists (e.g. from conditional slot), insert
+              // __refreshList BEFORE the `if (this.rendered_)` block so it isn't
+              // blocked by the conditional-patch early return.
+              const existing = addedMethods.get(depObserveKey)
+              if (existing && t.isBlockStatement(existing.body)) {
+                const renderedGuardIdx = existing.body.body.findIndex(
+                  (s) => t.isIfStatement(s) && t.isMemberExpression(s.test) && t.isIdentifier(s.test.property) && s.test.property.name === 'rendered_',
+                )
+                if (renderedGuardIdx >= 0) {
+                  existing.body.body.splice(renderedGuardIdx, 0, refreshStmt)
+                } else {
+                  existing.body.body.push(refreshStmt)
+                }
+              } else {
+                const delegateMethod = t.classMethod(
+                  'method',
+                  t.identifier(depMethodName),
+                  [t.identifier('__v'), t.identifier('__c')],
+                  t.blockStatement([refreshStmt]),
+                )
+                mergeObserveMethod(depObserveKey, delegateMethod)
+              }
             }
           }
 
@@ -2380,6 +2416,27 @@ export function applyStaticReactivity(
                   createdHooksMethod.body.body.push(...mapRegistrations)
                 }
                 classPath.node.body.body.push(createdHooksMethod)
+              }
+              // Static array maps inside child component children need a
+              // refresh call after mount to populate the DOM container.
+              // Use onAfterRenderHooks (not createdHooks) because the items
+              // array and DOM elements must exist before __reconcileList runs.
+              if (staticArrayRefreshOnMount.length > 0) {
+                const refreshStmts = [...new Set(staticArrayRefreshOnMount)].map((name) =>
+                  t.expressionStatement(
+                    t.callExpression(
+                      t.memberExpression(t.thisExpression(), t.identifier(name)),
+                      [],
+                    ),
+                  ),
+                )
+                const existingHook = classPath.node.body.body.find(
+                  (m) => t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name === 'onAfterRenderHooks',
+                ) as t.ClassMethod | undefined
+                if (existingHook) existingHook.body.body.push(...refreshStmts)
+                else classPath.node.body.body.push(
+                  t.classMethod('method', t.identifier('onAfterRenderHooks'), [], t.blockStatement(refreshStmts)),
+                )
               }
               if (localObserveHandlers.size > 0) {
                 classPath.node.body.body.push(
@@ -2777,8 +2834,8 @@ function replaceMapWithComponentArrayItems(
   templateMethod: t.ClassMethod,
   arrayExpr: t.Expression | undefined,
   itemsName: string,
-): void {
-  if (!arrayExpr || !t.isBlockStatement(templateMethod.body)) return
+): boolean {
+  if (!arrayExpr || !t.isBlockStatement(templateMethod.body)) return false
   const tempProg = t.program([
     t.expressionStatement(t.arrowFunctionExpression(templateMethod.params as t.Identifier[], templateMethod.body)),
   ])
@@ -2825,6 +2882,7 @@ function replaceMapWithComponentArrayItems(
       replaced = true
     },
   })
+  return replaced
 }
 
 function inlineIntoConstructor(classBody: t.ClassBody, statements: t.Statement[]): void {
