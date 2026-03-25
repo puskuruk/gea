@@ -2,7 +2,16 @@ import * as t from '@babel/types'
 import { appendToBody, id, js, jsMethod } from 'eszter'
 import type { NodePath } from '@babel/traverse'
 import type { ArrayMapBinding } from './ir.ts'
-import { normalizePathParts, pathPartsToString, replacePropRefsInExpression, isComponentTag, getJSXTagName, camelToKebab, loggingCatchClause } from './utils.ts'
+import {
+  normalizePathParts,
+  pathPartsToString,
+  replacePropRefsInExpression,
+  isComponentTag,
+  getJSXTagName,
+  camelToKebab,
+  loggingCatchClause,
+  optionalizeMemberChainsAfterComputedItemKey,
+} from './utils.ts'
 import { ITEM_IS_KEY } from './analyze-helpers.ts'
 import { createRequire } from 'module'
 
@@ -91,6 +100,9 @@ export function collectPatchEntries(arrayMap: ArrayMapBinding): PatchPlan {
     const rootTagName = getJSXTagName(modified.openingElement.name)
     const rootIsComponent = isComponentTag(rootTagName)
     walkJSXForPatch(modified, [], entries, rootIsComponent)
+  }
+  for (const ent of entries) {
+    ent.expression = optionalizeMemberChainsAfterComputedItemKey(ent.expression, 'item')
   }
   return { entries, requiresRerender }
 }
@@ -263,8 +275,8 @@ export function generateCreateItemMethod(
   const itemIdProperty = arrayMap.itemIdProperty
 
   // Detect if the map item template root is a component (PascalCase tag)
-  const itemTemplateRootIsComponent = t.isJSXElement(arrayMap.itemTemplate) &&
-    isComponentTag(getJSXTagName(arrayMap.itemTemplate.openingElement.name))
+  const itemTemplateRootIsComponent =
+    t.isJSXElement(arrayMap.itemTemplate) && isComponentTag(getJSXTagName(arrayMap.itemTemplate.openingElement.name))
 
   let { entries, requiresRerender } = collectPatchEntries(arrayMap)
 
@@ -367,7 +379,8 @@ export function generateCreateItemMethod(
                 else if (t.isObjectPattern(decl.id)) {
                   for (const prop of decl.id.properties) {
                     if (t.isObjectProperty(prop) && t.isIdentifier(prop.value)) setupVarNames.add(prop.value.name)
-                    else if (t.isRestElement(prop) && t.isIdentifier(prop.argument)) setupVarNames.add(prop.argument.name)
+                    else if (t.isRestElement(prop) && t.isIdentifier(prop.argument))
+                      setupVarNames.add(prop.argument.name)
                   }
                 }
               }
@@ -385,14 +398,21 @@ export function generateCreateItemMethod(
           }
           let needsSetup = false
           for (const name of setupVarNames) {
-            if (propsRefsFreeVars.has(name)) { needsSetup = true; break }
+            if (propsRefsFreeVars.has(name)) {
+              needsSetup = true
+              break
+            }
           }
           if (needsSetup) {
             const propRefsNames = propNames ?? new Set<string>()
             for (const stmt of templateSetupContext.statements) {
               let clonedStmt = t.cloneNode(stmt, true) as t.Statement
               if (propRefsNames.size > 0 || wholeParamName) {
-                clonedStmt = replacePropRefsInExpression(clonedStmt as any, propRefsNames, wholeParamName) as any as t.Statement
+                clonedStmt = replacePropRefsInExpression(
+                  clonedStmt as any,
+                  propRefsNames,
+                  wholeParamName,
+                ) as any as t.Statement
               }
               rerenderBody.push(clonedStmt)
             }
@@ -448,10 +468,9 @@ export function generateCreateItemMethod(
     t.variableDeclaration('var', [
       t.variableDeclarator(
         t.identifier('__tw'),
-        t.callExpression(
-          t.memberExpression(t.identifier('document'), t.identifier('createElement')),
-          [t.stringLiteral('template')],
-        ),
+        t.callExpression(t.memberExpression(t.identifier('document'), t.identifier('createElement')), [
+          t.stringLiteral('template'),
+        ]),
       ),
     ]),
     t.expressionStatement(
@@ -519,10 +538,9 @@ export function generateCreateItemMethod(
         t.variableDeclaration('var', [
           t.variableDeclarator(
             t.identifier('__fw'),
-            t.callExpression(
-              t.memberExpression(t.identifier('document'), t.identifier('createElement')),
-              [t.stringLiteral('template')],
-            ),
+            t.callExpression(t.memberExpression(t.identifier('document'), t.identifier('createElement')), [
+              t.stringLiteral('template'),
+            ]),
           ),
         ]),
         t.expressionStatement(
@@ -561,21 +579,16 @@ export function generateCreateItemMethod(
     const refName = childPathRefName(entry.childPath)
     const navExpr = buildElementNavExpr(elVar, entry.childPath)
     body.push(
-      t.expressionStatement(
-        t.assignmentExpression(
-          '=',
-          t.memberExpression(elVar, t.identifier(refName)),
-          navExpr,
-        ),
-      ),
+      t.expressionStatement(t.assignmentExpression('=', t.memberExpression(elVar, t.identifier(refName)), navExpr)),
     )
     refMap.set(key, t.memberExpression(elVar, t.identifier(refName)))
   }
 
   for (const entry of patchedEntries) {
-    const navExpr = entry.childPath.length > 0
-      ? (refMap.get(entry.childPath.join('_')) || buildElementNavExpr(elVar, entry.childPath))
-      : elVar
+    const navExpr =
+      entry.childPath.length > 0
+        ? refMap.get(entry.childPath.join('_')) || buildElementNavExpr(elVar, entry.childPath)
+        : elVar
     switch (entry.type) {
       case 'className':
         body.push(
@@ -617,15 +630,26 @@ export function generateCreateItemMethod(
                       t.memberExpression(
                         t.callExpression(
                           t.memberExpression(
-                            t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [attrVal]),
+                            t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [
+                              attrVal,
+                            ]),
                             t.identifier('map'),
                           ),
                           [
                             t.arrowFunctionExpression(
                               [t.arrayPattern([t.identifier('k'), t.identifier('v')])],
-                              t.binaryExpression('+', t.binaryExpression('+',
-                                t.callExpression(t.memberExpression(t.identifier('k'), t.identifier('replace')), [t.regExpLiteral('[A-Z]', 'g'), t.stringLiteral('-$&')]),
-                                t.stringLiteral(': ')), t.identifier('v')),
+                              t.binaryExpression(
+                                '+',
+                                t.binaryExpression(
+                                  '+',
+                                  t.callExpression(t.memberExpression(t.identifier('k'), t.identifier('replace')), [
+                                    t.regExpLiteral('[A-Z]', 'g'),
+                                    t.stringLiteral('-$&'),
+                                  ]),
+                                  t.stringLiteral(': '),
+                                ),
+                                t.identifier('v'),
+                              ),
                             ),
                           ],
                         ),

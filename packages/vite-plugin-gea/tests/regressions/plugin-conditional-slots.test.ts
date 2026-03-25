@@ -226,11 +226,19 @@ test('constructor-inlined conditional slot init is guarded when template has ear
 
   assert.match(output, /__geaRegisterCond/, 'should generate __geaRegisterCond calls')
 
+  const ctorStart = output.indexOf('constructor(')
+  const templateStart = output.indexOf('  template()')
+  assert.ok(ctorStart >= 0 && templateStart > ctorStart, 'expected constructor before template()')
+  const ctorBody = output.slice(ctorStart, templateStart)
   assert.match(
-    output,
-    /try\s*\{/,
-    'constructor-inlined setup for conditional slots must be wrapped in try-catch ' +
-      'to survive null store values before template early-return guard runs',
+    ctorBody,
+    /issue\?\.description/,
+    'constructor-inlined cond-slot setup must optionalize store reads that precede the template early-return guard',
+  )
+  assert.doesNotMatch(
+    ctorBody,
+    /\btry\s*\{/,
+    'constructor must not swallow init errors with try/catch; use safe reads instead',
   )
 })
 

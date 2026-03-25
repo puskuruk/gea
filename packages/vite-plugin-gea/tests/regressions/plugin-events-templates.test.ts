@@ -35,7 +35,8 @@ test('prop text patch preserves surrounding template text', () => {
     }
   `)
 
-  assert.match(output, /const __boundValue = `[\s\S]*Pay \$\$\$\{this\.props\.totalPrice\}[\s\S]*`;/)
+  assert.match(output, /const __boundValue = `[\s\S]*Pay \$\$\$\{value\}[\s\S]*`;/)
+  assert.match(output, /if \(!\(value === null \|\| value === undefined\)\)/)
   assert.match(output, /textContent = __boundValue/)
   assert.doesNotMatch(output, /__geaPatchProp_totalPrice\(value\)[\s\S]*textContent = value/)
 })

@@ -1,8 +1,4 @@
 {
   "extends": "../shared/tsconfig.json",
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "../../packages/vite-plugin-gea/gea-env.d.ts"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", "../../packages/vite-plugin-gea/gea-env.d.ts"]
 }

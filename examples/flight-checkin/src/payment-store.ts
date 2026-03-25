@@ -1,6 +1,6 @@
 import { Store } from '@geajs/core'
 
-class PaymentStore extends Store {
+export class PaymentStore extends Store {
   passengerName = ''
   cardNumber = ''
   expiry = ''

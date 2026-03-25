@@ -103,9 +103,7 @@ export default class App extends Component {
               {store.filteredTransactions.length === 0 ? (
                 <p class="empty-state">No transactions match your filters.</p>
               ) : (
-                store.filteredTransactions.map((tx) => (
-                  <TransactionRow key={tx.id} tx={tx} />
-                ))
+                store.filteredTransactions.map((tx) => <TransactionRow key={tx.id} tx={tx} />)
               )}
             </div>
           </div>
@@ -164,13 +162,24 @@ export default class App extends Component {
 
               <div class="form-field">
                 <Label htmlFor="tx-desc">Description</Label>
-                <Input inputId="tx-desc" placeholder="e.g. Grocery run" value={store.draftDescription} onInput={store.setDraftDescription} />
+                <Input
+                  inputId="tx-desc"
+                  placeholder="e.g. Grocery run"
+                  value={store.draftDescription}
+                  onInput={store.setDraftDescription}
+                />
               </div>
 
               <div class="form-row">
                 <div class="form-field">
                   <Label htmlFor="tx-amount">Amount ($)</Label>
-                  <Input inputId="tx-amount" type="number" placeholder="0.00" value={store.draftAmount} onInput={store.setDraftAmount} />
+                  <Input
+                    inputId="tx-amount"
+                    type="number"
+                    placeholder="0.00"
+                    value={store.draftAmount}
+                    onInput={store.setDraftAmount}
+                  />
                 </div>
                 <div class="form-field">
                   <Label htmlFor="tx-date">Date</Label>
@@ -201,12 +210,17 @@ export default class App extends Component {
               </div>
 
               <div class="modal-actions">
-                <Button variant="outline" click={store.closeAdd}>Cancel</Button>
+                <Button variant="outline" click={store.closeAdd}>
+                  Cancel
+                </Button>
                 <Button
                   disabled={!store.draftValid}
                   click={() => {
                     store.addTransaction()
-                    ToastStore.success({ title: 'Transaction added', description: `${store.draftDescription || 'Entry'} saved.` })
+                    ToastStore.success({
+                      title: 'Transaction added',
+                      description: `${store.draftDescription || 'Entry'} saved.`,
+                    })
                   }}
                 >
                   Add

@@ -12,7 +12,14 @@ import type {
   UnresolvedMapInfo,
   UnresolvedRelationalClassBinding,
 } from './ir.ts'
-import { buildObserveKey, pathPartsToString, resolvePath, generateSelector, getDirectChildElements, getJSXTagName } from './utils.ts'
+import {
+  buildObserveKey,
+  pathPartsToString,
+  resolvePath,
+  generateSelector,
+  getDirectChildElements,
+  getJSXTagName,
+} from './utils.ts'
 import { analyzeJSXInMap } from './analyze-map.ts'
 import {
   resolveExpr,
@@ -53,6 +60,11 @@ export interface AnalysisResult {
   conditionalSlotNodeMap: Map<t.Node, string>
   /** Guard condition from early return pattern (if (guard) return A; return B;) that requires full re-render */
   earlyReturnGuard?: t.Expression
+  /**
+   * Index into templateSetupContext.statements (statements before the final return) of the
+   * early-return if. Setup after this index must not run unless that if has been evaluated first.
+   */
+  earlyReturnBarrierIndex?: number
 }
 
 function buildTextTemplateExpressionFromParts(
@@ -167,27 +179,8 @@ export function analyzeTemplate(
       conditionalSlotNodeMap: new Map(),
     }
 
-  // Detect early return pattern: if (cond) { return JSX; } return JSX;
-  // Record the guard condition so the reactivity system can trigger a full re-render.
-  let earlyReturnGuard: t.Expression | undefined
   const bodyStmts = templateMethod.body.body
-  for (let i = 0; i < bodyStmts.length - 1; i++) {
-    const s = bodyStmts[i]
-    if (
-      t.isIfStatement(s) &&
-      !s.alternate &&
-      t.isBlockStatement(s.consequent) &&
-      s.consequent.body.length === 1 &&
-      t.isReturnStatement(s.consequent.body[0]) &&
-      s.consequent.body[0].argument &&
-      t.isReturnStatement(bodyStmts[i + 1])
-    ) {
-      earlyReturnGuard = t.cloneNode(s.test, true) as t.Expression
-      break
-    }
-  }
-
-  const returnStmt = templateMethod.body.body.find((s) => t.isReturnStatement(s) && s.argument !== null) as
+  const returnStmt = bodyStmts.find((s) => t.isReturnStatement(s) && s.argument !== null) as
     | t.ReturnStatement
     | undefined
   if (!returnStmt?.argument)
@@ -205,7 +198,34 @@ export function analyzeTemplate(
       conditionalSlotScopedStoreKeys: new Set(),
       conditionalSlotNodeMap: new Map(),
     }
-  const returnIndex = templateMethod.body.body.indexOf(returnStmt)
+
+  const returnIndex = bodyStmts.indexOf(returnStmt)
+
+  // if (guard) return A; …setup…; return B — guard must run before main-branch setup (e.g. const x = item.foo).
+  let earlyReturnGuard: t.Expression | undefined
+  let earlyReturnBarrierIndex: number | undefined
+  const earlyReturnFromIf = (s: t.IfStatement): t.ReturnStatement | null => {
+    if (t.isReturnStatement(s.consequent) && s.consequent.argument) return s.consequent
+    if (
+      t.isBlockStatement(s.consequent) &&
+      s.consequent.body.length === 1 &&
+      t.isReturnStatement(s.consequent.body[0]) &&
+      s.consequent.body[0].argument
+    ) {
+      return s.consequent.body[0]
+    }
+    return null
+  }
+  for (let i = 0; i < returnIndex; i++) {
+    const s = bodyStmts[i]
+    if (!t.isIfStatement(s) || s.alternate) continue
+    const earlyRet = earlyReturnFromIf(s)
+    if (!earlyRet?.argument) continue
+    earlyReturnGuard = t.cloneNode(s.test, true) as t.Expression
+    earlyReturnBarrierIndex = i
+    break
+  }
+
   const templateSetupContext = {
     params: templateMethod.params.filter(
       (param): param is t.Identifier | t.Pattern | t.RestElement => !t.isTSParameterProperty(param),
@@ -341,6 +361,7 @@ export function analyzeTemplate(
     conditionalSlotScopedStoreKeys,
     conditionalSlotNodeMap,
     earlyReturnGuard,
+    earlyReturnBarrierIndex,
   }
 }
 
@@ -731,9 +752,7 @@ function analyzeChildren(
         )
         // Determine if a conditional slot was created for this expression
         const slotCountAfter = conditionalSlots?.length ?? 0
-        const slotId = slotCountAfter > slotCountBefore
-          ? conditionalSlots![slotCountAfter - 1].slotId
-          : undefined
+        const slotId = slotCountAfter > slotCountBefore ? conditionalSlots![slotCountAfter - 1].slotId : undefined
         nestedMapCalls.forEach(({ mapExpr, parentElement, containerPath }) => {
           let mapNode = node
           let mapElementPath = elementPath
@@ -1457,7 +1476,9 @@ function collectAllStateAccesses(
         !path.parentPath.node.computed
       ) {
         const grandParent = path.parentPath.parentPath
-        if (!(grandParent && t.isCallExpression(grandParent.node) && grandParent.node.callee === path.parentPath.node)) {
+        if (
+          !(grandParent && t.isCallExpression(grandParent.node) && grandParent.node.callee === path.parentPath.node)
+        ) {
           return
         }
       }

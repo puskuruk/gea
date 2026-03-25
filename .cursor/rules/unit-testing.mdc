@@ -35,7 +35,7 @@ Vitest does not recognize `node:test` describe/it blocks and reports false "No t
 
 Each package defines its own test script in `package.json`:
 
-- `@geajs/core`: `tsx --conditions source --import ./tests/preload.mjs --test tests/**/*.test.ts`
+- `@geajs/core`: `tsx --conditions source --import ./tests/preload.ts --test tests/*.test.ts --test tests/examples/*.test.ts` (POSIX `sh` does not expand `**`; two globs cover root + `tests/examples/`)
 - `@geajs/vite-plugin`: `tsx --test 'tests/**/*.test.ts'`
 
 The root `npm test` runs all workspace test scripts via `npm run test --workspaces --if-present`.

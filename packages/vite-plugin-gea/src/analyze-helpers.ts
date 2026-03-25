@@ -155,7 +155,16 @@ export function normalizeDestructuredMapCallback(arrowFn: t.ArrowFunctionExpress
     const rewriteNode = (node: t.Node): void => {
       if (!node || typeof node !== 'object') return
       for (const key of Object.keys(node) as (keyof typeof node)[]) {
-        if (key === 'type' || key === 'start' || key === 'end' || key === 'loc' || key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments') continue
+        if (
+          key === 'type' ||
+          key === 'start' ||
+          key === 'end' ||
+          key === 'loc' ||
+          key === 'leadingComments' ||
+          key === 'trailingComments' ||
+          key === 'innerComments'
+        )
+          continue
         const child = (node as any)[key]
         if (Array.isArray(child)) {
           for (let i = 0; i < child.length; i++) {
@@ -163,7 +172,11 @@ export function normalizeDestructuredMapCallback(arrowFn: t.ArrowFunctionExpress
               if (t.isIdentifier(child[i]) && indexMap.has(child[i].name)) {
                 if (t.isMemberExpression(node) && key === 'property' && !(node as t.MemberExpression).computed) continue
                 if (t.isObjectProperty(node) && key === 'key') continue
-                child[i] = t.memberExpression(t.identifier(itemName), t.numericLiteral(indexMap.get(child[i].name)!), true)
+                child[i] = t.memberExpression(
+                  t.identifier(itemName),
+                  t.numericLiteral(indexMap.get(child[i].name)!),
+                  true,
+                )
               } else {
                 rewriteNode(child[i])
               }
@@ -173,7 +186,11 @@ export function normalizeDestructuredMapCallback(arrowFn: t.ArrowFunctionExpress
           if (t.isIdentifier(child) && indexMap.has(child.name)) {
             if (t.isMemberExpression(node) && key === 'property' && !(node as t.MemberExpression).computed) continue
             if (t.isObjectProperty(node) && key === 'key') continue
-            ;(node as any)[key] = t.memberExpression(t.identifier(itemName), t.numericLiteral(indexMap.get(child.name)!), true)
+            ;(node as any)[key] = t.memberExpression(
+              t.identifier(itemName),
+              t.numericLiteral(indexMap.get(child.name)!),
+              true,
+            )
           } else {
             rewriteNode(child)
           }
@@ -200,7 +217,16 @@ export function normalizeDestructuredMapCallback(arrowFn: t.ArrowFunctionExpress
   const rewriteNode = (node: t.Node): void => {
     if (!node || typeof node !== 'object') return
     for (const key of Object.keys(node) as (keyof typeof node)[]) {
-      if (key === 'type' || key === 'start' || key === 'end' || key === 'loc' || key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments') continue
+      if (
+        key === 'type' ||
+        key === 'start' ||
+        key === 'end' ||
+        key === 'loc' ||
+        key === 'leadingComments' ||
+        key === 'trailingComments' ||
+        key === 'innerComments'
+      )
+        continue
       const child = (node as any)[key]
       if (Array.isArray(child)) {
         for (let i = 0; i < child.length; i++) {

@@ -63,24 +63,13 @@ function ensureMapItemHelper(
         [],
       )
     }
-    const base = ctx.isImportedState
-      ? t.identifier(ctx.storeVar || 'store')
-      : t.thisExpression()
+    const base = ctx.isImportedState ? t.identifier(ctx.storeVar || 'store') : t.thisExpression()
     if (ctx.arrayPathParts.length === 0) return base
     const [, ...rest] = ctx.arrayPathParts
     const isIndex = /^\d+$/.test(first)
     const optionalFirst = ctx.isImportedState
-      ? t.memberExpression(
-          base,
-          isIndex ? t.numericLiteral(Number(first)) : t.identifier(first),
-          isIndex,
-        )
-      : t.optionalMemberExpression(
-          base,
-          isIndex ? t.numericLiteral(Number(first)) : t.identifier(first),
-          isIndex,
-          true,
-        )
+      ? t.memberExpression(base, isIndex ? t.numericLiteral(Number(first)) : t.identifier(first), isIndex)
+      : t.optionalMemberExpression(base, isIndex ? t.numericLiteral(Number(first)) : t.identifier(first), isIndex, true)
     return rest.length > 0 ? buildMemberChainFromParts(optionalFirst, rest) : optionalFirst
   })()
 
@@ -107,7 +96,11 @@ function ensureMapItemHelper(
           )
         : t.arrowFunctionExpression(
             [t.identifier('_'), t.identifier('__i')],
-            t.binaryExpression('===', t.callExpression(t.identifier('String'), [t.identifier('__i')]), t.identifier('__itemId')),
+            t.binaryExpression(
+              '===',
+              t.callExpression(t.identifier('String'), [t.identifier('__i')]),
+              t.identifier('__itemId'),
+            ),
           )
   const method = jsMethod`${id(helperName)}(e) {
     const __el = e.target.closest('[data-gea-item-id]');

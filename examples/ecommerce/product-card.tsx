@@ -16,7 +16,9 @@ export default class ProductCard extends Component {
           {product.badge && (
             <Badge
               class="product-badge"
-              variant={product.badge === 'Out of Stock' ? 'destructive' : product.badge === 'New' ? 'default' : 'secondary'}
+              variant={
+                product.badge === 'Out of Stock' ? 'destructive' : product.badge === 'New' ? 'default' : 'secondary'
+              }
             >
               {product.badge}
             </Badge>

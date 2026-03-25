@@ -5,7 +5,7 @@ type LuggageId = (typeof LUGGAGE_OPTIONS)[number]['id']
 type SeatId = (typeof SEAT_OPTIONS)[number]['id']
 type MealId = (typeof MEAL_OPTIONS)[number]['id']
 
-class OptionsStore extends Store {
+export class OptionsStore extends Store {
   luggage: LuggageId = 'carry-on'
   seat: SeatId = 'economy'
   meal: MealId = 'none'

@@ -9,8 +9,5 @@
     "vite.config.ts",
     "../../packages/vite-plugin-gea/gea-env.d.ts"
   ],
-  "exclude": [
-    "dist",
-    "node_modules"
-  ]
+  "exclude": ["dist", "node_modules"]
 }

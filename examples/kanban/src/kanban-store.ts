@@ -80,7 +80,7 @@ const FAKE_COLUMNS: Column[] = [
 
 const FAKE_TASKS_MAP: Record<string, Task> = Object.fromEntries(FAKE_TASKS.map((t) => [t.id, t]))
 
-class KanbanStore extends Store {
+export class KanbanStore extends Store {
   columns = FAKE_COLUMNS
   tasks = FAKE_TASKS_MAP
   selectedTaskId: string | null = null

@@ -10,7 +10,7 @@ const WINNING_LINES = [
   [1, 4, 7],
   [2, 5, 8],
   [0, 4, 8],
-  [2, 4, 6]
+  [2, 4, 6],
 ]
 
 class GameStore extends Store {
@@ -25,7 +25,7 @@ class GameStore extends Store {
         return this.board[a]
       }
     }
-    if (this.board.every(cell => cell !== null)) return 'draw'
+    if (this.board.every((cell) => cell !== null)) return 'draw'
     return null
   }
 

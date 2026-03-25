@@ -15,7 +15,7 @@ function objectToQueryString(obj: Record<string, any>): string {
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined && value !== null) {
       if (Array.isArray(value)) {
-        value.forEach(v => params.append(`${key}[]`, String(v)))
+        value.forEach((v) => params.append(`${key}[]`, String(v)))
       } else {
         params.append(key, String(value))
       }

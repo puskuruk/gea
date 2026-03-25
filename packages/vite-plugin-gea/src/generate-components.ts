@@ -208,7 +208,6 @@ function getPropsBuilderMethodName(child: ChildComponent): string {
   return `__buildProps_${child.instanceVar.replace(/^_/, '')}`
 }
 
-
 function collectBindingNames(stmt: t.Statement): string[] {
   if (t.isVariableDeclaration(stmt)) {
     const names: string[] = []
@@ -302,4 +301,3 @@ function buildPropsBuilderMethod(child: ChildComponent): t.ClassMethod {
 
   return appendToBody(jsMethod`${id(getPropsBuilderMethodName(child))}() {}`, ...prunedSetup, returnStmt)
 }
-

@@ -9,7 +9,6 @@ interface FeedItem {
   color: string
 }
 
-
 const colors = ['#4F46E5', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0891B2', '#BE185D']
 
 const titles = [

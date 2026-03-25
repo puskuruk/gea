@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { installDom, flushMicrotasks, compileJsxComponent, loadRuntimeModules } from './runtime-helpers'
+import { installDom, flushMicrotasks } from '../../../../tests/helpers/jsdom-setup'
+import { compileJsxComponent, loadRuntimeModules } from '../helpers/compile'
 
 // Bug: store-backed component list inside a conditional (lazy) child renders
 // items in the constructor but the DOM container doesn't exist until the
@@ -100,14 +101,10 @@ test('store-backed component list inside lazy conditional renders items after mo
     await flushMicrotasks()
 
     // After flip: items must be rendered
-    assert.equal(
-      root.querySelectorAll('.item-row').length,
-      3,
-      'items must render after lazy component mounts',
-    )
+    assert.equal(root.querySelectorAll('.item-row').length, 3, 'items must render after lazy component mounts')
 
     // Verify content
-    const names = Array.from(root.querySelectorAll('.item-row td')).map(td => td.textContent)
+    const names = Array.from(root.querySelectorAll('.item-row td')).map((td) => td.textContent)
     assert.deepEqual(names, ['Alice', 'Bob', 'Charlie'])
   } finally {
     restoreDom()

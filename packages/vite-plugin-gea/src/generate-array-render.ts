@@ -7,6 +7,8 @@ import {
   pathPartsToString,
   replacePropRefsInExpression,
   replacePropRefsInStatements,
+  optionalizeMemberChainsAfterComputedItemKey,
+  optionalizeComputedItemKeyInStatements,
 } from './utils.ts'
 import { ITEM_IS_KEY } from './analyze-helpers.ts'
 import { collectTemplateSetupStatements } from './transform-attributes.ts'
@@ -187,9 +189,15 @@ export function generateRenderItemMethod(
   eventIdCounter?: { value: number },
   classBody?: t.ClassBody,
   templateSetupContext?: TemplateSetupContext,
-): { method: t.ClassMethod | null; handlers: EventHandler[]; handlerPropsInMap: HandlerPropInMap[]; needsUnwrapHelper: boolean } {
+): {
+  method: t.ClassMethod | null
+  handlers: EventHandler[]
+  handlerPropsInMap: HandlerPropInMap[]
+  needsUnwrapHelper: boolean
+} {
   const renderEventHandlers: EventHandler[] = []
-  if (!arrayMap.itemTemplate) return { method: null, handlers: renderEventHandlers, handlerPropsInMap: [], needsUnwrapHelper: false }
+  if (!arrayMap.itemTemplate)
+    return { method: null, handlers: renderEventHandlers, handlerPropsInMap: [], needsUnwrapHelper: false }
   const arrayPath = pathPartsToString(arrayMap.arrayPathParts || normalizePathParts((arrayMap as any).arrayPath || ''))
 
   const modified = t.cloneNode(arrayMap.itemTemplate, true) as t.JSXElement | t.JSXFragment
@@ -231,8 +239,12 @@ export function generateRenderItemMethod(
     }
   }
 
+  const itemKey = arrayMap.itemVariable
   wrapped.expressions = wrapped.expressions.map((expr) =>
-    replacePropRefsInExpression(unwrapComparisonOperands(expr as t.Expression), propNames, wholeParam),
+    optionalizeMemberChainsAfterComputedItemKey(
+      replacePropRefsInExpression(unwrapComparisonOperands(expr as t.Expression), propNames, wholeParam),
+      itemKey,
+    ),
   )
 
   const handlerRegStmts = buildHandlerRegistrationStatements(
@@ -251,13 +263,19 @@ export function generateRenderItemMethod(
         ])
       : wrapped
   const setupStmts = collectTemplateSetupStatements(setupScope, templateSetupContext)
-  const rewrittenSetup = setupStmts
-    .map((stmt) => replacePropRefsInStatements([t.cloneNode(stmt, true) as t.Statement], propNames, wholeParam))
-    .flat()
+  const rewrittenSetup = optionalizeComputedItemKeyInStatements(
+    setupStmts
+      .map((stmt) => replacePropRefsInStatements([t.cloneNode(stmt, true) as t.Statement], propNames, wholeParam))
+      .flat(),
+    itemKey,
+  )
 
-  const rewrittenCallbackBody = callbackBodyStmts
-    .map((stmt) => replacePropRefsInStatements([t.cloneNode(stmt, true) as t.Statement], propNames, wholeParam))
-    .flat()
+  const rewrittenCallbackBody = optionalizeComputedItemKeyInStatements(
+    callbackBodyStmts
+      .map((stmt) => replacePropRefsInStatements([t.cloneNode(stmt, true) as t.Statement], propNames, wholeParam))
+      .flat(),
+    itemKey,
+  )
 
   const baseMethod = jsMethod`${id(methodName)}(${id(arrayMap.itemVariable)}) {}`
   if (arrayMap.indexVariable) {
@@ -281,13 +299,7 @@ export function generateRenderItemMethod(
     return false
   }
   const needsUnwrapHelper = [...rewrittenCallbackBody, returnStmt].some((stmt) => containsVCall(stmt))
-  const method = appendToBody(
-    baseMethod,
-    ...rewrittenSetup,
-    ...rewrittenCallbackBody,
-    ...handlerRegStmts,
-    returnStmt,
-  )
+  const method = appendToBody(baseMethod, ...rewrittenSetup, ...rewrittenCallbackBody, ...handlerRegStmts, returnStmt)
 
   if (handlerPropsInMap.length > 0 && classBody) {
     const handleItemHandler = jsMethod`__handleItemHandler(itemId, e) {
@@ -314,4 +326,3 @@ export function generateRenderItemMethod(
   if (eventHandlers) renderEventHandlers.forEach((h) => eventHandlers.push(h))
   return { method, handlers: renderEventHandlers, handlerPropsInMap, needsUnwrapHelper }
 }
-

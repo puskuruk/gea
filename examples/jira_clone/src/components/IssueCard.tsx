@@ -11,11 +11,7 @@ export default class IssueCard extends Component {
 
   template({ issueId, title, type, priority, assignees = [] }: any) {
     return (
-      <div
-        class="issue-card"
-        data-draggable-id={issueId}
-        click={() => this.handleClick()}
-      >
+      <div class="issue-card" data-draggable-id={issueId} click={() => this.handleClick()}>
         <p class="issue-card-title">{title}</p>
         <div class="issue-card-footer">
           <div class="issue-card-footer-left">

@@ -45,11 +45,21 @@ export default class Progress extends ZagComponent {
     return (
       <div data-part="root" class={props.class || ''}>
         <div class="flex justify-between mb-1">
-          {props.label && <label data-part="label" class="progress-label text-sm font-medium">{props.label}</label>}
-          <span data-part="value-text" class="progress-value-text text-sm text-muted-foreground">{this.percent}%</span>
+          {props.label && (
+            <label data-part="label" class="progress-label text-sm font-medium">
+              {props.label}
+            </label>
+          )}
+          <span data-part="value-text" class="progress-value-text text-sm text-muted-foreground">
+            {this.percent}%
+          </span>
         </div>
         <div data-part="track" class="progress-track relative h-2 w-full overflow-hidden rounded-full bg-primary/20">
-          <div data-part="range" class="progress-range h-full w-full flex-1 bg-primary transition-all" style={`width: ${this.percent}%`}></div>
+          <div
+            data-part="range"
+            class="progress-range h-full w-full flex-1 bg-primary transition-all"
+            style={`width: ${this.percent}%`}
+          ></div>
         </div>
       </div>
     )

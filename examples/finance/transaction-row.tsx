@@ -17,11 +17,7 @@ export default class TransactionRow extends Component {
           <span class="tx-desc">{tx.description}</span>
           <span class="tx-date">{tx.date}</span>
         </div>
-        <Badge
-          class="tx-cat-badge"
-          variant="outline"
-          style={`color: ${color}; border-color: ${color}40`}
-        >
+        <Badge class="tx-cat-badge" variant="outline" style={`color: ${color}; border-color: ${color}40`}>
           {tx.category}
         </Badge>
         <span class={`tx-amount ${tx.type}`}>

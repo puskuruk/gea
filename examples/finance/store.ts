@@ -51,7 +51,7 @@ const INITIAL_TRANSACTIONS: Transaction[] = [
   { id: 't12', description: 'Spotify', amount: 10, category: 'Entertainment', type: 'expense', date: '2026-03-20' },
 ]
 
-class FinanceStore extends Store {
+export class FinanceStore extends Store {
   transactions: Transaction[] = INITIAL_TRANSACTIONS
   filterCategory: Category | 'All' = 'All'
   filterType: TransactionType | 'All' = 'All'
@@ -104,10 +104,7 @@ class FinanceStore extends Store {
   }
 
   get draftValid(): boolean {
-    return (
-      this.draftDescription.trim().length > 0 &&
-      Number(this.draftAmount) > 0
-    )
+    return this.draftDescription.trim().length > 0 && Number(this.draftAmount) > 0
   }
 
   setFilterCategory(value: string): void {

@@ -63,10 +63,7 @@ export function buildValueExpression(textExpr: TextExpression, stateRefs: Map<st
   }
   if (textExpr.isImportedState && textExpr.storeVar) {
     return buildMemberChainFromParts(
-      t.memberExpression(
-        t.identifier(textExpr.storeVar),
-        t.identifier('__store'),
-      ),
+      t.memberExpression(t.identifier(textExpr.storeVar), t.identifier('__store')),
       textExpr.pathParts,
     )
   }
@@ -97,17 +94,10 @@ function rewriteStateRefs(expr: t.Expression, stateRefs: Map<string, StateRefMet
       } else if (ref.kind === 'local-destructured' && ref.propName) {
         // Destructured local vars like `const { x } = this`
         // must be rewritten to `this.x` in observer methods.
-        path.replaceWith(
-          t.memberExpression(t.thisExpression(), t.identifier(ref.propName)),
-        )
+        path.replaceWith(t.memberExpression(t.thisExpression(), t.identifier(ref.propName)))
         path.skip()
       } else {
-        path.replaceWith(
-          t.memberExpression(
-            t.identifier(path.node.name),
-            t.identifier('__store'),
-          ),
-        )
+        path.replaceWith(t.memberExpression(t.identifier(path.node.name), t.identifier('__store')))
         path.skip()
       }
     },

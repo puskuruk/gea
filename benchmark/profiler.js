@@ -194,57 +194,97 @@
 
     // 1. Create 1,000 rows
     // Warmup
-    for (let i = 0; i < 5; i++) { store.run(); await waitForFlush() }
+    for (let i = 0; i < 5; i++) {
+      store.run()
+      await waitForFlush()
+    }
     results.create1k = await profileOperation(
       'create 1,000 rows',
-      (s) => { s.clear() },
-      (s) => { s.run() },
+      (s) => {
+        s.clear()
+      },
+      (s) => {
+        s.run()
+      },
       10,
     )
 
     // 2. Replace all rows
-    for (let i = 0; i < 5; i++) { store.run(); await waitForFlush() }
+    for (let i = 0; i < 5; i++) {
+      store.run()
+      await waitForFlush()
+    }
     results.replaceAll = await profileOperation(
       'replace all 1,000 rows',
-      (s) => { s.run() },
-      (s) => { s.run() },
+      (s) => {
+        s.run()
+      },
+      (s) => {
+        s.run()
+      },
       10,
     )
 
     // 3. Partial update (every 10th row)
-    for (let i = 0; i < 3; i++) { store.run(); store.update(); await waitForFlush() }
+    for (let i = 0; i < 3; i++) {
+      store.run()
+      store.update()
+      await waitForFlush()
+    }
     results.partialUpdate = await profileOperation(
       'partial update (every 10th row)',
-      (s) => { s.run() },
-      (s) => { s.update() },
+      (s) => {
+        s.run()
+      },
+      (s) => {
+        s.update()
+      },
       10,
     )
 
     // 4. Select row
-    for (let i = 0; i < 5; i++) { store.run(); store.select(i + 1); await waitForFlush() }
+    for (let i = 0; i < 5; i++) {
+      store.run()
+      store.select(i + 1)
+      await waitForFlush()
+    }
     let selectCounter = 1
     results.selectRow = await profileOperation(
       'select row',
       (s) => {
-        if (selectCounter === 1) { s.run() }
+        if (selectCounter === 1) {
+          s.run()
+        }
       },
-      (s) => { s.select(selectCounter++) },
+      (s) => {
+        s.select(selectCounter++)
+      },
       20,
     )
 
     // 5. Swap rows
-    for (let i = 0; i < 5; i++) { store.run(); store.swapRows(); await waitForFlush() }
+    for (let i = 0; i < 5; i++) {
+      store.run()
+      store.swapRows()
+      await waitForFlush()
+    }
     results.swapRows = await profileOperation(
       'swap rows',
-      (s) => { s.run() },
-      (s) => { s.swapRows() },
+      (s) => {
+        s.run()
+      },
+      (s) => {
+        s.swapRows()
+      },
       10,
     )
 
     // 6. Remove row
     results.removeRow = await profileOperation(
       'remove row',
-      (s) => { s.run() },
+      (s) => {
+        s.run()
+      },
       (s) => {
         const items = s.data.__getTarget || s.data
         s.remove(items[500]?.id || 500)
@@ -253,27 +293,42 @@
     )
 
     // 7. Create 10,000 rows
-    for (let i = 0; i < 3; i++) { store.runLots(); await waitForFlush() }
+    for (let i = 0; i < 3; i++) {
+      store.runLots()
+      await waitForFlush()
+    }
     results.create10k = await profileOperation(
       'create 10,000 rows',
-      (s) => { s.clear() },
-      (s) => { s.runLots() },
+      (s) => {
+        s.clear()
+      },
+      (s) => {
+        s.runLots()
+      },
       5,
     )
 
     // 8. Append 1,000 rows
     results.append1k = await profileOperation(
       'append 1,000 rows',
-      (s) => { s.run() },
-      (s) => { s.add() },
+      (s) => {
+        s.run()
+      },
+      (s) => {
+        s.add()
+      },
       10,
     )
 
     // 9. Clear rows
     results.clearRows = await profileOperation(
       'clear rows',
-      (s) => { s.run() },
-      (s) => { s.clear() },
+      (s) => {
+        s.run()
+      },
+      (s) => {
+        s.clear()
+      },
       10,
     )
 
@@ -291,10 +346,7 @@
       'store._collectMatchingObserverNodesFromNode',
       'store._notifyHandlers',
     ],
-    'store._notifyHandlers': [
-      'component.__observe_store_data',
-      'component.__observe_store_selected',
-    ],
+    'store._notifyHandlers': ['component.__observe_store_data', 'component.__observe_store_selected'],
     'component.__observe_store_data': ['component.__applyListChanges'],
     'component.__applyListChanges': ['component.createDataItem'],
     'component.createDataItem': ['component.renderDataItem'],
@@ -322,14 +374,14 @@
 
       const n = data.results.length
       const avgTotal = data.results.reduce((s, r) => s + r.totalTime, 0) / n
-      const stddev = Math.sqrt(
-        data.results.reduce((s, r) => s + (r.totalTime - avgTotal) ** 2, 0) / n,
-      )
+      const stddev = Math.sqrt(data.results.reduce((s, r) => s + (r.totalTime - avgTotal) ** 2, 0) / n)
       const avgSync = data.results.reduce((s, r) => s + r.syncTime, 0) / n
       const avgFlush = data.results.reduce((s, r) => s + r.flushTime, 0) / n
       const avgLayout = data.results.reduce((s, r) => s + r.layoutTime, 0) / n
       lines.push(`  Total: ${avgTotal.toFixed(2)}ms ±${stddev.toFixed(2)}ms (${n} runs)`)
-      lines.push(`  Phases: sync ${avgSync.toFixed(2)}ms │ flush ${avgFlush.toFixed(2)}ms │ layout/paint ${avgLayout.toFixed(2)}ms`)
+      lines.push(
+        `  Phases: sync ${avgSync.toFixed(2)}ms │ flush ${avgFlush.toFixed(2)}ms │ layout/paint ${avgLayout.toFixed(2)}ms`,
+      )
       lines.push('')
 
       // Aggregate breakdown
@@ -354,7 +406,7 @@
       for (const [cat, info] of sorted) {
         const avgTime = info.total / info.count
         const avgCalls = Math.round(info.calls / info.count)
-        const pct = avgTotal > 0 ? ((avgTime / avgTotal) * 100) : 0
+        const pct = avgTotal > 0 ? (avgTime / avgTotal) * 100 : 0
         const isLeaf = leafCats.has(cat)
 
         if (isLeaf) accountedLeaf += avgTime
@@ -372,7 +424,10 @@
       let instrumentedAction = 0
       for (const m of storeMethodKeys) {
         const entry = aggregated['benchmarkStore.' + m]
-        if (entry) { instrumentedAction = entry.total / entry.count; break }
+        if (entry) {
+          instrumentedAction = entry.total / entry.count
+          break
+        }
       }
       const proxyOverhead = Math.max(0, avgSync - instrumentedAction)
 
@@ -438,7 +493,7 @@
         breakdown[cat] = {
           avgMs: +(info.total / info.count).toFixed(4),
           avgCalls: Math.round(info.calls / info.count),
-          pctOfTotal: +(((info.total / info.count) / avgTotal) * 100).toFixed(2),
+          pctOfTotal: +((info.total / info.count / avgTotal) * 100).toFixed(2),
         }
       }
 

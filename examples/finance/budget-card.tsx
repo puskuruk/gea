@@ -16,13 +16,17 @@ export default class BudgetCard extends Component {
     return (
       <div class="budget-card" data-budget-category={category}>
         <div class="budget-header">
-          <span class="budget-cat" style={`color: ${color}`}>{category}</span>
+          <span class="budget-cat" style={`color: ${color}`}>
+            {category}
+          </span>
           <span class={`budget-amount ${over ? 'over' : ''}`}>
             ${spent.toFixed(0)} / ${budget}
           </span>
         </div>
         <Progress value={pct} class={over ? 'progress-over' : ''} />
-        <span class="budget-pct">{pct}%{over ? ' — Over budget!' : ''}</span>
+        <span class="budget-pct">
+          {pct}%{over ? ' — Over budget!' : ''}
+        </span>
       </div>
     )
   }

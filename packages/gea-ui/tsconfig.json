@@ -1,12 +1,5 @@
 {
   "extends": "../gea/tsconfig.json",
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "../vite-plugin-gea/gea-env.d.ts"
-  ],
-  "exclude": [
-    "dist",
-    "node_modules"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "../vite-plugin-gea/gea-env.d.ts"],
+  "exclude": ["dist", "node_modules"]
 }

@@ -431,7 +431,11 @@ export function geaPlugin(): Plugin {
                   // (exclude base classes — they're not child component tags)
                   const importedName = spec.imported?.name ?? spec.local.name
                   const geaCoreBaseClasses = ['Component', 'Store']
-                  if (source === '@geajs/core' && isComponentTag(importedName) && !geaCoreBaseClasses.includes(importedName)) {
+                  if (
+                    source === '@geajs/core' &&
+                    isComponentTag(importedName) &&
+                    !geaCoreBaseClasses.includes(importedName)
+                  ) {
                     knownComponentImports.add(spec.local.name)
                   }
                 }

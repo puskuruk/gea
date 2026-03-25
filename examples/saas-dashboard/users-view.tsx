@@ -45,9 +45,7 @@ export default class UsersView extends Component {
                   ))}
                 </tbody>
               </table>
-              {store.filteredUsers.length === 0 && (
-                <p class="empty-state">No users match your search.</p>
-              )}
+              {store.filteredUsers.length === 0 && <p class="empty-state">No users match your search.</p>}
             </div>
           </CardContent>
         </Card>
@@ -60,11 +58,22 @@ export default class UsersView extends Component {
               <p class="modal-desc">Invite a new member to your workspace.</p>
               <div class="form-field">
                 <Label htmlFor="new-name">Full Name</Label>
-                <Input inputId="new-name" placeholder="Jane Smith" value={store.draftName} onInput={store.setDraftName} />
+                <Input
+                  inputId="new-name"
+                  placeholder="Jane Smith"
+                  value={store.draftName}
+                  onInput={store.setDraftName}
+                />
               </div>
               <div class="form-field">
                 <Label htmlFor="new-email">Email</Label>
-                <Input inputId="new-email" type="email" placeholder="jane@acme.com" value={store.draftEmail} onInput={store.setDraftEmail} />
+                <Input
+                  inputId="new-email"
+                  type="email"
+                  placeholder="jane@acme.com"
+                  value={store.draftEmail}
+                  onInput={store.setDraftEmail}
+                />
               </div>
               <div class="form-field">
                 <Select
@@ -80,12 +89,17 @@ export default class UsersView extends Component {
                 />
               </div>
               <div class="modal-actions">
-                <Button variant="outline" click={store.closeAddUser}>Cancel</Button>
+                <Button variant="outline" click={store.closeAddUser}>
+                  Cancel
+                </Button>
                 <Button
                   disabled={!store.draftName.trim() || !store.draftEmail.trim()}
                   click={() => {
                     store.addUser()
-                    ToastStore.success({ title: 'User added', description: `${store.draftName || 'New user'} has been added.` })
+                    ToastStore.success({
+                      title: 'User added',
+                      description: `${store.draftName || 'New user'} has been added.`,
+                    })
                   }}
                 >
                   Add Member
@@ -105,7 +119,9 @@ export default class UsersView extends Component {
                 cannot be undone.
               </p>
               <div class="modal-actions">
-                <Button variant="outline" click={store.cancelDelete}>Cancel</Button>
+                <Button variant="outline" click={store.cancelDelete}>
+                  Cancel
+                </Button>
                 <Button
                   variant="destructive"
                   click={() => {

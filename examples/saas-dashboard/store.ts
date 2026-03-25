@@ -20,12 +20,26 @@ function uid() {
 const INITIAL_USERS: User[] = [
   { id: 'u1', name: 'Sofia Davis', email: 'sofia@acme.com', role: 'admin', status: 'active', joined: '2024-01-10' },
   { id: 'u2', name: 'Jackson Lee', email: 'jackson@acme.com', role: 'editor', status: 'active', joined: '2024-02-14' },
-  { id: 'u3', name: 'Isabella Nguyen', email: 'isabella@acme.com', role: 'viewer', status: 'active', joined: '2024-03-05' },
-  { id: 'u4', name: 'William Kim', email: 'william@acme.com', role: 'editor', status: 'inactive', joined: '2024-01-22' },
+  {
+    id: 'u3',
+    name: 'Isabella Nguyen',
+    email: 'isabella@acme.com',
+    role: 'viewer',
+    status: 'active',
+    joined: '2024-03-05',
+  },
+  {
+    id: 'u4',
+    name: 'William Kim',
+    email: 'william@acme.com',
+    role: 'editor',
+    status: 'inactive',
+    joined: '2024-01-22',
+  },
   { id: 'u5', name: 'Olivia Martin', email: 'olivia@acme.com', role: 'viewer', status: 'active', joined: '2024-04-01' },
 ]
 
-class DashboardStore extends Store {
+export class DashboardStore extends Store {
   currentView: View = 'overview'
 
   // Users

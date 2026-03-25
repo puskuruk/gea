@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { installDom, flushMicrotasks, compileJsxComponent, loadRuntimeModules } from './runtime-helpers'
+import { installDom, flushMicrotasks } from '../../../../tests/helpers/jsdom-setup'
+import { compileJsxComponent, loadRuntimeModules } from '../helpers/compile'
 
 test('compiled child props stay reactive for imported store state', async () => {
   const restoreDom = installDom()

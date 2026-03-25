@@ -92,7 +92,10 @@ describe('injectHMR', () => {
       assert.equal(injected, true)
 
       const code = codegen(ast)
-      assert.ok(code.includes('MyWidget: MyWidget') || code.includes('MyWidget'), 'shorthand named export in module obj')
+      assert.ok(
+        code.includes('MyWidget: MyWidget') || code.includes('MyWidget'),
+        'shorthand named export in module obj',
+      )
     })
 
     it('handles default export', () => {

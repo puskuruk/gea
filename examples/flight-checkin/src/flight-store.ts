@@ -18,7 +18,7 @@ interface BoardingPass {
   duration: string
 }
 
-class FlightStore extends Store {
+export class FlightStore extends Store {
   step = 1
   boardingPass: BoardingPass | null = null
 

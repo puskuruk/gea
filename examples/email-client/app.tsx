@@ -51,7 +51,9 @@ export default class App extends Component {
         <aside class="email-sidebar">
           <div class="email-sidebar-header">
             <h1 class="email-brand">✉ Mail</h1>
-            <Button size="sm" click={store.openCompose}>Compose</Button>
+            <Button size="sm" click={store.openCompose}>
+              Compose
+            </Button>
           </div>
 
           <nav class="folder-nav">
@@ -67,9 +69,7 @@ export default class App extends Component {
               >
                 <span class="folder-icon">{f.icon}</span>
                 <span class="folder-label">{f.label}</span>
-                {f.id === 'inbox' && store.inboxUnread > 0 && (
-                  <Badge class="folder-badge">{store.inboxUnread}</Badge>
-                )}
+                {f.id === 'inbox' && store.inboxUnread > 0 && <Badge class="folder-badge">{store.inboxUnread}</Badge>}
                 {f.id !== 'inbox' && store.folderCount(f.id) > 0 && (
                   <span class="folder-count">{store.folderCount(f.id)}</span>
                 )}
@@ -93,15 +93,8 @@ export default class App extends Component {
         {/* Email List */}
         <div class="email-list-panel">
           <div class="email-list-header">
-            <h2 class="email-list-title">
-              {store.activeFolder.charAt(0).toUpperCase() + store.activeFolder.slice(1)}
-            </h2>
-            <Input
-              placeholder="Search…"
-              value={store.searchQuery}
-              onInput={store.setSearch}
-              class="email-search"
-            />
+            <h2 class="email-list-title">{store.activeFolder.charAt(0).toUpperCase() + store.activeFolder.slice(1)}</h2>
+            <Input placeholder="Search…" value={store.searchQuery} onInput={store.setSearch} class="email-search" />
           </div>
           <Separator />
           <div class="email-list">
@@ -110,9 +103,7 @@ export default class App extends Component {
                 <p>No emails{store.searchQuery ? ' matching your search' : ''}.</p>
               </div>
             ) : (
-              store.folderEmails.map((email) => (
-                <EmailRow key={email.id} email={email} />
-              ))
+              store.folderEmails.map((email) => <EmailRow key={email.id} email={email} />)
             )}
           </div>
         </div>
@@ -128,16 +119,29 @@ export default class App extends Component {
             <div class="modal-box compose-box" click={(e: Event) => e.stopPropagation()}>
               <div class="compose-header">
                 <h3 class="modal-title">New Message</h3>
-                <button class="modal-close" click={store.closeCompose}>✕</button>
+                <button class="modal-close" click={store.closeCompose}>
+                  ✕
+                </button>
               </div>
 
               <div class="form-field">
                 <Label htmlFor="comp-to">To</Label>
-                <Input inputId="comp-to" type="email" placeholder="recipient@example.com" value={store.composeTo} onInput={store.setComposeTo} />
+                <Input
+                  inputId="comp-to"
+                  type="email"
+                  placeholder="recipient@example.com"
+                  value={store.composeTo}
+                  onInput={store.setComposeTo}
+                />
               </div>
               <div class="form-field">
                 <Label htmlFor="comp-subject">Subject</Label>
-                <Input inputId="comp-subject" placeholder="Subject" value={store.composeSubject} onInput={store.setComposeSubject} />
+                <Input
+                  inputId="comp-subject"
+                  placeholder="Subject"
+                  value={store.composeSubject}
+                  onInput={store.setComposeSubject}
+                />
               </div>
               <div class="form-field">
                 <Textarea
@@ -149,7 +153,9 @@ export default class App extends Component {
               </div>
 
               <div class="compose-actions">
-                <Button variant="outline" size="sm" click={store.closeCompose}>Discard</Button>
+                <Button variant="outline" size="sm" click={store.closeCompose}>
+                  Discard
+                </Button>
                 <Button
                   size="sm"
                   disabled={!store.composeValid}

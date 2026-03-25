@@ -107,22 +107,23 @@ export async function createEditor(container, files, activeFile, onChange) {
       effects: view.state.config.statusTemplate ? [] : [],
     })
     // Reconfigure with or without readOnly
-    view.setState(EditorState.create({
-      doc: view.state.doc.toString(),
-      extensions: [
-        ...sharedExtensions,
-        ...(readOnly ? [EditorState.readOnly.of(true)] : [
-          history(),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
-        ]),
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged && !isReadOnly) {
-            fileContents[currentFile] = update.state.doc.toString()
-            onChange(fileContents)
-          }
-        }),
-      ],
-    }))
+    view.setState(
+      EditorState.create({
+        doc: view.state.doc.toString(),
+        extensions: [
+          ...sharedExtensions,
+          ...(readOnly
+            ? [EditorState.readOnly.of(true)]
+            : [history(), keymap.of([...defaultKeymap, ...historyKeymap])]),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged && !isReadOnly) {
+              fileContents[currentFile] = update.state.doc.toString()
+              onChange(fileContents)
+            }
+          }),
+        ],
+      }),
+    )
   }
 
   function setActiveFile(name) {
@@ -145,7 +146,7 @@ export async function createEditor(container, files, activeFile, onChange) {
   }
 
   function loadFiles(newFiles, activeFile) {
-    Object.keys(fileContents).forEach(k => delete fileContents[k])
+    Object.keys(fileContents).forEach((k) => delete fileContents[k])
     Object.assign(fileContents, newFiles)
     compiledOutput = ''
     currentFile = activeFile

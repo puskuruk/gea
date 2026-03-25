@@ -55,12 +55,7 @@ async function flushMicrotasks() {
   await new Promise((r) => setTimeout(r, 0))
 }
 
-async function compileSource(
-  source: string,
-  id: string,
-  exportName: string,
-  bindings: Record<string, unknown>,
-) {
+async function compileSource(source: string, id: string, exportName: string, bindings: Record<string, unknown>) {
   const plugin = geaPlugin()
   const transform = typeof plugin.transform === 'function' ? plugin.transform : plugin.transform?.handler
   const result = await transform?.call({} as never, source, id)
@@ -91,9 +86,7 @@ return ${exportName};`
 }
 
 async function loadRuntimeModules(seed: string) {
-  const { default: ComponentManager } = await import(
-    `../../packages/gea/src/lib/base/component-manager`
-  )
+  const { default: ComponentManager } = await import(`../../packages/gea/src/lib/base/component-manager`)
   ComponentManager.instance = undefined
   return Promise.all([
     import(`../../packages/gea/src/lib/base/component.tsx?${seed}`),
@@ -125,12 +118,12 @@ async function buildConfigurator(seed: string) {
     { Component, store },
   )
 
-  const App = await compileSource(
-    readSource('app.tsx'),
-    resolve(EXAMPLE_DIR, 'app.tsx'),
-    'App',
-    { Component, store, OptionCard, SummaryPanel },
-  )
+  const App = await compileSource(readSource('app.tsx'), resolve(EXAMPLE_DIR, 'app.tsx'), 'App', {
+    Component,
+    store,
+    OptionCard,
+    SummaryPanel,
+  })
 
   return { Component, Store, store, App, OptionCard, SummaryPanel }
 }
@@ -303,13 +296,7 @@ describe('Configurator', () => {
       const names = Array.from(root.querySelectorAll('.option-card')).map(
         (c) => c.querySelector('.option-name')?.textContent,
       )
-      assert.deepEqual(names, [
-        '19″ Aero',
-        '20″ Sport',
-        '20″ Turbine',
-        '21″ Performance',
-        '21″ Carbon Fiber',
-      ])
+      assert.deepEqual(names, ['19″ Aero', '20″ Sport', '20″ Turbine', '21″ Performance', '21″ Carbon Fiber'])
 
       app.dispose()
     })
@@ -343,16 +330,8 @@ describe('Configurator', () => {
         store.setCategory(cat.id)
         await flushMicrotasks()
 
-        assert.equal(
-          root.querySelector('.options-heading')?.textContent,
-          cat.name,
-          `heading for ${cat.id}`,
-        )
-        assert.equal(
-          root.querySelectorAll('.option-card').length,
-          cat.count,
-          `card count for ${cat.id}`,
-        )
+        assert.equal(root.querySelector('.options-heading')?.textContent, cat.name, `heading for ${cat.id}`)
+        assert.equal(root.querySelectorAll('.option-card').length, cat.count, `card count for ${cat.id}`)
       }
 
       app.dispose()

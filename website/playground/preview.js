@@ -13,23 +13,17 @@ async function ensureGeaCoreBlob() {
 
 function rewriteImports(code, blobUrlMap, coreUrl) {
   return code
-    .replace(
-      /from\s+['"]@geajs\/core['"]/g,
-      `from '${coreUrl}'`
-    )
-    .replace(
-      /from\s+['"](\.[^'"]+)['"]/g,
-      (match, importPath) => {
-        const normalized = importPath.replace(/^\.\//, '')
-        const candidates = [normalized, `${normalized}.ts`, `${normalized}.tsx`, `${normalized}.js`, `${normalized}.jsx`]
-        for (const c of candidates) {
-          if (blobUrlMap[c]) {
-            return `from '${blobUrlMap[c]}'`
-          }
+    .replace(/from\s+['"]@geajs\/core['"]/g, `from '${coreUrl}'`)
+    .replace(/from\s+['"](\.[^'"]+)['"]/g, (match, importPath) => {
+      const normalized = importPath.replace(/^\.\//, '')
+      const candidates = [normalized, `${normalized}.ts`, `${normalized}.tsx`, `${normalized}.js`, `${normalized}.jsx`]
+      for (const c of candidates) {
+        if (blobUrlMap[c]) {
+          return `from '${blobUrlMap[c]}'`
         }
-        return match
       }
-    )
+      return match
+    })
 }
 
 function createBlobModules(compiledModules, fileOrder, coreUrl) {
@@ -66,9 +60,12 @@ function generateSrcdoc(entryBlobUrl, previewCSS) {
 }
 
 function generateErrorSrcdoc(errors) {
-  const errorHtml = errors.map(e =>
-    `<div style="margin-bottom:12px"><strong>${e.file}</strong><pre style="color:#ff6b6b;white-space:pre-wrap;margin:4px 0">${escapeHtml(e.message)}</pre></div>`
-  ).join('')
+  const errorHtml = errors
+    .map(
+      (e) =>
+        `<div style="margin-bottom:12px"><strong>${e.file}</strong><pre style="color:#ff6b6b;white-space:pre-wrap;margin:4px 0">${escapeHtml(e.message)}</pre></div>`,
+    )
+    .join('')
   return `<!DOCTYPE html>
 <html>
 <head><style>body{font-family:'IBM Plex Mono',monospace;background:#0a0a1a;color:#e0dff5;padding:16px;}pre{font-size:13px;}</style></head>
@@ -85,7 +82,7 @@ function escapeHtml(str) {
 
 export async function renderPreview(iframe, compiledModules, fileOrder, errors, previewCSS) {
   if (iframe._blobUrls) {
-    Object.values(iframe._blobUrls).forEach(url => URL.revokeObjectURL(url))
+    Object.values(iframe._blobUrls).forEach((url) => URL.revokeObjectURL(url))
   }
 
   if (errors && errors.length > 0) {

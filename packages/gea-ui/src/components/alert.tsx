@@ -27,20 +27,12 @@ export class Alert extends Component {
 
 export class AlertTitle extends Component {
   template(props: any) {
-    return (
-      <h5 class={cn('mb-1 font-medium leading-none tracking-tight', props.class)}>
-        {props.children}
-      </h5>
-    )
+    return <h5 class={cn('mb-1 font-medium leading-none tracking-tight', props.class)}>{props.children}</h5>
   }
 }
 
 export class AlertDescription extends Component {
   template(props: any) {
-    return (
-      <div class={cn('text-sm [&_p]:leading-relaxed', props.class)}>
-        {props.children}
-      </div>
-    )
+    return <div class={cn('text-sm [&_p]:leading-relaxed', props.class)}>{props.children}</div>
   }
 }

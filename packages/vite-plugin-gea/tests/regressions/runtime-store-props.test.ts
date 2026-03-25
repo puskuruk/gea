@@ -4,7 +4,8 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { installDom, flushMicrotasks, compileJsxComponent, loadRuntimeModules } from './runtime-helpers'
+import { installDom, flushMicrotasks } from '../../../../tests/helpers/jsdom-setup'
+import { compileJsxComponent, loadRuntimeModules } from '../helpers/compile'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 

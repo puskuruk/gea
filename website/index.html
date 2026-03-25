@@ -1575,7 +1575,7 @@
               tab.classList.toggle('compiled', showingCompiled)
               tab.querySelector('.tab-mode-toggle').textContent = showingCompiled ? 'compiled' : 'original'
               if (showingCompiled) {
-                formatCompiled(compiledModulesCache[activeFile] || '').then(formatted => {
+                formatCompiled(compiledModulesCache[activeFile] || '').then((formatted) => {
                   editorInstance.showCompiled(formatted)
                   editorInstance.setCompiledView()
                 })
@@ -1672,7 +1672,7 @@
         compiledModulesCache = result.compiledModules
         formattedCache = {}
         if (editorInstance && showingCompiled) {
-          formatCompiled(compiledModulesCache[activeFile] || '').then(formatted => {
+          formatCompiled(compiledModulesCache[activeFile] || '').then((formatted) => {
             editorInstance.showCompiled(formatted)
           })
         }

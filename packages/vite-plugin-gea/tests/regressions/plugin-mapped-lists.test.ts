@@ -3,7 +3,16 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import test from 'node:test'
 import { tmpdir } from 'node:os'
-import { transformComponentSource, transformWithPlugin, withDom, createArrayObserverHarness, renderInitialList, generate, getObserveMethodName, t } from './plugin-helpers'
+import {
+  transformComponentSource,
+  transformWithPlugin,
+  withDom,
+  createArrayObserverHarness,
+  renderInitialList,
+  generate,
+  getObserveMethodName,
+  t,
+} from './plugin-helpers'
 import type { ArrayMapBinding } from './plugin-helpers'
 import { generateCreateItemMethod } from '../../src/generate-array-patch'
 import { generateEnsureArrayConfigsMethod } from '../../src/generate-array'
@@ -149,7 +158,11 @@ export default function OptionStep({ options, onSelect }) {
       componentPath,
     )
     assert.ok(output)
-    assert.match(output, /this\._optionsItems\s*=\s*\(this\.props\.options\s*\?\?\s*\[\]\)\.map/, 'constructor should init _optionsItems with __child()')
+    assert.match(
+      output,
+      /this\._optionsItems\s*=\s*\(this\.props\.options\s*\?\?\s*\[\]\)\.map/,
+      'constructor should init _optionsItems with __child()',
+    )
     assert.match(output, /this\.__child\(OptionItem/, 'constructor init should use __child()')
     assert.doesNotMatch(output, /_buildOptionsItems/, 'build method should not exist')
     assert.doesNotMatch(output, /__mountOptionsItems/, 'mount method should not exist')

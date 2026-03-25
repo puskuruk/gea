@@ -51,7 +51,11 @@ export default class TreeView extends ZagComponent {
   template(props: any) {
     return (
       <div data-part="root" class={props.class || ''}>
-        {props.label && <label data-part="label" class="tree-view-label text-sm font-medium mb-2 block">{props.label}</label>}
+        {props.label && (
+          <label data-part="label" class="tree-view-label text-sm font-medium mb-2 block">
+            {props.label}
+          </label>
+        )}
         <div data-part="tree" class="tree-view-tree" role="tree">
           {props.children}
         </div>

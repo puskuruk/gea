@@ -821,9 +821,10 @@ export class Store {
           if (!methodCache) methodCache = new Map()
           let cached = methodCache.get(prop)
           if (cached !== undefined) return cached
-          cached = store._interceptArrayMethod(obj, prop, basePath, baseParts)
-            || store._interceptArrayIterator(obj, prop, basePath, baseParts, createProxy)
-            || value.bind(obj)
+          cached =
+            store._interceptArrayMethod(obj, prop, basePath, baseParts) ||
+            store._interceptArrayIterator(obj, prop, basePath, baseParts, createProxy) ||
+            value.bind(obj)
           methodCache.set(prop, cached)
           return cached
         }

@@ -27,10 +27,14 @@ export default class AppShell extends Component {
           </nav>
           <div class="top-bar-user">
             <span class="user-name">{authStore.user?.name}</span>
-            <button class="btn-logout" click={() => this.logout()}>Logout</button>
+            <button class="btn-logout" click={() => this.logout()}>
+              Logout
+            </button>
           </div>
         </header>
-        <div class="app-content"><Outlet /></div>
+        <div class="app-content">
+          <Outlet />
+        </div>
       </div>
     )
   }

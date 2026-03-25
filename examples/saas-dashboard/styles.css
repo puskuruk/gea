@@ -1,4 +1,8 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
@@ -72,7 +76,9 @@ body {
   border: none;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .nav-item:hover {
@@ -356,8 +362,12 @@ body {
   cursor: pointer;
 }
 
-.status-dot.active { background: #16a34a; }
-.status-dot.inactive { background: hsl(var(--muted-foreground)); }
+.status-dot.active {
+  background: #16a34a;
+}
+.status-dot.inactive {
+  background: hsl(var(--muted-foreground));
+}
 
 .empty-state {
   text-align: center;

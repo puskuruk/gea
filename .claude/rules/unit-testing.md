@@ -23,7 +23,7 @@ import assert from 'node:assert/strict'
 
 Each package defines its own test script in `package.json`:
 
-- `@geajs/core`: `tsx --conditions source --import ./tests/preload.mjs --test tests/**/*.test.ts`
+- `@geajs/core`: `tsx --conditions source --import ./tests/preload.ts --test tests/**/*.test.ts`
 - `@geajs/vite-plugin`: `tsx --test 'tests/**/*.test.ts'`
 
 The root `npm test` runs all workspace test scripts via `npm run test --workspaces --if-present`.

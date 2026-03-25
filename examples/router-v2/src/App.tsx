@@ -29,17 +29,17 @@ const routes = {
           '/projects': Projects,
           '/projects/:id': Project,
           '/projects/:id/edit': () => import('./views/ProjectEdit'),
-        }
+        },
       },
       '/settings': {
         layout: SettingsLayout,
         mode: { type: 'query', param: 'tab' },
         children: {
-          'profile': ProfileSettings,
-          'billing': BillingSettings,
-        }
+          profile: ProfileSettings,
+          billing: BillingSettings,
+        },
       },
-    }
+    },
   },
 
   '*': NotFound,

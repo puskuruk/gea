@@ -1,5 +1,18 @@
 import { Component } from '@geajs/core'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, CardDescription, Progress, Separator, Switch, Tabs, ToastStore } from '@geajs/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  Progress,
+  Separator,
+  Switch,
+  Tabs,
+  ToastStore,
+} from '@geajs/ui'
 import store from './store'
 
 export default class SettingsView extends Component {
@@ -104,7 +117,12 @@ export default class SettingsView extends Component {
                         <Button
                           variant="outline"
                           size="sm"
-                          click={() => ToastStore.info({ title: 'Email sent', description: 'Check your inbox for a password reset link.' })}
+                          click={() =>
+                            ToastStore.info({
+                              title: 'Email sent',
+                              description: 'Check your inbox for a password reset link.',
+                            })
+                          }
                         >
                           Change Password
                         </Button>
@@ -136,7 +154,9 @@ export default class SettingsView extends Component {
                       <Separator class="my-4" />
                       <Button
                         variant="outline"
-                        click={() => ToastStore.info({ title: 'Opening portal', description: 'Redirecting to billing portal…' })}
+                        click={() =>
+                          ToastStore.info({ title: 'Opening portal', description: 'Redirecting to billing portal…' })
+                        }
                       >
                         Manage Subscription
                       </Button>

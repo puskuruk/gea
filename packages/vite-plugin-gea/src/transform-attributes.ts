@@ -12,6 +12,12 @@ const traverse = require('@babel/traverse').default
 export interface TemplateSetupContext {
   params: Array<t.Identifier | t.Pattern | t.RestElement>
   statements: t.Statement[]
+  /**
+   * If set, statements with index > this value are only valid after statements[0..barrier]
+   * have run (includes the early-return `if` at this index). Used so `collectTemplateSetupStatements`
+   * does not emit `const x = item.foo` without the preceding `if (!item) return …`.
+   */
+  earlyReturnBarrierIndex?: number
 }
 
 export function buildComponentPropsExpression(
@@ -37,7 +43,14 @@ export function buildComponentPropsExpression(
     else if (t.isJSXExpressionContainer(attr.value) && !t.isJSXEmptyExpression(attr.value.expression)) {
       const expr = attr.value.expression as t.Expression
       propValue = transformExpression(expr)
-      if (propValue && (/^on[A-Z]/.test(propName) || /^(click|input|change|submit|focus|blur|keydown|keyup|keypress|mousedown|mouseup|mouseover|mouseout|mouseenter|mouseleave|touchstart|touchend|touchmove|pointerdown|pointerup|pointermove|scroll|resize|drag|dragstart|dragend|dragover|drop|reset)$/.test(propName)) && t.isMemberExpression(propValue)) {
+      if (
+        propValue &&
+        (/^on[A-Z]/.test(propName) ||
+          /^(click|input|change|submit|focus|blur|keydown|keyup|keypress|mousedown|mouseup|mouseover|mouseout|mouseenter|mouseleave|touchstart|touchend|touchmove|pointerdown|pointerup|pointermove|scroll|resize|drag|dragstart|dragend|dragover|drop|reset)$/.test(
+            propName,
+          )) &&
+        t.isMemberExpression(propValue)
+      ) {
         const argsId = t.identifier('args')
         propValue = t.arrowFunctionExpression(
           [t.restElement(argsId)],
@@ -238,6 +251,32 @@ export function collectTemplateSetupStatements(
   collectReferencedIdentifiers(expr).forEach(includeName)
 
   ordered.sort((a, b) => a.index - b.index)
+
+  const barrier = templateSetupContext.earlyReturnBarrierIndex
+  if (barrier !== undefined && ordered.length > 0) {
+    const stmtIndices = ordered.filter((e) => e.index >= 0).map((e) => e.index)
+    if (stmtIndices.length > 0) {
+      const maxIdx = Math.max(...stmtIndices)
+      const minIdx = Math.min(...stmtIndices)
+      // Main-branch setup after the barrier (e.g. const desc = item.x) needs the early if first.
+      // Setup taken only from before the barrier (e.g. const { item }) still needs that if before
+      // the main return template runs.
+      if (maxIdx > barrier || minIdx <= barrier) {
+        const have = new Set(ordered.map((e) => e.index))
+        const extra: Array<{ index: number; statement: t.Statement }> = []
+        for (let bi = 0; bi <= barrier; bi++) {
+          if (!have.has(bi)) {
+            extra.push({
+              index: bi,
+              statement: t.cloneNode(templateSetupContext.statements[bi], true) as t.Statement,
+            })
+          }
+        }
+        ordered.push(...extra)
+        ordered.sort((a, b) => a.index - b.index)
+      }
+    }
+  }
 
   for (const entry of ordered) {
     if (entry.index !== -1) continue

@@ -286,7 +286,8 @@ test('style expression skip guard is not generated for object expressions in tem
 test('functional component with multiple conds omits unused destructured props from truthy callbacks', async () => {
   // This mirrors the option-card pattern: two conditionals where one's condition-only
   // variable "selected" leaks into the other's truthy callback as dead code.
-  const output = await transformFunctionalComponent(`
+  const output = await transformFunctionalComponent(
+    `
     export default function OptionCard({ selected, color, label }) {
       return (
         <div>
@@ -300,7 +301,9 @@ test('functional component with multiple conds omits unused destructured props f
         </div>
       )
     }
-  `, 'OptionCard')
+  `,
+    'OptionCard',
+  )
 
   // Verify __geaRegisterCond is generated
   assert.match(output, /__geaRegisterCond\(0/, 'should generate __geaRegisterCond(0,...)')

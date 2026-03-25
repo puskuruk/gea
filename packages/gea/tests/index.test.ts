@@ -43,8 +43,12 @@ function installDom() {
 
 describe('gea entry point', () => {
   let restoreDom: () => void
-  beforeEach(() => { restoreDom = installDom() })
-  afterEach(() => { restoreDom() })
+  beforeEach(() => {
+    restoreDom = installDom()
+  })
+  afterEach(() => {
+    restoreDom()
+  })
 
   it('exports Store, Component, ComponentManager, applyListChanges', async () => {
     const seed = `idx-${Date.now()}-${Math.random()}`

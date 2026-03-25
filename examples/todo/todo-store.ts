@@ -12,7 +12,7 @@ function uid(): string {
   return `todo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-class TodoStore extends Store {
+export class TodoStore extends Store {
   todos: Todo[] = []
   filter: Filter = 'all'
   draft = ''

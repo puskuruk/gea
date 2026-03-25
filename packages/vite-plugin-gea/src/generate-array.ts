@@ -96,20 +96,35 @@ function buildPropPatcherFunction(
               '=',
               t.memberExpression(t.memberExpression(target, t.identifier('style')), t.identifier('cssText')),
               t.conditionalExpression(
-                t.binaryExpression('===', t.unaryExpression('typeof', t.identifier('__attrValue')), t.stringLiteral('object')),
+                t.binaryExpression(
+                  '===',
+                  t.unaryExpression('typeof', t.identifier('__attrValue')),
+                  t.stringLiteral('object'),
+                ),
                 t.callExpression(
                   t.memberExpression(
                     t.callExpression(
                       t.memberExpression(
-                        t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [t.identifier('__attrValue')]),
+                        t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [
+                          t.identifier('__attrValue'),
+                        ]),
                         t.identifier('map'),
                       ),
                       [
                         t.arrowFunctionExpression(
                           [t.arrayPattern([t.identifier('k'), t.identifier('v')])],
-                          t.binaryExpression('+', t.binaryExpression('+',
-                            t.callExpression(t.memberExpression(t.identifier('k'), t.identifier('replace')), [t.regExpLiteral('[A-Z]', 'g'), t.stringLiteral('-$&')]),
-                            t.stringLiteral(': ')), t.identifier('v')),
+                          t.binaryExpression(
+                            '+',
+                            t.binaryExpression(
+                              '+',
+                              t.callExpression(t.memberExpression(t.identifier('k'), t.identifier('replace')), [
+                                t.regExpLiteral('[A-Z]', 'g'),
+                                t.stringLiteral('-$&'),
+                              ]),
+                              t.stringLiteral(': '),
+                            ),
+                            t.identifier('v'),
+                          ),
                         ),
                       ],
                     ),
@@ -200,9 +215,8 @@ function buildPatchEntryPropPatcher(entry: {
   const value = t.identifier('value')
   const item = t.identifier('item')
   const target = t.identifier('__target')
-  const targetExpr = entry.childPath.length > 0
-    ? t.memberExpression(row, t.identifier(childPathRefName(entry.childPath)))
-    : row
+  const targetExpr =
+    entry.childPath.length > 0 ? t.memberExpression(row, t.identifier(childPathRefName(entry.childPath))) : row
 
   if (entry.type === 'className') {
     const isRoot = entry.childPath.length === 0
@@ -233,20 +247,35 @@ function buildPatchEntryPropPatcher(entry: {
               '=',
               t.memberExpression(t.memberExpression(target, t.identifier('style')), t.identifier('cssText')),
               t.conditionalExpression(
-                t.binaryExpression('===', t.unaryExpression('typeof', t.identifier('__attrValue')), t.stringLiteral('object')),
+                t.binaryExpression(
+                  '===',
+                  t.unaryExpression('typeof', t.identifier('__attrValue')),
+                  t.stringLiteral('object'),
+                ),
                 t.callExpression(
                   t.memberExpression(
                     t.callExpression(
                       t.memberExpression(
-                        t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [t.identifier('__attrValue')]),
+                        t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [
+                          t.identifier('__attrValue'),
+                        ]),
                         t.identifier('map'),
                       ),
                       [
                         t.arrowFunctionExpression(
                           [t.arrayPattern([t.identifier('k'), t.identifier('v')])],
-                          t.binaryExpression('+', t.binaryExpression('+',
-                            t.callExpression(t.memberExpression(t.identifier('k'), t.identifier('replace')), [t.regExpLiteral('[A-Z]', 'g'), t.stringLiteral('-$&')]),
-                            t.stringLiteral(': ')), t.identifier('v')),
+                          t.binaryExpression(
+                            '+',
+                            t.binaryExpression(
+                              '+',
+                              t.callExpression(t.memberExpression(t.identifier('k'), t.identifier('replace')), [
+                                t.regExpLiteral('[A-Z]', 'g'),
+                                t.stringLiteral('-$&'),
+                              ]),
+                              t.stringLiteral(': '),
+                            ),
+                            t.identifier('v'),
+                          ),
                         ),
                       ],
                     ),
@@ -412,8 +441,8 @@ export function generateEnsureArrayConfigsMethod(arrayMaps: ArrayMapBinding[]): 
     }
 
     // Detect if the map item template root is a component (PascalCase tag)
-    const rootIsComponent = t.isJSXElement(arrayMap.itemTemplate) &&
-      isComponentTag(getJSXTagName(arrayMap.itemTemplate.openingElement.name))
+    const rootIsComponent =
+      t.isJSXElement(arrayMap.itemTemplate) && isComponentTag(getJSXTagName(arrayMap.itemTemplate.openingElement.name))
     if (rootIsComponent) {
       properties.push(t.objectProperty(t.identifier('hasComponentItems'), t.booleanLiteral(true)))
     }
@@ -510,10 +539,7 @@ export function generateArrayConditionalPatchObserver(
   const containerRef = t.memberExpression(t.thisExpression(), t.identifier(containerName))
   const proxiedArr = arrayMap.isImportedState
     ? buildMemberChain(
-        t.memberExpression(
-          t.identifier(arrayMap.storeVar || 'store'),
-          t.identifier('__store'),
-        ),
+        t.memberExpression(t.identifier(arrayMap.storeVar || 'store'), t.identifier('__store')),
         arrayPath,
       )
     : buildMemberChain(t.thisExpression(), arrayPath)
@@ -580,10 +606,7 @@ export function generateArrayConditionalRerenderObserver(arrayMap: ArrayMapBindi
   const configRef = t.memberExpression(t.thisExpression(), t.identifier(getArrayConfigPropName(arrayMap)))
   const proxiedArr = arrayMap.isImportedState
     ? buildMemberChain(
-        t.memberExpression(
-          t.identifier(arrayMap.storeVar || 'store'),
-          t.identifier('__store'),
-        ),
+        t.memberExpression(t.identifier(arrayMap.storeVar || 'store'), t.identifier('__store')),
         arrayPath,
       )
     : buildMemberChain(t.thisExpression(), arrayPath)

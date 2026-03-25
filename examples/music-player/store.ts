@@ -22,12 +22,26 @@ function fmt(secs: number): string {
 }
 
 export const TRACKS: Track[] = [
-  { id: 't1', title: 'Midnight City', artist: 'M83', album: 'Hurry Up, We\'re Dreaming', duration: 244, playlistId: 'pl1' },
+  {
+    id: 't1',
+    title: 'Midnight City',
+    artist: 'M83',
+    album: "Hurry Up, We're Dreaming",
+    duration: 244,
+    playlistId: 'pl1',
+  },
   { id: 't2', title: 'Intro', artist: 'The xx', album: 'xx', duration: 126, playlistId: 'pl1' },
   { id: 't3', title: 'Crystalised', artist: 'The xx', album: 'xx', duration: 209, playlistId: 'pl1' },
   { id: 't4', title: 'Do I Wanna Know?', artist: 'Arctic Monkeys', album: 'AM', duration: 272, playlistId: 'pl2' },
   { id: 't5', title: 'R U Mine?', artist: 'Arctic Monkeys', album: 'AM', duration: 199, playlistId: 'pl2' },
-  { id: 't6', title: 'Why\'d You Only Call Me When You\'re High?', artist: 'Arctic Monkeys', album: 'AM', duration: 161, playlistId: 'pl2' },
+  {
+    id: 't6',
+    title: "Why'd You Only Call Me When You're High?",
+    artist: 'Arctic Monkeys',
+    album: 'AM',
+    duration: 161,
+    playlistId: 'pl2',
+  },
   { id: 't7', title: 'Heat Waves', artist: 'Glass Animals', album: 'Dreamland', duration: 238, playlistId: 'pl3' },
   { id: 't8', title: 'Youth', artist: 'Glass Animals', album: 'Dreamland', duration: 244, playlistId: 'pl3' },
   { id: 't9', title: 'Tangerine', artist: 'Glass Animals', album: 'Dreamland', duration: 179, playlistId: 'pl3' },
@@ -79,9 +93,7 @@ class MusicStore extends Store {
   get filteredTracks(): Track[] {
     const q = this.searchQuery.toLowerCase()
     if (!q) return this.activeTracks
-    return this.activeTracks.filter(
-      (t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q),
-    )
+    return this.activeTracks.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q))
   }
 
   fmt(secs: number): string {

@@ -17,7 +17,7 @@ export default class SummaryPanel extends Component {
         <div class="summary-divider"></div>
 
         <div class="summary-options">
-          {upgrades.map(u => (
+          {upgrades.map((u) => (
             <div key={u.catId} class="summary-line">
               <div class="summary-line-info">
                 <span class="summary-line-cat">{u.catName}</span>

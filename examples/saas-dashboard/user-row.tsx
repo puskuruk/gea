@@ -27,7 +27,10 @@ export default class UserRow extends Component {
             title={user.status}
             click={() => {
               store.toggleStatus(user.id)
-              ToastStore.success({ title: 'Status updated', description: `${user.name} is now ${user.status === 'active' ? 'inactive' : 'active'}.` })
+              ToastStore.success({
+                title: 'Status updated',
+                description: `${user.name} is now ${user.status === 'active' ? 'inactive' : 'active'}.`,
+              })
             }}
           />
           {user.status}

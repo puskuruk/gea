@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { installDom, flushMicrotasks, compileJsxComponent, loadRuntimeModules } from './runtime-helpers'
+import { installDom, flushMicrotasks } from '../../../../tests/helpers/jsdom-setup'
+import { compileJsxComponent, loadRuntimeModules } from '../helpers/compile'
 
 test('drop scenario: move task between columns uses incremental DOM updates with zero full rebuilds', async () => {
   const restoreDom = installDom()

@@ -4,32 +4,115 @@
     <meta charset="utf-8" />
     <title>Gea Benchmark Profiler</title>
     <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; background: #0d1117; color: #c9d1d9; padding: 20px; }
-      h1 { color: #58a6ff; margin-bottom: 10px; font-size: 1.4em; }
-      .controls { margin: 15px 0; display: flex; gap: 10px; align-items: center; }
-      button { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.9em; }
-      button:hover { background: #30363d; border-color: #58a6ff; }
-      button:disabled { opacity: 0.5; cursor: not-allowed; }
-      button.primary { background: #238636; border-color: #2ea043; }
-      button.primary:hover { background: #2ea043; }
-      #status { color: #8b949e; font-size: 0.9em; }
-      #output { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; white-space: pre; overflow-x: auto; font-size: 0.82em; line-height: 1.5; margin-top: 15px; min-height: 200px; }
-      #app-container { position: absolute; left: -9999px; top: 0; width: 1000px; visibility: hidden; }
-      .table { width: 100%; }
-      .table td { padding: 2px 4px; }
-      .danger { background: #f33; color: white; }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+        background: #0d1117;
+        color: #c9d1d9;
+        padding: 20px;
+      }
+      h1 {
+        color: #58a6ff;
+        margin-bottom: 10px;
+        font-size: 1.4em;
+      }
+      .controls {
+        margin: 15px 0;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      button {
+        background: #21262d;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.9em;
+      }
+      button:hover {
+        background: #30363d;
+        border-color: #58a6ff;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      button.primary {
+        background: #238636;
+        border-color: #2ea043;
+      }
+      button.primary:hover {
+        background: #2ea043;
+      }
+      #status {
+        color: #8b949e;
+        font-size: 0.9em;
+      }
+      #output {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 16px;
+        white-space: pre;
+        overflow-x: auto;
+        font-size: 0.82em;
+        line-height: 1.5;
+        margin-top: 15px;
+        min-height: 200px;
+      }
+      #app-container {
+        position: absolute;
+        left: -9999px;
+        top: 0;
+        width: 1000px;
+        visibility: hidden;
+      }
+      .table {
+        width: 100%;
+      }
+      .table td {
+        padding: 2px 4px;
+      }
+      .danger {
+        background: #f33;
+        color: white;
+      }
     </style>
     <!-- Minimal bootstrap styles for benchmark rows -->
     <style>
-      .container { max-width: 100%; }
-      .jumbotron { display: none; }
-      .table-hover tbody tr:hover { background: rgba(255,255,255,0.05); }
-      .col-md-1, .col-md-4, .col-md-6 { display: inline-block; }
-      .col-md-1 { width: 8%; }
-      .col-md-4 { width: 33%; }
-      .col-md-6 { width: 50%; }
-      .glyphicon-remove::before { content: 'x'; }
+      .container {
+        max-width: 100%;
+      }
+      .jumbotron {
+        display: none;
+      }
+      .table-hover tbody tr:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .col-md-1,
+      .col-md-4,
+      .col-md-6 {
+        display: inline-block;
+      }
+      .col-md-1 {
+        width: 8%;
+      }
+      .col-md-4 {
+        width: 33%;
+      }
+      .col-md-6 {
+        width: 50%;
+      }
+      .glyphicon-remove::before {
+        content: 'x';
+      }
     </style>
   </head>
   <body>
@@ -50,27 +133,18 @@
       </select>
       <span id="status">Ready</span>
     </div>
-    <div id="output">Click "Run Full Profile" to start instrumentation and profiling.
-
-This will:
-1. Instrument Store proxy traps, change batching, observer routing
-2. Instrument Component DOM operations (list reconciliation, item creation)
-3. Run each benchmark operation multiple times
-4. Report detailed timing breakdowns showing where time is spent
-
-Key areas measured:
-  • store._emitChanges        — proxy trap → change emission
-  • store._flushChanges       — microtask batch flush
-  • store._normalizeBatch     — swap detection in change batches
-  • store._deliverArrayItemPropBatch — fast path for item prop updates
-  • store._collectMatchingObserverNodes — observer tree traversal
-  • store._notifyHandlers     — handler invocation
-  • store._createProxy        — nested proxy creation
-  • component.__observe_store_data — compiled data observer
-  • component.__observe_store_selected — compiled selected observer
-  • component.__applyListChanges — list reconciliation dispatcher
-  • component.createDataItem  — DOM element creation for rows
-  • component.renderDataItem  — HTML string template for rows</div>
+    <div id="output">
+      Click "Run Full Profile" to start instrumentation and profiling. This will: 1. Instrument Store proxy traps,
+      change batching, observer routing 2. Instrument Component DOM operations (list reconciliation, item creation) 3.
+      Run each benchmark operation multiple times 4. Report detailed timing breakdowns showing where time is spent Key
+      areas measured: • store._emitChanges — proxy trap → change emission • store._flushChanges — microtask batch flush
+      • store._normalizeBatch — swap detection in change batches • store._deliverArrayItemPropBatch — fast path for item
+      prop updates • store._collectMatchingObserverNodes — observer tree traversal • store._notifyHandlers — handler
+      invocation • store._createProxy — nested proxy creation • component.__observe_store_data — compiled data observer
+      • component.__observe_store_selected — compiled selected observer • component.__applyListChanges — list
+      reconciliation dispatcher • component.createDataItem — DOM element creation for rows • component.renderDataItem —
+      HTML string template for rows
+    </div>
 
     <!-- Hidden app container -->
     <div id="app-container">
@@ -93,8 +167,14 @@ Key areas measured:
       function initProfiler() {
         if (profilerReady) return true
         const p = window.__geaProfiler
-        if (!p) { setStatus('Error: profiler not loaded'); return false }
-        if (!p.instrument()) { setStatus('Error: instrumentation failed'); return false }
+        if (!p) {
+          setStatus('Error: profiler not loaded')
+          return false
+        }
+        if (!p.instrument()) {
+          setStatus('Error: instrumentation failed')
+          return false
+        }
         profilerReady = true
         setStatus('Instrumented')
         return true
@@ -185,7 +265,10 @@ Key areas measured:
         }
 
         const config = operations[op]
-        if (!config) { setStatus('Unknown operation'); return }
+        if (!config) {
+          setStatus('Unknown operation')
+          return
+        }
 
         try {
           const result = await p.profileOperation(config.name, config.setup, config.action, 10)

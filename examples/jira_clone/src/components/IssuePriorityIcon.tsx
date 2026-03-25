@@ -8,7 +8,7 @@ const priorityIcons: Record<string, { icon: string; color: string }> = {
 
 export default function IssuePriorityIcon({ priority, top = 0, left = 0 }) {
   const info = priorityIcons[priority] || priorityIcons['3']
-  const transform = (left || top) ? `transform:translate(${left}px,${top}px)` : ''
+  const transform = left || top ? `transform:translate(${left}px,${top}px)` : ''
   return (
     <span class="issue-priority-icon" style={`color:${info.color};${transform}`}>
       <i class={`icon icon-${info.icon}`}></i>

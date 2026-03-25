@@ -184,7 +184,9 @@ describe('Component.__el', () => {
 
   it('returns element by id suffix with caching', async () => {
     class MyComp extends Component {
-      template() { return `<div id="${this.id}"><p id="${this.id}-info">hi</p></div>` }
+      template() {
+        return `<div id="${this.id}"><p id="${this.id}-info">hi</p></div>`
+      }
     }
     const comp = new MyComp()
     document.body.innerHTML = ''
@@ -198,7 +200,9 @@ describe('Component.__el', () => {
 
   it('re-queries DOM when cached element is disconnected', async () => {
     class MyComp extends Component {
-      template() { return `<div id="${this.id}"><p id="${this.id}-info">hi</p></div>` }
+      template() {
+        return `<div id="${this.id}"><p id="${this.id}-info">hi</p></div>`
+      }
     }
     const comp = new MyComp()
     document.body.innerHTML = ''
@@ -240,7 +244,9 @@ describe('Component.__updateText', () => {
 
   it('updates textContent of element by suffix', async () => {
     class MyComp extends Component {
-      template() { return `<div id="${this.id}"><span id="${this.id}-msg">old</span></div>` }
+      template() {
+        return `<div id="${this.id}"><span id="${this.id}-msg">old</span></div>`
+      }
     }
     const comp = new MyComp()
     document.body.innerHTML = ''
@@ -251,7 +257,9 @@ describe('Component.__updateText', () => {
 
   it('does nothing if element not found', () => {
     class MyComp extends Component {
-      template() { return `<div id="${this.id}"></div>` }
+      template() {
+        return `<div id="${this.id}"></div>`
+      }
     }
     const comp = new MyComp()
     document.body.innerHTML = ''
@@ -279,21 +287,25 @@ describe('Component.__observe', () => {
 
   it('registers observer and pushes remover to __observer_removers__', async () => {
     class MyComp extends Component {
-      template() { return `<div id="${this.id}"></div>` }
+      template() {
+        return `<div id="${this.id}"></div>`
+      }
     }
-    class TestStore extends Store { count = 0 }
+    class TestStore extends Store {
+      count = 0
+    }
     const store = new TestStore()
     const comp = new MyComp()
     const values: number[] = []
     comp.__observe(store, ['count'], (v: number) => values.push(v))
     assert.equal(comp.__observer_removers__.length, 1)
     store.count = 5
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 50))
     assert.deepEqual(values, [5])
     // Dispose should clean up
     comp.dispose()
     store.count = 10
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 50))
     assert.deepEqual(values, [5]) // No new value
   })
 })
@@ -314,10 +326,14 @@ describe('Component.__reconcileList', () => {
 
   it('removes disposed items and keeps survivors', async () => {
     class Parent extends Component {
-      template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
+      template() {
+        return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>`
+      }
     }
     class Item extends Component {
-      template() { return `<li id="${this.id}">${this.props.text}</li>` }
+      template() {
+        return `<li id="${this.id}">${this.props.text}</li>`
+      }
     }
     const parent = new Parent()
     document.body.innerHTML = ''
@@ -329,14 +345,20 @@ describe('Component.__reconcileList', () => {
       parent.__child(Item, { text: 'c' }, 3),
     ]
     const list = parent.__el('list')
-    items.forEach(item => item.render(list))
+    items.forEach((item) => item.render(list))
 
     // Remove item with key "2"
-    const newData = [{ id: 1, text: 'a' }, { id: 3, text: 'c' }]
+    const newData = [
+      { id: 1, text: 'a' },
+      { id: 3, text: 'c' },
+    ]
     const result = parent.__reconcileList(
-      items, newData, list, Item,
-      d => ({ text: d.text }),
-      d => d.id,
+      items,
+      newData,
+      list,
+      Item,
+      (d) => ({ text: d.text }),
+      (d) => d.id,
     )
     assert.equal(result.length, 2)
     assert.equal(result[0], items[0]) // reused
@@ -345,26 +367,34 @@ describe('Component.__reconcileList', () => {
 
   it('adds new items for new keys', async () => {
     class Parent extends Component {
-      template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
+      template() {
+        return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>`
+      }
     }
     class Item extends Component {
-      template() { return `<li id="${this.id}">${this.props.text}</li>` }
+      template() {
+        return `<li id="${this.id}">${this.props.text}</li>`
+      }
     }
     const parent = new Parent()
     document.body.innerHTML = ''
     parent.render(document.body)
 
-    const items = [
-      parent.__child(Item, { text: 'a' }, 1),
-    ]
+    const items = [parent.__child(Item, { text: 'a' }, 1)]
     const list = parent.__el('list')
-    items.forEach(item => item.render(list))
+    items.forEach((item) => item.render(list))
 
-    const newData = [{ id: 1, text: 'a' }, { id: 2, text: 'b' }]
+    const newData = [
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]
     const result = parent.__reconcileList(
-      items, newData, list, Item,
-      d => ({ text: d.text }),
-      d => d.id,
+      items,
+      newData,
+      list,
+      Item,
+      (d) => ({ text: d.text }),
+      (d) => d.id,
     )
     assert.equal(result.length, 2)
     assert.equal(result[0], items[0]) // reused
@@ -374,10 +404,14 @@ describe('Component.__reconcileList', () => {
 
   it('reorders items to match new data order', async () => {
     class Parent extends Component {
-      template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
+      template() {
+        return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>`
+      }
     }
     class Item extends Component {
-      template() { return `<li id="${this.id}">${this.props.text}</li>` }
+      template() {
+        return `<li id="${this.id}">${this.props.text}</li>`
+      }
     }
     const parent = new Parent()
     document.body.innerHTML = ''
@@ -389,14 +423,21 @@ describe('Component.__reconcileList', () => {
       parent.__child(Item, { text: 'c' }, 3),
     ]
     const list = parent.__el('list')
-    items.forEach(item => item.render(list))
+    items.forEach((item) => item.render(list))
 
     // Reverse the order
-    const newData = [{ id: 3, text: 'c' }, { id: 1, text: 'a' }, { id: 2, text: 'b' }]
+    const newData = [
+      { id: 3, text: 'c' },
+      { id: 1, text: 'a' },
+      { id: 2, text: 'b' },
+    ]
     const result = parent.__reconcileList(
-      items, newData, list, Item,
-      d => ({ text: d.text }),
-      d => d.id,
+      items,
+      newData,
+      list,
+      Item,
+      (d) => ({ text: d.text }),
+      (d) => d.id,
     )
     assert.equal(result.length, 3)
     assert.equal(result[0], items[2]) // was third, now first
@@ -420,7 +461,9 @@ describe('Component.__observeList', () => {
     let nextId = 1
     class TodoStore extends Store {
       todos: any[] = []
-      add(text: string) { this.todos.push({ id: nextId++, text, done: false }) }
+      add(text: string) {
+        this.todos.push({ id: nextId++, text, done: false })
+      }
       toggle(id: number) {
         const t = this.todos.find((t: any) => t.id === id)
         if (t) t.done = !t.done
@@ -438,11 +481,15 @@ describe('Component.__observeList', () => {
 
   it('appends items on push', async () => {
     class Item extends Component {
-      template() { return `<li id="${this.id}">${this.props.text}</li>` }
+      template() {
+        return `<li id="${this.id}">${this.props.text}</li>`
+      }
     }
     class Parent extends Component {
       _items: any[] = []
-      template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
+      template() {
+        return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>`
+      }
     }
     const parent = new Parent()
     document.body.innerHTML = ''
@@ -456,18 +503,22 @@ describe('Component.__observeList', () => {
     })
 
     store.add('first')
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 50))
     assert.equal(parent._items.length, 1)
     assert.equal(parent.__el('list')?.children.length, 1)
   })
 
   it('updates item props on property change', async () => {
     class Item extends Component {
-      template() { return `<li id="${this.id}">${this.props.done ? 'done' : 'todo'}</li>` }
+      template() {
+        return `<li id="${this.id}">${this.props.done ? 'done' : 'todo'}</li>`
+      }
     }
     class Parent extends Component {
       _items: any[] = []
-      template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
+      template() {
+        return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>`
+      }
     }
     const parent = new Parent()
     document.body.innerHTML = ''
@@ -481,22 +532,26 @@ describe('Component.__observeList', () => {
     })
 
     store.add('task')
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 50))
     const todoId = store.todos[0].id
 
     store.toggle(todoId)
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 50))
     // Item should have updated props
     assert.equal(parent._items[0].props.done, true)
   })
 
   it('reconciles on filter (remove)', async () => {
     class Item extends Component {
-      template() { return `<li id="${this.id}">${this.props.text}</li>` }
+      template() {
+        return `<li id="${this.id}">${this.props.text}</li>`
+      }
     }
     class Parent extends Component {
       _items: any[] = []
-      template() { return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>` }
+      template() {
+        return `<div id="${this.id}"><ul id="${this.id}-list"></ul></div>`
+      }
     }
     const parent = new Parent()
     document.body.innerHTML = ''
@@ -511,12 +566,12 @@ describe('Component.__observeList', () => {
 
     store.add('first')
     store.add('second')
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 50))
     assert.equal(parent._items.length, 2)
     const firstId = store.todos[0].id
 
     store.remove(firstId)
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 50))
     assert.equal(parent._items.length, 1)
     assert.equal(parent._items[0].props.text, 'second')
   })

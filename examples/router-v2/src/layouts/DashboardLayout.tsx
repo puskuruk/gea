@@ -19,7 +19,9 @@ export default class DashboardLayout extends Component {
             />
           </nav>
         </aside>
-        <main class="dashboard-main"><Outlet /></main>
+        <main class="dashboard-main">
+          <Outlet />
+        </main>
       </div>
     )
   }

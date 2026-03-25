@@ -36,7 +36,9 @@ export default class MessageThread extends Component {
             <div class="message-wrap theirs typing-wrap">
               <Avatar name={conv.name} />
               <div class="bubble bubble-theirs typing-dots">
-                <span /><span /><span />
+                <span />
+                <span />
+                <span />
               </div>
             </div>
           )}
@@ -58,7 +60,9 @@ export default class MessageThread extends Component {
               }}
               aria-label="Message input"
             />
-            <Button click={store.sendMessage} disabled={!store.draft.trim()}>Send</Button>
+            <Button click={store.sendMessage} disabled={!store.draft.trim()}>
+              Send
+            </Button>
           </div>
         </div>
       </div>

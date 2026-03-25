@@ -6,7 +6,11 @@ export default class OverviewView extends Component {
   template() {
     const stats = [
       { label: 'Total Users', value: store.users.length.toString(), change: '+12% vs last month' },
-      { label: 'Active Users', value: store.activeCount.toString(), change: `${store.activeCount} of ${store.users.length}` },
+      {
+        label: 'Active Users',
+        value: store.activeCount.toString(),
+        change: `${store.activeCount} of ${store.users.length}`,
+      },
       { label: 'Admins', value: store.adminCount.toString(), change: 'Full access' },
       { label: 'Monthly Revenue', value: '$24,500', change: '+8.2% vs last month' },
     ]

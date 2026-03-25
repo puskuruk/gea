@@ -5,22 +5,13 @@
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "emitDeclarationOnly": true,
-    "lib": [
-      "ES2020",
-      "DOM"
-    ],
-    "types": [
-      "node"
-    ],
+    "lib": ["ES2020", "DOM"],
+    "types": ["node"],
     "declaration": true,
     "strict": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true
   },
-  "include": [
-    "./src/**/*.ts",
-    "./tests/**/*.ts",
-    "gea-env.d.ts"
-  ]
+  "include": ["./src/**/*.ts", "./tests/**/*.ts", "gea-env.d.ts"]
 }

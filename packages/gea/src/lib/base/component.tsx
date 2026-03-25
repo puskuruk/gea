@@ -228,11 +228,7 @@ export default class Component extends Store {
         target[prop] = value
         if (typeof (component as any).__onPropChange === 'function') {
           if (value !== prev || (typeof prev === 'object' && prev !== null)) {
-            try {
-              ;(component as any).__onPropChange(prop, value)
-            } catch (err) {
-              console.error(err)
-            }
+            ;(component as any).__onPropChange(prop, value)
           }
         }
         return true
@@ -630,9 +626,7 @@ export default class Component extends Store {
     this.__reorderChildren(container, next)
 
     // Clean up __childComponents
-    this.__childComponents = this.__childComponents.filter(
-      child => !oldItems.includes(child) || next.includes(child)
-    )
+    this.__childComponents = this.__childComponents.filter((child) => !oldItems.includes(child) || next.includes(child))
 
     return next
   }

@@ -10,7 +10,6 @@ export default class KanbanColumn extends Component {
   declare props: KanbanColumnProps
 
   template({ column }: KanbanColumnProps) {
-    console.log('KanbanColumn', column)
     const taskIds = column.taskIds
     const isDragOver = kanbanStore.dragOverColumnId === column.id
     const isAdding = kanbanStore.addingToColumnId === column.id

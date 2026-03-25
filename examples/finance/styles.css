@@ -1,4 +1,8 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
@@ -60,9 +64,15 @@ body {
   letter-spacing: -0.02em;
 }
 
-.summary-value.income { color: #16a34a; }
-.summary-value.expense { color: #dc2626; }
-.summary-value.neutral { color: hsl(var(--foreground)); }
+.summary-value.income {
+  color: #16a34a;
+}
+.summary-value.expense {
+  color: #dc2626;
+}
+.summary-value.neutral {
+  color: hsl(var(--foreground));
+}
 
 /* Main Grid */
 .main-grid {
@@ -116,8 +126,12 @@ body {
   transition: background 0.1s;
 }
 
-.tx-row:hover { background: hsl(var(--accent) / 0.4); }
-.tx-row:last-child { border-bottom: none; }
+.tx-row:hover {
+  background: hsl(var(--accent) / 0.4);
+}
+.tx-row:last-child {
+  border-bottom: none;
+}
 
 .tx-icon {
   width: 36px;
@@ -163,8 +177,12 @@ body {
   text-align: right;
 }
 
-.tx-amount.income { color: #16a34a; }
-.tx-amount.expense { color: #dc2626; }
+.tx-amount.income {
+  color: #16a34a;
+}
+.tx-amount.expense {
+  color: #dc2626;
+}
 
 .tx-remove {
   background: none;
@@ -174,7 +192,9 @@ body {
   font-size: 0.75rem;
   padding: 0.25rem;
   border-radius: 4px;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .tx-remove:hover {
@@ -224,7 +244,10 @@ body {
   color: hsl(var(--muted-foreground));
 }
 
-.budget-amount.over { color: #dc2626; font-weight: 600; }
+.budget-amount.over {
+  color: #dc2626;
+  font-weight: 600;
+}
 
 .budget-pct {
   font-size: 0.75rem;
@@ -289,7 +312,7 @@ body {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -333,6 +356,10 @@ body {
 }
 
 @media (max-width: 900px) {
-  .main-grid { grid-template-columns: 1fr; }
-  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

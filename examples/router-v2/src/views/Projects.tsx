@@ -13,7 +13,7 @@ export default class Projects extends Component {
       <div class="view projects">
         <h1>Projects</h1>
         <div class="project-list">
-          {projects.map(p => (
+          {projects.map((p) => (
             <div key={p.id} class="project-card">
               <div class="project-info">
                 <h3>{p.name}</h3>

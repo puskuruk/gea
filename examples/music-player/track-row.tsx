@@ -17,7 +17,9 @@ export default class TrackRow extends Component {
       >
         <td class="track-num">
           {isPlaying ? (
-            <span class="playing-icon" aria-label="Now playing">▶</span>
+            <span class="playing-icon" aria-label="Now playing">
+              ▶
+            </span>
           ) : (
             <span class="track-index">{index + 1}</span>
           )}

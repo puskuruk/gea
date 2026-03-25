@@ -41,7 +41,10 @@ export default class Collapsible extends ZagComponent {
   template(props: any) {
     return (
       <div data-part="root" class={props.class || ''}>
-        <button data-part="trigger" class="collapsible-trigger flex w-full items-center justify-between py-2 text-sm font-medium">
+        <button
+          data-part="trigger"
+          class="collapsible-trigger flex w-full items-center justify-between py-2 text-sm font-medium"
+        >
           {props.label || 'Toggle'}
         </button>
         <div data-part="content" class="collapsible-content overflow-hidden">

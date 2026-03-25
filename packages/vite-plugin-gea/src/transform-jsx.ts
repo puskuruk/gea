@@ -181,12 +181,7 @@ function buildClassObjectExpression(expr: t.Expression): t.Expression {
           ),
           t.identifier('map'),
         ),
-        [
-          t.arrowFunctionExpression(
-            [t.arrayPattern([t.identifier('__k')])],
-            t.identifier('__k'),
-          ),
-        ],
+        [t.arrowFunctionExpression([t.arrayPattern([t.identifier('__k')])], t.identifier('__k'))],
       ),
       t.identifier('join'),
     ),
@@ -225,10 +220,10 @@ function buildStyleObjectExpression(expr: t.Expression): t.Expression {
             t.templateElement({ raw: '', cooked: '' }, true),
           ],
           [
-            t.callExpression(
-              t.memberExpression(t.identifier('__k'), t.identifier('replace')),
-              [t.regExpLiteral('[A-Z]', 'g'), t.stringLiteral('-$&')],
-            ),
+            t.callExpression(t.memberExpression(t.identifier('__k'), t.identifier('replace')), [
+              t.regExpLiteral('[A-Z]', 'g'),
+              t.stringLiteral('-$&'),
+            ]),
             t.conditionalExpression(
               t.logicalExpression(
                 '&&',
@@ -291,9 +286,7 @@ function extractHtmlTemplatesFromConditional(expr: t.Expression): {
   return {}
 }
 
-function extractChildInstanceRef(
-  expr: t.Expression,
-): { instanceVar: string; guardExpr: t.Expression } | null {
+function extractChildInstanceRef(expr: t.Expression): { instanceVar: string; guardExpr: t.Expression } | null {
   if (!t.isLogicalExpression(expr) || expr.operator !== '&&') return null
   const right = expr.right
   let memberExpr: t.MemberExpression | null = null
@@ -394,7 +387,12 @@ interface TemplatePart {
 }
 
 function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 function getStaticStringValue(expr: t.Expression): string | null {
@@ -701,10 +699,7 @@ function replaceJSXInExpression(
       ...node.arguments.slice(1).map((a) => t.cloneNode(a)),
     ])
   }
-  if (
-    t.isCallExpression(node) &&
-    (t.isArrowFunctionExpression(node.callee) || t.isFunctionExpression(node.callee))
-  ) {
+  if (t.isCallExpression(node) && (t.isArrowFunctionExpression(node.callee) || t.isFunctionExpression(node.callee))) {
     const callee = node.callee
     if (t.isBlockStatement(callee.body)) {
       const replaceReturnsInStatements = (stmts: t.Statement[]): t.Statement[] =>
@@ -722,7 +717,7 @@ function replaceJSXInExpression(
               ? t.isBlockStatement(stmt.alternate)
                 ? t.blockStatement(replaceReturnsInStatements(stmt.alternate.body))
                 : t.isIfStatement(stmt.alternate)
-                  ? replaceReturnsInStatements([stmt.alternate])[0] as t.IfStatement
+                  ? (replaceReturnsInStatements([stmt.alternate])[0] as t.IfStatement)
                   : t.isReturnStatement(stmt.alternate) && stmt.alternate.argument
                     ? t.returnStatement(replaceJSXInExpression(stmt.alternate.argument, mapJSXNodes, ctx))
                     : stmt.alternate
@@ -741,10 +736,7 @@ function replaceJSXInExpression(
       )
     }
     const newBody = replaceJSXInExpression(callee.body as t.Expression, mapJSXNodes, ctx)
-    return t.callExpression(
-      t.arrowFunctionExpression(callee.params, newBody, callee.async),
-      node.arguments,
-    )
+    return t.callExpression(t.arrowFunctionExpression(callee.params, newBody, callee.async), node.arguments)
   }
   return node
 }
@@ -865,9 +857,10 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
       ctx.componentInstanceCursors?.set(tagName, cursor + 1)
       if (ctx.lazyChildComponents) instance.lazy = true
       const rawChildPrefix = elementPath.length > 0 ? elementPath.join(' > ') : undefined
-      const childPathPrefix = ctx.elementPathPrefix && rawChildPrefix
-        ? ctx.elementPathPrefix + ' > ' + rawChildPrefix
-        : rawChildPrefix ?? ctx.elementPathPrefix
+      const childPathPrefix =
+        ctx.elementPathPrefix && rawChildPrefix
+          ? ctx.elementPathPrefix + ' > ' + rawChildPrefix
+          : (rawChildPrefix ?? ctx.elementPathPrefix)
       const childPropCtx = { ...ctx, inChildrenProp: true, elementPathPrefix: childPathPrefix }
       const props = buildComponentPropsExpression(
         node,
@@ -894,9 +887,10 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
   // Components in map callbacks (both root and nested) produce real JS instances, not HTML strings.
   if (isComp) {
     const rawChildPrefix2 = elementPath.length > 0 ? elementPath.join(' > ') : undefined
-    const childPathPrefix2 = ctx.elementPathPrefix && rawChildPrefix2
-      ? ctx.elementPathPrefix + ' > ' + rawChildPrefix2
-      : rawChildPrefix2 ?? ctx.elementPathPrefix
+    const childPathPrefix2 =
+      ctx.elementPathPrefix && rawChildPrefix2
+        ? ctx.elementPathPrefix + ' > ' + rawChildPrefix2
+        : (rawChildPrefix2 ?? ctx.elementPathPrefix)
     const childPropCtx = { ...ctx, inChildrenProp: true, elementPathPrefix: childPathPrefix2 }
     const props = buildComponentPropsExpression(
       node,
@@ -1293,10 +1287,7 @@ function processChildren(
         })
         appendString(parts, `-->`)
       } else {
-        if (
-          !ctx.inChildrenProp &&
-          (t.isArrowFunctionExpression(rawExpr) || t.isFunctionExpression(rawExpr))
-        ) {
+        if (!ctx.inChildrenProp && (t.isArrowFunctionExpression(rawExpr) || t.isFunctionExpression(rawExpr))) {
           const err = new Error(
             `[gea] Function-as-child ({(ctx) => ...}) is not supported. Pass callback functions via named props instead (e.g., renderItem={...}).`,
           )

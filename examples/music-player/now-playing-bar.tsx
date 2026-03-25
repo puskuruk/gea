@@ -78,7 +78,9 @@ export default class NowPlayingBar extends Component {
 
         {/* Volume */}
         <div class="np-volume">
-          <span class="volume-icon" aria-label="Volume">🔊</span>
+          <span class="volume-icon" aria-label="Volume">
+            🔊
+          </span>
           <Slider
             value={[store.volume]}
             min={0}

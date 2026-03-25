@@ -7,7 +7,8 @@ import { transformComponentSource } from './plugin-helpers'
 // .join('') only in the template() method, missing the case where the .map()
 // is inside a __buildProps_* method (child component's children prop).
 test('static array .map() with child components inside child component children includes items in props', () => {
-  const output = transformComponentSource(`
+  const output = transformComponentSource(
+    `
     import { Component } from '@geajs/core'
     import Card from './Card'
     import ListItem from './ListItem'
@@ -29,7 +30,9 @@ test('static array .map() with child components inside child component children 
         )
       }
     }
-  `, new Set(['Card', 'ListItem']))
+  `,
+    new Set(['Card', 'ListItem']),
+  )
 
   // The compiled output should include the items array in constructor:
   assert.match(output, /_ITEMSItems/, 'should create _ITEMSItems in constructor')
@@ -51,7 +54,8 @@ test('static array .map() with child components inside child component children 
 // inside a conditional (lazy getter), the observer should guard the
 // __geaUpdateProps call to avoid premature creation.
 test('observer for store prop guarding a lazy conditional child does not eagerly access getter', () => {
-  const output = transformComponentSource(`
+  const output = transformComponentSource(
+    `
     import { Component } from '@geajs/core'
     import store from './flight-store'
     import BoardingPass from './BoardingPass'
@@ -68,7 +72,9 @@ test('observer for store prop guarding a lazy conditional child does not eagerly
         )
       }
     }
-  `, new Set(['BoardingPass']))
+  `,
+    new Set(['BoardingPass']),
+  )
 
   // The observer for store.boardingPass should NOT unconditionally call
   // this._boardingPass.__geaUpdateProps(...) because _boardingPass is a
@@ -86,5 +92,39 @@ test('observer for store prop guarding a lazy conditional child does not eagerly
     output,
     /if\s*\(this\.__lazy_boardingPass\)/,
     'observer should guard lazy child __geaUpdateProps with __lazy backing field check',
+  )
+})
+
+test('user createdHooks is merged: compiler prepends __observe, user body remains', () => {
+  const output = transformComponentSource(
+    `
+    import { Component } from '@geajs/core'
+    import store from './store'
+
+    export default class WithUserCreatedHooks extends Component {
+      template() {
+        return (
+          <div>
+            <span class="count">{store.count}</span>
+          </div>
+        )
+      }
+
+      createdHooks() {
+        this.__userCreatedHooksRan = true
+      }
+    }
+  `,
+    new Set(),
+  )
+
+  const createdHooksDecls = output.match(/createdHooks\s*\([^)]*\)\s*\{/g)
+  assert.ok(createdHooksDecls, 'expected createdHooks in output')
+  assert.equal(createdHooksDecls!.length, 1, 'must not emit duplicate createdHooks methods')
+
+  assert.match(
+    output,
+    /createdHooks\s*\([^)]*\)\s*\{[\s\S]*__observe\([\s\S]*__userCreatedHooksRan/s,
+    'generated store setup should run before user createdHooks body',
   )
 })

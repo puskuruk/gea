@@ -21,24 +21,46 @@ export default class CheckoutDialog extends Component {
       <div class="modal-backdrop" click={store.closeCheckout}>
         <div class="modal-box" click={(e: Event) => e.stopPropagation()}>
           <h3 class="modal-title">Checkout</h3>
-          <p class="modal-desc">Order total: <strong>${store.cartTotal.toFixed(2)}</strong></p>
+          <p class="modal-desc">
+            Order total: <strong>${store.cartTotal.toFixed(2)}</strong>
+          </p>
 
           <div class="form-field">
             <Label htmlFor="co-name">Full Name</Label>
-            <Input inputId="co-name" placeholder="Jane Smith" value={store.checkoutName} onInput={store.setCheckoutName} />
+            <Input
+              inputId="co-name"
+              placeholder="Jane Smith"
+              value={store.checkoutName}
+              onInput={store.setCheckoutName}
+            />
           </div>
           <div class="form-field">
             <Label htmlFor="co-email">Email</Label>
-            <Input inputId="co-email" type="email" placeholder="jane@example.com" value={store.checkoutEmail} onInput={store.setCheckoutEmail} />
+            <Input
+              inputId="co-email"
+              type="email"
+              placeholder="jane@example.com"
+              value={store.checkoutEmail}
+              onInput={store.setCheckoutEmail}
+            />
           </div>
           <div class="form-field">
             <Label htmlFor="co-card">Card Number</Label>
-            <Input inputId="co-card" placeholder="1234 5678 9012 3456" value={store.checkoutCard} onInput={store.setCheckoutCard} />
+            <Input
+              inputId="co-card"
+              placeholder="1234 5678 9012 3456"
+              value={store.checkoutCard}
+              onInput={store.setCheckoutCard}
+            />
           </div>
 
           <div class="modal-actions">
-            <Button variant="outline" click={store.closeCheckout}>Cancel</Button>
-            <Button disabled={!store.checkoutValid} click={store.placeOrder}>Place Order</Button>
+            <Button variant="outline" click={store.closeCheckout}>
+              Cancel
+            </Button>
+            <Button disabled={!store.checkoutValid} click={store.placeOrder}>
+              Place Order
+            </Button>
           </div>
         </div>
       </div>

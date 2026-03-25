@@ -60,13 +60,26 @@ export default class NumberInput extends ZagComponent {
   template(props: any) {
     return (
       <div data-part="root" class={props.class || ''}>
-        {props.label && <label data-part="label" class="number-input-label text-sm font-medium mb-1 block">{props.label}</label>}
+        {props.label && (
+          <label data-part="label" class="number-input-label text-sm font-medium mb-1 block">
+            {props.label}
+          </label>
+        )}
         <div data-part="control" class="number-input-control flex">
-          <button data-part="decrement-trigger" class="number-input-decrement inline-flex h-9 items-center justify-center rounded-l-md border border-r-0 border-input px-2 hover:bg-accent">
+          <button
+            data-part="decrement-trigger"
+            class="number-input-decrement inline-flex h-9 items-center justify-center rounded-l-md border border-r-0 border-input px-2 hover:bg-accent"
+          >
             &#x2212;
           </button>
-          <input data-part="input" class="number-input-input h-9 w-full border border-input bg-transparent px-3 text-center text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
-          <button data-part="increment-trigger" class="number-input-increment inline-flex h-9 items-center justify-center rounded-r-md border border-l-0 border-input px-2 hover:bg-accent">
+          <input
+            data-part="input"
+            class="number-input-input h-9 w-full border border-input bg-transparent px-3 text-center text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+          <button
+            data-part="increment-trigger"
+            class="number-input-increment inline-flex h-9 items-center justify-center rounded-r-md border border-l-0 border-input px-2 hover:bg-accent"
+          >
             &#x2B;
           </button>
         </div>

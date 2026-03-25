@@ -48,9 +48,7 @@ const examples: ExampleDef[] = [
   { name: 'runtime-only-jsx', port: 5310 },
 ]
 
-const activeExamples = targetProject
-  ? examples.filter((e) => e.name === targetProject)
-  : examples
+const activeExamples = targetProject ? examples.filter((e) => e.name === targetProject) : examples
 
 export default defineConfig({
   testDir: '.',

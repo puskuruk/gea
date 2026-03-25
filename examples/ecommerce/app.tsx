@@ -104,14 +104,20 @@ export default class App extends Component {
             {store.filteredProducts.length === 0 ? (
               <div class="no-results">
                 <p>No products match your filters.</p>
-                <button class="filter-btn" click={() => { store.setCategory('All'); store.minRating = 0; store.inStockOnly = false; router.push('/') }}>
+                <button
+                  class="filter-btn"
+                  click={() => {
+                    store.setCategory('All')
+                    store.minRating = 0
+                    store.inStockOnly = false
+                    router.push('/')
+                  }}
+                >
                   Clear Filters
                 </button>
               </div>
             ) : (
-              store.filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))
+              store.filteredProducts.map((product) => <ProductCard key={product.id} product={product} />)
             )}
           </main>
         </div>

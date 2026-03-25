@@ -47,12 +47,7 @@ async function flushMicrotasks() {
   await new Promise((r) => setTimeout(r, 0))
 }
 
-async function compileSource(
-  source: string,
-  id: string,
-  exportName: string,
-  bindings: Record<string, unknown>,
-) {
+async function compileSource(source: string, id: string, exportName: string, bindings: Record<string, unknown>) {
   const plugin = geaPlugin()
   const transform = typeof plugin.transform === 'function' ? plugin.transform : plugin.transform?.handler
   const result = await transform?.call({} as never, source, id)
@@ -83,9 +78,7 @@ return ${exportName};`
 }
 
 async function loadRuntimeModules(seed: string) {
-  const { default: ComponentManager } = await import(
-    `../../packages/gea/src/lib/base/component-manager`
-  )
+  const { default: ComponentManager } = await import(`../../packages/gea/src/lib/base/component-manager`)
   ComponentManager.instance = undefined
   return Promise.all([
     import(`../../packages/gea/src/lib/base/component.tsx?${seed}`),

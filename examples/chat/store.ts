@@ -24,10 +24,38 @@ function uid() {
 const NOW = Date.now()
 
 const INITIAL_CONVERSATIONS: Conversation[] = [
-  { id: 'c1', name: 'Sofia Davis', lastMessage: 'Sure, sounds good!', timestamp: NOW - 120000, unread: 2, online: true },
-  { id: 'c2', name: 'Jackson Lee', lastMessage: 'Can we reschedule?', timestamp: NOW - 3600000, unread: 0, online: false },
-  { id: 'c3', name: 'Team General', lastMessage: 'New release deployed 🚀', timestamp: NOW - 7200000, unread: 5, online: true },
-  { id: 'c4', name: 'Isabella Nguyen', lastMessage: 'Thanks for the review!', timestamp: NOW - 86400000, unread: 0, online: true },
+  {
+    id: 'c1',
+    name: 'Sofia Davis',
+    lastMessage: 'Sure, sounds good!',
+    timestamp: NOW - 120000,
+    unread: 2,
+    online: true,
+  },
+  {
+    id: 'c2',
+    name: 'Jackson Lee',
+    lastMessage: 'Can we reschedule?',
+    timestamp: NOW - 3600000,
+    unread: 0,
+    online: false,
+  },
+  {
+    id: 'c3',
+    name: 'Team General',
+    lastMessage: 'New release deployed 🚀',
+    timestamp: NOW - 7200000,
+    unread: 5,
+    online: true,
+  },
+  {
+    id: 'c4',
+    name: 'Isabella Nguyen',
+    lastMessage: 'Thanks for the review!',
+    timestamp: NOW - 86400000,
+    unread: 0,
+    online: true,
+  },
 ]
 
 const INITIAL_MESSAGES: Record<string, Message[]> = {
@@ -51,7 +79,13 @@ const INITIAL_MESSAGES: Record<string, Message[]> = {
   ],
   c4: [
     { id: 'm13', senderId: 'c4', text: 'I just reviewed the PR.', timestamp: NOW - 90000000, read: true },
-    { id: 'm14', senderId: 'me', text: 'Awesome, let me know if anything needs changing.', timestamp: NOW - 88000000, read: true },
+    {
+      id: 'm14',
+      senderId: 'me',
+      text: 'Awesome, let me know if anything needs changing.',
+      timestamp: NOW - 88000000,
+      read: true,
+    },
     { id: 'm15', senderId: 'c4', text: 'Thanks for the review!', timestamp: NOW - 86400000, read: true },
   ],
 }
@@ -63,7 +97,7 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleDateString()
 }
 
-class ChatStore extends Store {
+export class ChatStore extends Store {
   conversations: Conversation[] = INITIAL_CONVERSATIONS
   messages: Record<string, Message[]> = INITIAL_MESSAGES
   activeConversationId: string = 'c1'

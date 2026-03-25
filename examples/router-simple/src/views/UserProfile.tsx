@@ -22,7 +22,9 @@ export default class UserProfile extends Component {
       return (
         <div class="view">
           <h1>User not found</h1>
-          <p>No user with id <strong>{id}</strong>.</p>
+          <p>
+            No user with id <strong>{id}</strong>.
+          </p>
           <Link to="/" label="Back to Home" class="back-link" />
         </div>
       )

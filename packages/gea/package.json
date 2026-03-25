@@ -38,8 +38,8 @@
     "size": "node -e \"process.stdout.write('gzip size: ')\" && gzip-size dist/gea.js",
     "ts-type-check": "tsc --noEmit --project tsconfig.build.json",
     "lint": "eslint src",
-    "test": "tsx --conditions source --import ./tests/preload.mjs --test tests/**/*.test.ts",
-    "test:coverage": "c8 --reporter=text --reporter=lcov tsx --conditions source --import ./tests/preload.mjs --test tests/**/*.test.ts"
+    "test": "tsx --conditions source --import ./tests/preload.ts --test tests/*.test.ts --test tests/examples/*.test.ts",
+    "test:coverage": "c8 --reporter=text --reporter=lcov tsx --conditions source --import ./tests/preload.ts --test tests/*.test.ts --test tests/examples/*.test.ts"
   },
   "publishConfig": {
     "access": "public"

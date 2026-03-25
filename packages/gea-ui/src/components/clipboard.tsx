@@ -33,10 +33,8 @@ export default class Clipboard extends ZagComponent {
       '[data-part="control"]': 'getControlProps',
       '[data-part="trigger"]': 'getTriggerProps',
       '[data-part="input"]': 'getInputProps',
-      '[data-part="indicator-copied"]': (api) =>
-        api.getIndicatorProps({ copied: true }),
-      '[data-part="indicator-not-copied"]': (api) =>
-        api.getIndicatorProps({ copied: false }),
+      '[data-part="indicator-copied"]': (api) => api.getIndicatorProps({ copied: true }),
+      '[data-part="indicator-not-copied"]': (api) => api.getIndicatorProps({ copied: false }),
     }
   }
 
@@ -47,14 +45,25 @@ export default class Clipboard extends ZagComponent {
   template(props: any) {
     return (
       <div data-part="root" class={props.class || ''}>
-        {props.label && <label data-part="label" class="clipboard-label text-sm font-medium mb-1 block">{props.label}</label>}
+        {props.label && (
+          <label data-part="label" class="clipboard-label text-sm font-medium mb-1 block">
+            {props.label}
+          </label>
+        )}
         <div data-part="control" class="clipboard-control flex gap-2">
-          <input data-part="input" class="clipboard-input flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm" />
-          <button data-part="trigger" class="clipboard-trigger inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm shadow-sm hover:bg-accent">
-            {this.copied
-              ? <span data-part="indicator-copied">&#x2713; Copied</span>
-              : <span data-part="indicator-not-copied">Copy</span>
-            }
+          <input
+            data-part="input"
+            class="clipboard-input flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+          />
+          <button
+            data-part="trigger"
+            class="clipboard-trigger inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm shadow-sm hover:bg-accent"
+          >
+            {this.copied ? (
+              <span data-part="indicator-copied">&#x2713; Copied</span>
+            ) : (
+              <span data-part="indicator-not-copied">Copy</span>
+            )}
           </button>
         </div>
       </div>

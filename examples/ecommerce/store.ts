@@ -20,11 +20,35 @@ function uid() {
 }
 
 export const PRODUCTS: Product[] = [
-  { id: 'p1', name: 'Wireless Headphones', price: 89.99, category: 'Electronics', rating: 4, inStock: true, badge: 'Best Seller' },
+  {
+    id: 'p1',
+    name: 'Wireless Headphones',
+    price: 89.99,
+    category: 'Electronics',
+    rating: 4,
+    inStock: true,
+    badge: 'Best Seller',
+  },
   { id: 'p2', name: 'Mechanical Keyboard', price: 129.99, category: 'Electronics', rating: 5, inStock: true },
-  { id: 'p3', name: 'USB-C Hub', price: 49.99, category: 'Electronics', rating: 4, inStock: false, badge: 'Out of Stock' },
+  {
+    id: 'p3',
+    name: 'USB-C Hub',
+    price: 49.99,
+    category: 'Electronics',
+    rating: 4,
+    inStock: false,
+    badge: 'Out of Stock',
+  },
   { id: 'p4', name: 'Standing Desk Mat', price: 39.99, category: 'Home Office', rating: 4, inStock: true },
-  { id: 'p5', name: 'Monitor Light Bar', price: 59.99, category: 'Electronics', rating: 5, inStock: true, badge: 'New' },
+  {
+    id: 'p5',
+    name: 'Monitor Light Bar',
+    price: 59.99,
+    category: 'Electronics',
+    rating: 5,
+    inStock: true,
+    badge: 'New',
+  },
   { id: 'p6', name: 'Ergonomic Chair', price: 349.99, category: 'Home Office', rating: 5, inStock: true },
   { id: 'p7', name: 'Webcam 4K', price: 99.99, category: 'Electronics', rating: 3, inStock: true },
   { id: 'p8', name: 'Cable Management Kit', price: 19.99, category: 'Home Office', rating: 4, inStock: true },
@@ -32,7 +56,7 @@ export const PRODUCTS: Product[] = [
 
 export const CATEGORIES = ['All', 'Electronics', 'Home Office']
 
-class EcommerceStore extends Store {
+export class EcommerceStore extends Store {
   products: Product[] = PRODUCTS
   cart: CartItem[] = []
   selectedCategory = 'All'
@@ -77,7 +101,11 @@ class EcommerceStore extends Store {
   }
 
   get checkoutValid(): boolean {
-    return this.checkoutName.trim().length > 1 && this.checkoutEmail.includes('@') && this.checkoutCard.replace(/\s/g, '').length === 16
+    return (
+      this.checkoutName.trim().length > 1 &&
+      this.checkoutEmail.includes('@') &&
+      this.checkoutCard.replace(/\s/g, '').length === 16
+    )
   }
 
   setCategory(cat: string): void {

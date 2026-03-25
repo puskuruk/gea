@@ -42,8 +42,8 @@ const INITIAL_EMAILS: Email[] = [
     from: 'Sofia Davis',
     fromEmail: 'sofia@acme.com',
     subject: 'Q1 Review Meeting',
-    preview: 'Hi, let\'s schedule the Q1 review for next week. Do you have time on Thursday?',
-    body: 'Hi,\n\nLet\'s schedule the Q1 review for next week. Do you have time on Thursday afternoon? I was thinking around 2pm.\n\nWe need to go over the metrics and plan for Q2.\n\nBest,\nSofia',
+    preview: "Hi, let's schedule the Q1 review for next week. Do you have time on Thursday?",
+    body: "Hi,\n\nLet's schedule the Q1 review for next week. Do you have time on Thursday afternoon? I was thinking around 2pm.\n\nWe need to go over the metrics and plan for Q2.\n\nBest,\nSofia",
     folder: 'inbox',
     labels: ['work'],
     date: dateStr(0, 9),
@@ -55,8 +55,8 @@ const INITIAL_EMAILS: Email[] = [
     from: 'Jackson Lee',
     fromEmail: 'jackson@design.io',
     subject: 'New design mockups ready',
-    preview: 'Hey! I\'ve finished the dashboard mockups. Check them out in Figma.',
-    body: 'Hey!\n\nI\'ve finished the dashboard mockups. You can check them out in Figma. Let me know what you think!\n\nLink: figma.com/file/mock\n\nCheers,\nJackson',
+    preview: "Hey! I've finished the dashboard mockups. Check them out in Figma.",
+    body: "Hey!\n\nI've finished the dashboard mockups. You can check them out in Figma. Let me know what you think!\n\nLink: figma.com/file/mock\n\nCheers,\nJackson",
     folder: 'inbox',
     labels: ['work'],
     date: dateStr(0, 11),
@@ -94,8 +94,8 @@ const INITIAL_EMAILS: Email[] = [
     from: 'Isabella Nguyen',
     fromEmail: 'isabella@startup.co',
     subject: 'Re: Project proposal',
-    preview: 'I reviewed the proposal and I think it\'s ready to present.',
-    body: 'Hi,\n\nI reviewed the proposal and I think it\'s ready to present to the client.\n\nI only have a few minor suggestions:\n1. Clarify the timeline on page 4\n2. Add more detail to the budget section\n\nOtherwise, looks great!\n\nIsabella',
+    preview: "I reviewed the proposal and I think it's ready to present.",
+    body: "Hi,\n\nI reviewed the proposal and I think it's ready to present to the client.\n\nI only have a few minor suggestions:\n1. Clarify the timeline on page 4\n2. Add more detail to the budget section\n\nOtherwise, looks great!\n\nIsabella",
     folder: 'inbox',
     labels: ['work'],
     date: dateStr(3, 16),
@@ -130,7 +130,7 @@ const INITIAL_EMAILS: Email[] = [
   },
 ]
 
-class EmailStore extends Store {
+export class EmailStore extends Store {
   emails: Email[] = INITIAL_EMAILS
   activeFolder: Folder = 'inbox'
   activeEmailId: string | null = null
@@ -149,9 +149,7 @@ class EmailStore extends Store {
       .filter((e) => {
         if (!q) return true
         return (
-          e.subject.toLowerCase().includes(q) ||
-          e.from.toLowerCase().includes(q) ||
-          e.preview.toLowerCase().includes(q)
+          e.subject.toLowerCase().includes(q) || e.from.toLowerCase().includes(q) || e.preview.toLowerCase().includes(q)
         )
       })
       .sort((a, b) => b.date.localeCompare(a.date))

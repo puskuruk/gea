@@ -128,7 +128,10 @@ export function parseSource(code: string): ParseResult | null {
       const decl = path.node.declaration
       if (!decl) return
 
-      const checkNamedFn = (name: string, fn: t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration) => {
+      const checkNamedFn = (
+        name: string,
+        fn: t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration,
+      ) => {
         const body = t.isFunctionDeclaration(fn) ? fn.body : fn.body
         if (checkReturnsJSX(body)) {
           const err = new Error(

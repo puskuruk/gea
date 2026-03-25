@@ -2,12 +2,8 @@
   "extends": "../../packages/gea/tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@geajs/core": [
-        "../../packages/gea/src"
-      ],
-      "@geajs/mobile": [
-        "../../packages/gea-mobile/src"
-      ]
+      "@geajs/core": ["../../packages/gea/src"],
+      "@geajs/mobile": ["../../packages/gea-mobile/src"]
     }
   },
   "include": [
@@ -17,8 +13,5 @@
     "vite.config.ts",
     ".//Users/dashersw/Projects/Code/github/dashersw/gea/packages/vite-plugin-gea/gea-env.d.ts"
   ],
-  "exclude": [
-    "dist",
-    "node_modules"
-  ]
+  "exclude": ["dist", "node_modules"]
 }

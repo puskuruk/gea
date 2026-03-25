@@ -49,7 +49,10 @@ export default class HoverCard extends ZagComponent {
           {props.triggerLabel || 'Hover me'}
         </a>
         <div data-part="positioner" class="hover-card-positioner">
-          <div data-part="content" class="hover-card-content z-50 w-64 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none">
+          <div
+            data-part="content"
+            class="hover-card-content z-50 w-64 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none"
+          >
             {props.children}
           </div>
         </div>

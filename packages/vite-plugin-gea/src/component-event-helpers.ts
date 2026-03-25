@@ -109,7 +109,14 @@ export function getHoistableRootEvent(
   selector: string | null,
 ): HoistableRootEventMeta | null {
   if (elementPath.length !== 0 || !selector) return null
-  if (attrName.startsWith('data-') || attrName === 'class' || attrName === 'className' || attrName === 'style' || attrName === 'id') return null
+  if (
+    attrName.startsWith('data-') ||
+    attrName === 'class' ||
+    attrName === 'className' ||
+    attrName === 'style' ||
+    attrName === 'id'
+  )
+    return null
   const eventType = toGeaEventType(attrName)
   const directProp = resolvePropCallbackName(expr, context)
   if (directProp) return { eventType, propName: directProp, selector }

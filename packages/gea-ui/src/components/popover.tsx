@@ -55,11 +55,25 @@ export default class Popover extends ZagComponent {
           {props.triggerLabel || 'Open'}
         </button>
         <div data-part="positioner" class="popover-positioner">
-          <div data-part="content" class="popover-content z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none">
-            {props.title && <div data-part="title" class="popover-title font-medium leading-none mb-2">{props.title}</div>}
-            {props.description && <p data-part="description" class="popover-description text-sm text-muted-foreground mb-3">{props.description}</p>}
+          <div
+            data-part="content"
+            class="popover-content z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none"
+          >
+            {props.title && (
+              <div data-part="title" class="popover-title font-medium leading-none mb-2">
+                {props.title}
+              </div>
+            )}
+            {props.description && (
+              <p data-part="description" class="popover-description text-sm text-muted-foreground mb-3">
+                {props.description}
+              </p>
+            )}
             <div class="popover-body">{props.children}</div>
-            <button data-part="close-trigger" class="popover-close-trigger absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-sm">
+            <button
+              data-part="close-trigger"
+              class="popover-close-trigger absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-sm"
+            >
               &#x2715;
             </button>
           </div>

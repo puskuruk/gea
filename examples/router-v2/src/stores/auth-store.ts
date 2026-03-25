@@ -1,7 +1,9 @@
 import { Store } from '@geajs/core'
 
-class AuthStore extends Store {
-  user: { name: string; email: string } | null = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : null
+export class AuthStore extends Store {
+  user: { name: string; email: string } | null = localStorage.getItem('user')
+    ? JSON.parse(localStorage.getItem('user')!)
+    : null
 
   login(name: string, email: string) {
     this.user = { name, email }

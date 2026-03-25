@@ -17,7 +17,7 @@ export default class App extends Component {
         </header>
 
         <nav class="category-nav">
-          {categories.map(cat => (
+          {categories.map((cat) => (
             <button
               key={cat.id}
               class={`cat-tab ${activeCategory === cat.id ? 'cat-tab--active' : ''}`}
@@ -34,7 +34,7 @@ export default class App extends Component {
             <h2 class="options-heading">{currentCategory.name}</h2>
             <p class="options-sub">Select one option below</p>
             <div class="options-grid">
-              {currentCategory.options.map(opt => (
+              {currentCategory.options.map((opt) => (
                 <OptionCard
                   key={opt.id}
                   name={opt.name}

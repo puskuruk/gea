@@ -57,10 +57,13 @@ async function main() {
   await page.goto(`http://localhost:${port}/profile.html`)
 
   // Wait for app to render
-  await page.waitForFunction(() => {
-    const el = document.querySelector('#main > *')
-    return el !== null
-  }, { timeout: 5000 })
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector('#main > *')
+      return el !== null
+    },
+    { timeout: 5000 },
+  )
 
   console.log('App loaded. Instrumenting and running profile...\n')
 
@@ -85,7 +88,9 @@ async function main() {
     const sorted = Object.entries(data.breakdown).sort((a, b) => b[1].avgMs - a[1].avgMs)
     for (const [cat, info] of sorted) {
       if (info.avgMs >= 0.01) {
-        console.log(`  ${cat.padEnd(50)} ${info.avgMs.toFixed(3).padStart(8)}ms  ${String(info.avgCalls).padStart(6)} calls  ${info.pctOfTotal.toFixed(1).padStart(6)}%`)
+        console.log(
+          `  ${cat.padEnd(50)} ${info.avgMs.toFixed(3).padStart(8)}ms  ${String(info.avgCalls).padStart(6)} calls  ${info.pctOfTotal.toFixed(1).padStart(6)}%`,
+        )
       }
     }
   }

@@ -133,6 +133,7 @@ export function transformComponentFile(
         templateSetupContext: {
           params: path.node.params,
           statements: returnIndex >= 0 ? body.slice(0, returnIndex) : [],
+          earlyReturnBarrierIndex: analysis.earlyReturnBarrierIndex,
         },
         sourceFile,
         isRoot: true,

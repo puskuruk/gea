@@ -5,16 +5,16 @@ function isNilOrEmpty(value: any): boolean {
 }
 
 export const is = {
-  required: (): Validator => value => isNilOrEmpty(value) && 'This field is required',
+  required: (): Validator => (value) => isNilOrEmpty(value) && 'This field is required',
   minLength:
     (min: number): Validator =>
-    value =>
+    (value) =>
       !!value && value.length < min && `Must be at least ${min} characters`,
   maxLength:
     (max: number): Validator =>
-    value =>
+    (value) =>
       !!value && value.length > max && `Must be at most ${max} characters`,
-  url: (): Validator => value =>
+  url: (): Validator => (value) =>
     !!value &&
     !/^(?:https?:\/\/)?[\w.-]+(?:\.[\w.-]+)+[\w\-._~:/?#[\]@!$&'()*+,;=.]+$/.test(value) &&
     'Must be a valid URL',

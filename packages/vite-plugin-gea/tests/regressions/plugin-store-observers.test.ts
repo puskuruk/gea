@@ -189,11 +189,9 @@ test('wildcard observers resolve imported array paths correctly', () => {
       new Map<string, StateRefMeta>([['storeState', { kind: 'imported', source: './store' }]]),
     )
     const methodSource = generate(method).code
-    const harness = createObserveHarness(
-      methodSource,
-      '',
-      { storeState: { __store: { todos: [{ id: 1, label: 'before' }] } } },
-    )
+    const harness = createObserveHarness(methodSource, '', {
+      storeState: { __store: { todos: [{ id: 1, label: 'before' }] } },
+    })
     harness.root = document.createElement('div')
     harness.root.innerHTML = '<div class="item" data-gea-item-id="0"><span class="label">before</span></div>'
     harness.__todos_container = harness.root
@@ -430,7 +428,11 @@ test('component class getters that access stores create observers for underlying
     }
   `)
 
-  assert.match(output, /this\.__observe\(routeStore/, 'compiler must observe routeStore when a component getter accesses it')
+  assert.match(
+    output,
+    /this\.__observe\(routeStore/,
+    'compiler must observe routeStore when a component getter accesses it',
+  )
   assert.match(output, /\["path"\]/, 'observer must be registered for the underlying store path the getter reads')
 })
 

@@ -55,12 +55,7 @@ async function flushMicrotasks() {
   await new Promise((r) => setTimeout(r, 0))
 }
 
-async function compileSource(
-  source: string,
-  id: string,
-  exportName: string,
-  bindings: Record<string, unknown>,
-) {
+async function compileSource(source: string, id: string, exportName: string, bindings: Record<string, unknown>) {
   const plugin = geaPlugin()
   const transform = typeof plugin.transform === 'function' ? plugin.transform : plugin.transform?.handler
   const result = await transform?.call({} as never, source, id)
@@ -91,9 +86,7 @@ return ${exportName};`
 }
 
 async function loadRuntimeModules(seed: string) {
-  const { default: ComponentManager } = await import(
-    `../../packages/gea/src/lib/base/component-manager`
-  )
+  const { default: ComponentManager } = await import(`../../packages/gea/src/lib/base/component-manager`)
   ComponentManager.instance = undefined
   return Promise.all([
     import(`../../packages/gea/src/lib/base/component.tsx?${seed}`),
@@ -112,19 +105,11 @@ function mountApp(App: any) {
 async function buildTicTacToe(seed: string) {
   const [{ default: Component }, { Store }] = await loadRuntimeModules(seed)
 
-  const gameStore = await compileSource(
-    readSource('game-store.ts'),
-    resolve(EXAMPLE_DIR, 'game-store.ts'),
-    'store',
-    { Store },
-  )
+  const gameStore = await compileSource(readSource('game-store.ts'), resolve(EXAMPLE_DIR, 'game-store.ts'), 'store', {
+    Store,
+  })
 
-  const Cell = await compileSource(
-    readSource('cell.tsx'),
-    resolve(EXAMPLE_DIR, 'cell.tsx'),
-    'Cell',
-    { Component },
-  )
+  const Cell = await compileSource(readSource('cell.tsx'), resolve(EXAMPLE_DIR, 'cell.tsx'), 'Cell', { Component })
 
   const Scoreboard = await compileSource(
     readSource('scoreboard.tsx'),
@@ -133,19 +118,18 @@ async function buildTicTacToe(seed: string) {
     { Component },
   )
 
-  const Board = await compileSource(
-    readSource('board.tsx'),
-    resolve(EXAMPLE_DIR, 'board.tsx'),
-    'Board',
-    { Component, gameStore, Cell },
-  )
+  const Board = await compileSource(readSource('board.tsx'), resolve(EXAMPLE_DIR, 'board.tsx'), 'Board', {
+    Component,
+    gameStore,
+    Cell,
+  })
 
-  const App = await compileSource(
-    readSource('app.tsx'),
-    resolve(EXAMPLE_DIR, 'app.tsx'),
-    'App',
-    { Component, gameStore, Board, Scoreboard },
-  )
+  const App = await compileSource(readSource('app.tsx'), resolve(EXAMPLE_DIR, 'app.tsx'), 'App', {
+    Component,
+    gameStore,
+    Board,
+    Scoreboard,
+  })
 
   return { Component, Store, gameStore, Cell, Scoreboard, Board, App }
 }

@@ -61,18 +61,23 @@
         const box = document.getElementById('box')
         let boxX = (window.innerWidth - 120) / 2
         let boxY = (window.innerHeight - 120) / 2
-        let offsetX = 0, offsetY = 0
+        let offsetX = 0,
+          offsetY = 0
         let dragging = false
 
         box.style.transform = `translate3d(${boxX}px, ${boxY}px, 0)`
 
-        box.addEventListener('touchstart', (e) => {
-          e.preventDefault()
-          const t = e.touches[0]
-          offsetX = t.clientX - boxX
-          offsetY = t.clientY - boxY
-          dragging = true
-        }, { passive: false })
+        box.addEventListener(
+          'touchstart',
+          (e) => {
+            e.preventDefault()
+            const t = e.touches[0]
+            offsetX = t.clientX - boxX
+            offsetY = t.clientY - boxY
+            dragging = true
+          },
+          { passive: false },
+        )
 
         box.addEventListener('mousedown', (e) => {
           offsetX = e.clientX - boxX
@@ -80,14 +85,18 @@
           dragging = true
         })
 
-        document.addEventListener('touchmove', (e) => {
-          if (!dragging) return
-          e.preventDefault()
-          const t = e.touches[0]
-          boxX = t.clientX - offsetX
-          boxY = t.clientY - offsetY
-          box.style.transform = `translate3d(${boxX}px, ${boxY}px, 0)`
-        }, { passive: false })
+        document.addEventListener(
+          'touchmove',
+          (e) => {
+            if (!dragging) return
+            e.preventDefault()
+            const t = e.touches[0]
+            boxX = t.clientX - offsetX
+            boxY = t.clientY - offsetY
+            box.style.transform = `translate3d(${boxX}px, ${boxY}px, 0)`
+          },
+          { passive: false },
+        )
 
         document.addEventListener('mousemove', (e) => {
           if (!dragging) return
@@ -96,9 +105,15 @@
           box.style.transform = `translate3d(${boxX}px, ${boxY}px, 0)`
         })
 
-        document.addEventListener('touchend', () => { dragging = false })
-        document.addEventListener('touchcancel', () => { dragging = false })
-        document.addEventListener('mouseup', () => { dragging = false })
+        document.addEventListener('touchend', () => {
+          dragging = false
+        })
+        document.addEventListener('touchcancel', () => {
+          dragging = false
+        })
+        document.addEventListener('mouseup', () => {
+          dragging = false
+        })
       })()
     </script>
   </body>

@@ -45,7 +45,9 @@ export default class App extends Component {
               >
                 <span class="playlist-icon">♫</span>
                 <span class="playlist-name">{pl.name}</span>
-                <Badge variant="outline" class="playlist-count">{pl.trackIds.length}</Badge>
+                <Badge variant="outline" class="playlist-count">
+                  {pl.trackIds.length}
+                </Badge>
               </button>
             ))}
           </nav>
@@ -58,7 +60,11 @@ export default class App extends Component {
                 <div class="sidebar-track-meta">
                   <p class="sidebar-track-title">{store.currentTrack.title}</p>
                   <p class="sidebar-track-artist">{store.currentTrack.artist}</p>
-                  {store.isPlaying && <Badge variant="secondary" class="playing-badge">Playing</Badge>}
+                  {store.isPlaying && (
+                    <Badge variant="secondary" class="playing-badge">
+                      Playing
+                    </Badge>
+                  )}
                 </div>
               </div>
             ) : (
@@ -99,9 +105,7 @@ export default class App extends Component {
                 ))}
               </tbody>
             </table>
-            {store.filteredTracks.length === 0 && (
-              <p class="no-tracks">No tracks match your search.</p>
-            )}
+            {store.filteredTracks.length === 0 && <p class="no-tracks">No tracks match your search.</p>}
           </div>
         </main>
 

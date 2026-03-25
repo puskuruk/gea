@@ -8,8 +8,5 @@ export default {
     format: 'es',
     inlineDynamicImports: true,
   },
-  plugins: [
-    nodeResolve({ browser: true }),
-    commonjs(),
-  ],
+  plugins: [nodeResolve({ browser: true }), commonjs()],
 }

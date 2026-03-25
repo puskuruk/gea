@@ -78,8 +78,14 @@ export function generateComponentArrayMethods(
   templateSetupContext?: TemplateSetupContext,
 ): t.ClassMethod[] {
   const result = generateComponentArrayResult(
-    um, arrayPropName, imports, propNames, _classBody,
-    storeArrayAccess, wholeParamName, templateSetupContext,
+    um,
+    arrayPropName,
+    imports,
+    propNames,
+    _classBody,
+    storeArrayAccess,
+    wholeParamName,
+    templateSetupContext,
   )
   if (!result) return []
   return [result.itemPropsMethod]
@@ -238,29 +244,17 @@ export function generateComponentArrayResult(
   // Constructor init: this._todosItems = (store.todos ?? []).map((opt, __k) => this.__child(Ctor, this.__itemProps_todos(opt), key))
   const mapParams: t.Identifier[] = [t.identifier('opt')]
   if (indexVar || !itemIdProp) mapParams.push(t.identifier('__k'))
-  const childCall = t.callExpression(
-    t.memberExpression(t.thisExpression(), t.identifier('__child')),
-    [
-      t.identifier(comp.componentTag),
-      t.cloneNode(itemPropsCall, true),
-      t.cloneNode(keyExpr, true),
-    ],
-  )
+  const childCall = t.callExpression(t.memberExpression(t.thisExpression(), t.identifier('__child')), [
+    t.identifier(comp.componentTag),
+    t.cloneNode(itemPropsCall, true),
+    t.cloneNode(keyExpr, true),
+  ])
   const mapCallback = t.arrowFunctionExpression(mapParams, childCall)
   const nullishCoalesce = t.logicalExpression('??', t.cloneNode(arrAccessExpr, true), t.arrayExpression([]))
-  const parenthesized = t.parenthesizedExpression
-    ? t.parenthesizedExpression(nullishCoalesce)
-    : nullishCoalesce
-  const mapCallExpr = t.callExpression(
-    t.memberExpression(parenthesized, t.identifier('map')),
-    [mapCallback],
-  )
+  const parenthesized = t.parenthesizedExpression ? t.parenthesizedExpression(nullishCoalesce) : nullishCoalesce
+  const mapCallExpr = t.callExpression(t.memberExpression(parenthesized, t.identifier('map')), [mapCallback])
   const constructorInit = t.expressionStatement(
-    t.assignmentExpression(
-      '=',
-      t.memberExpression(t.thisExpression(), t.identifier(itemsName)),
-      mapCallExpr,
-    ),
+    t.assignmentExpression('=', t.memberExpression(t.thisExpression(), t.identifier(itemsName)), mapCallExpr),
   )
 
   return {
