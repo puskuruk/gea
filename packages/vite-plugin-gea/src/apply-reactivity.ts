@@ -2056,10 +2056,12 @@ export function applyStaticReactivity(
               const mapReplaceExpr = storeArrayAccess
                 ? t.memberExpression(t.identifier(storeArrayAccess.storeVar), t.identifier(storeArrayAccess.propName))
                 : computationExpr
-              const wasReplaced = replaceMapWithComponentArrayItems(
-                templateMethod,
+              const itemsArrName = getComponentArrayItemsName(arrayPropName)
+              const wasReplaced = replaceMapWithComponentArrayItems(templateMethod, mapReplaceExpr, itemsArrName)
+              replaceMapWithComponentArrayItemsInConditionalSlots(
+                analysis.conditionalSlots || [],
                 mapReplaceExpr,
-                getComponentArrayItemsName(arrayPropName),
+                itemsArrName,
               )
               // When the .map() lives inside a child component's children prop
               // (not directly in template), it won't be replaced. Schedule a
@@ -2381,13 +2383,17 @@ export function applyStaticReactivity(
               })
             })
 
-            // Consolidate map sync observers: when multiple observers for the
-            // same delegate+store combination exist, keep only the shortest
-            // path prefix.  The store's notification system walks down the path
-            // tree, so observing ["tasks"] already fires on any descendant
-            // change (e.g. tasks.*.title).  Registering deeper paths is
-            // redundant work — extra observer nodes, extra handler invocations,
-            // all calling the same __geaSyncMap delegate.
+            // Map sync observers: resolve store getters to underlying field paths, then
+            // register one handler per resolved path.  A getter like `folderEmails` may
+            // depend on several sibling fields (`emails`, `activeFolder`, …); each must
+            // subscribe to the same __geaSyncMap delegate.  Older logic keyed only by
+            // store+delegate and kept the shortest path, which dropped sibling deps when
+            // they had the same length (e.g. kept `emails` but not `activeFolder`).
+            //
+            // When the same delegate receives multiple observer rows where one path is a
+            // strict prefix of another, the store still notifies on the shorter path for
+            // nested mutations — duplicate handlers are harmless but rare here because
+            // we key by full resolved path.
             const consolidatedMapSync = new Map<string, (typeof mapSyncObservers)[0]>()
             for (const obs of mapSyncObservers) {
               // Resolve getters to their underlying dep paths first
@@ -2400,11 +2406,8 @@ export function applyStaticReactivity(
                 }
               }
               for (const rp of resolvedPaths) {
-                const groupKey = `${obs.storeVar}:${obs.delegateName}`
-                const existing = consolidatedMapSync.get(groupKey)
-                if (!existing || rp.length < existing.pathParts.length) {
-                  consolidatedMapSync.set(groupKey, { ...obs, pathParts: rp })
-                }
+                const groupKey = `${obs.storeVar}:${obs.delegateName}:${rp.join('_')}`
+                consolidatedMapSync.set(groupKey, { ...obs, pathParts: rp })
               }
             }
             for (const obs of consolidatedMapSync.values()) {
@@ -3013,6 +3016,7 @@ function replaceMapWithComponentArrayItems(
   templateMethod: t.ClassMethod,
   arrayExpr: t.Expression | undefined,
   itemsName: string,
+  opts?: { slotBranch?: boolean },
 ): boolean {
   if (!arrayExpr || !t.isBlockStatement(templateMethod.body)) return false
   const tempProg = t.program([
@@ -3052,16 +3056,46 @@ function replaceMapWithComponentArrayItems(
         toReplace = path.parentPath.parentPath as NodePath<t.CallExpression>
       }
 
-      // Replace with `this._items.join('')`
-      // so the template stringifies the pre-built instances
-      const itemsAccess = t.memberExpression(t.thisExpression(), t.identifier(itemsName))
-      const joinCall = t.callExpression(t.memberExpression(itemsAccess, t.identifier('join')), [t.stringLiteral('')])
-
-      toReplace.replaceWith(joinCall)
+      // Main template: join pre-built instances. Conditional-slot branch: empty —
+      // __geaPatchCond reinjects slot HTML; join would duplicate __observeList rows
+      // (examples/email-client Sent → label → Inbox).
+      const replacement = opts?.slotBranch
+        ? t.stringLiteral('')
+        : t.callExpression(
+            t.memberExpression(t.memberExpression(t.thisExpression(), t.identifier(itemsName)), t.identifier('join')),
+            [t.stringLiteral('')],
+          )
+      toReplace.replaceWith(replacement)
       replaced = true
     },
   })
   return replaced
+}
+
+/** Conditional-slot branches are separate AST fragments; rewrite `.map()` there too. */
+function replaceMapWithComponentArrayItemsInConditionalSlots(
+  slots: import('./ir').ConditionalSlot[],
+  arrayExpr: t.Expression | undefined,
+  itemsName: string,
+): void {
+  if (!arrayExpr || slots.length === 0) return
+  for (const slot of slots) {
+    for (const key of ['truthyHtmlExpr', 'falsyHtmlExpr'] as const) {
+      const expr = slot[key]
+      if (!expr) continue
+      const fakeMethod = t.classMethod(
+        'method',
+        t.identifier('__tmpSlotMapReplace'),
+        [t.identifier('__p')],
+        t.blockStatement([t.returnStatement(t.cloneNode(expr, true))]),
+      )
+      replaceMapWithComponentArrayItems(fakeMethod, arrayExpr, itemsName, { slotBranch: true })
+      const ret = fakeMethod.body.body[0]
+      if (t.isReturnStatement(ret) && ret.argument) {
+        slot[key] = ret.argument
+      }
+    }
+  }
 }
 
 function inlineIntoConstructor(classBody: t.ClassBody, statements: t.Statement[]): void {

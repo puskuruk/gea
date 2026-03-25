@@ -950,7 +950,10 @@ export default class Component extends Store {
       }
     }
 
-    if (items.length > prev.length) {
+    // Do not use the append-only fast path when prev is empty: the container may still
+    // hold non-list UI from a ternary branch (e.g. `.list-empty` while map length was 0).
+    // Appending would leave that placeholder and duplicate rows after the next sync.
+    if (items.length > prev.length && prev.length > 0) {
       let appendOk = true
       for (let j = 0; j < prev.length; j++) {
         if (itemKey(prev[j]) !== itemKey(items[j])) {
@@ -996,8 +999,10 @@ export default class Component extends Store {
     }
 
     c.__geaPrev = items.slice()
-    let oldCount: number = c.__geaCount
-    if (oldCount == null) {
+    let oldCount: number | undefined = c.__geaCount
+    // __geaCount can be 0 while the DOM still has non-map nodes (e.g. a ternary empty-state
+    // branch). Recount from the live tree so we clear them before inserting mapped rows.
+    if (oldCount == null || (oldCount === 0 && container.firstChild)) {
       oldCount = 0
       for (let n: ChildNode | null = container.firstChild; n; n = n.nextSibling) {
         if (n.nodeType === 1) oldCount++

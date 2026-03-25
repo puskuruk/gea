@@ -730,6 +730,34 @@ describe('Component – __geaSyncItems', () => {
     s.__geaSyncItems(list, ['x', 'y'], mkItem)
     assert.equal((list as any).__geaPrev.length, 2)
   })
+
+  it('after empty-list placeholder, growing from zero removes placeholder and does not leave extra siblings', () => {
+    class S extends Component {
+      template() {
+        return '<div></div>'
+      }
+    }
+    const s = new S()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    s.render(container)
+    const list = document.createElement('div')
+    s.element_!.appendChild(list)
+    const empty = document.createElement('div')
+    empty.className = 'list-empty'
+    empty.textContent = 'No items'
+    list.appendChild(empty)
+    ;(list as any).__geaPrev = []
+    ;(list as any).__geaCount = 0
+    s.__geaSyncItems(list, ['a', 'b', 'c'], mkItem)
+    assert.equal(list.querySelectorAll('[data-gea-item-id]').length, 3)
+    assert.equal(
+      list.querySelectorAll('.list-empty').length,
+      0,
+      'ternary empty branch must not remain when items appear',
+    )
+    assert.equal(list.children.length, 3)
+  })
 })
 
 describe('Component – __geaCloneItem', () => {
