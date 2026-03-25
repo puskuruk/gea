@@ -99,10 +99,18 @@ jobs:
       - name: Find e2e test projects
         id: find
         run: |
-          # Get all available spec files
+          # Get project names defined in the Playwright config (source of truth)
+          config_projects=$(grep -oP "name:\s*'[^']+'" tests/e2e/playwright.config.ts \
+            | sed "s/name: *'//;s/'$//" \
+            | jq -R -s -c 'split("\n") | map(select(. != ""))')
+
+          # Get all available spec files, then intersect with config projects
+          # This prevents orphan spec files from creating impossible matrix jobs
           all_projects=$(find tests/e2e -maxdepth 1 -name '*.spec.ts' -printf '%f\n' \
             | sed 's/\.spec\.ts$//' \
-            | jq -R -s -c 'split("\n") | map(select(. != ""))')
+            | jq -R -s -c 'split("\n") | map(select(. != ""))' \
+            | jq -c --argjson cfg "$config_projects" \
+              '[.[] | select(. as $s | $cfg | index($s))]')
 
           requested='${{ needs.changes.outputs.projects }}'
 
