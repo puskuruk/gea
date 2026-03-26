@@ -206,6 +206,9 @@ export function resolvePath(
     }
     if (stateRefs.has(expr.name)) {
       const ref = stateRefs.get(expr.name)!
+      if (ref.kind === 'derived') {
+        return { parts: null }
+      }
       if (ref.kind === 'local-destructured' && ref.propName) {
         return { parts: [ref.propName] }
       }

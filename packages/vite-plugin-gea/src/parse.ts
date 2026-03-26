@@ -22,12 +22,13 @@ export interface ParseResult {
 }
 
 export interface StateRefMeta {
-  kind: 'local' | 'imported' | 'imported-destructured' | 'local-destructured' | 'store-alias'
+  kind: 'local' | 'imported' | 'imported-destructured' | 'local-destructured' | 'store-alias' | 'derived'
   source?: string
   storeVar?: string
   propName?: string
   getterDeps?: Map<string, import('./ir.ts').PathParts[]>
   reactiveFields?: Set<string>
+  initExpression?: t.Expression
 }
 
 export function parseSource(code: string): ParseResult | null {
@@ -230,5 +231,48 @@ export function collectStateReferences(
     },
   })
 
+  // Second pass: collect derived consts inside class methods whose
+  // initializers transitively reference known state refs.
+  // These are patterns like `const issueType = issue.type || 'task'`
+  // where `issue` is a destructured store variable.
+  const candidates = new Map<string, t.Expression>()
+  traverse(ast, {
+    VariableDeclarator(path: NodePath<t.VariableDeclarator>) {
+      if (!path.node.init || !t.isIdentifier(path.node.id)) return
+      if (stateRefs.has(path.node.id.name)) return
+      const classMethod = path.findParent((p: NodePath) => t.isClassMethod(p.node))
+      if (!classMethod) return
+      candidates.set(path.node.id.name, t.cloneNode(path.node.init, true))
+    },
+  })
+
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const [name, init] of candidates) {
+      if (stateRefs.has(name)) continue
+      if (expressionReferencesStateRefs(init, stateRefs)) {
+        stateRefs.set(name, { kind: 'derived', initExpression: init })
+        candidates.delete(name)
+        changed = true
+      }
+    }
+  }
+
   return stateRefs
+}
+
+function expressionReferencesStateRefs(expr: t.Node, stateRefs: Map<string, StateRefMeta>): boolean {
+  if (t.isIdentifier(expr) && stateRefs.has(expr.name)) return true
+  for (const key of t.VISITOR_KEYS[expr.type] || []) {
+    const child = (expr as any)[key]
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        if (item && typeof item === 'object' && item.type && expressionReferencesStateRefs(item, stateRefs)) return true
+      }
+    } else if (child && typeof child === 'object' && child.type) {
+      if (expressionReferencesStateRefs(child, stateRefs)) return true
+    }
+  }
+  return false
 }

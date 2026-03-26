@@ -75,15 +75,22 @@ function rewriteStateRefs(expr: t.Expression, stateRefs: Map<string, StateRefMet
   traverse(prog, {
     noScope: true,
     Identifier(path: NodePath<t.Identifier>) {
-      if (path.parentPath && t.isMemberExpression(path.parentPath.node) && path.parentPath.node.property === path.node)
+      if (
+        path.parentPath &&
+        t.isMemberExpression(path.parentPath.node) &&
+        path.parentPath.node.property === path.node &&
+        !path.parentPath.node.computed
+      )
         return
       if (!stateRefs.has(path.node.name)) return
       const ref = stateRefs.get(path.node.name)!
-      if (ref.kind === 'local') {
+      if (ref.kind === 'derived' && ref.initExpression) {
+        const inlined = rewriteStateRefs(t.cloneNode(ref.initExpression, true), stateRefs)
+        path.replaceWith(inlined)
+        path.skip()
+      } else if (ref.kind === 'local') {
         path.replaceWith(t.thisExpression())
-      } else if (ref.kind === 'imported-destructured' && ref.storeVar && ref.propName) {
-        // Destructured store vars like `const { totalPrice } = store`
-        // must be rewritten to `store.__store.totalPrice` in observer methods.
+      } else if ((ref.kind === 'imported-destructured' || ref.kind === 'store-alias') && ref.storeVar && ref.propName) {
         path.replaceWith(
           t.memberExpression(
             t.memberExpression(t.identifier(ref.storeVar), t.identifier('__store')),
