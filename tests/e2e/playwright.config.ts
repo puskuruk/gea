@@ -46,6 +46,7 @@ const examples: ExampleDef[] = [
   },
   { name: 'runtime-only', port: 5309 },
   { name: 'runtime-only-jsx', port: 5310 },
+  { name: 'ssr-router-simple', port: 5311, dir: 'ssr/router-simple' },
 ]
 
 const activeExamples = targetProject ? examples.filter((e) => e.name === targetProject) : examples

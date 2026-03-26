@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
-import { geaPlugin } from '../../../packages/vite-plugin-gea/index.ts'
+import { geaPlugin } from '../../../packages/vite-plugin-gea/src/index.ts'
 import { geaSSR } from '../../../packages/gea-ssr/src/vite.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
