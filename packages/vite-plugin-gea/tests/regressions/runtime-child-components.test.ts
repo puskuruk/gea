@@ -704,6 +704,54 @@ test('children prop update must render as HTML, not textContent', async () => {
   }
 })
 
+test('Link with plain text children renders anchor content, not raw template expression', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-link-text-children`
+    const [{ default: Component }] = await Promise.all([import(`../../../gea/src/lib/base/component.tsx?${seed}`)])
+    const { default: Link } = await import(`../../../gea/src/lib/router/link.ts?${seed}`)
+
+    const Home = await compileJsxComponent(
+      `
+        import { Component, Link } from '@geajs/core'
+
+        export default class Home extends Component {
+          template() {
+            return (
+              <div>
+                Home | <Link to="/">Test</Link>
+              </div>
+            )
+          }
+        }
+      `,
+      '/virtual/HomeWithLink.jsx',
+      'Home',
+      { Component, Link },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const view = new Home()
+    view.render(root)
+    await flushMicrotasks()
+
+    const anchor = view.el.querySelector('a') as HTMLAnchorElement | null
+    assert.ok(anchor, 'Link must render as an <a> element')
+    assert.equal(anchor.getAttribute('href'), '/')
+    assert.equal(anchor.textContent, 'Test')
+    assert.ok(!view.el.innerHTML.includes('${'), 'rendered HTML must not contain raw template expressions')
+    assert.ok(!view.el.innerHTML.includes('this._link'), 'rendered HTML must not contain this._link literal')
+
+    view.dispose()
+    await flushMicrotasks()
+  } finally {
+    restoreDom()
+  }
+})
+
 test('Link child component must not collide with native <link> tag', async () => {
   const restoreDom = installDom()
 
