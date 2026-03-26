@@ -10,10 +10,7 @@
 
 export type JsonPrimitive = string | number | boolean | null
 
-export type JsonSerializable =
-  | JsonPrimitive
-  | JsonSerializable[]
-  | { [key: string]: JsonSerializable }
+export type JsonSerializable = JsonPrimitive | JsonSerializable[] | { [key: string]: JsonSerializable }
 
 // ── Store types ─────────────────────────────────────────────────────────────
 
@@ -47,7 +44,7 @@ export interface GeaComponentInstance<P extends Record<string, unknown> = Record
   rendered_?: boolean
 
   /** Must return an HTML string (or something coercible to string). */
-  template(props: P): string
+  template(props?: P): string
 
   /** Full client-side render into a DOM element. */
   render?(element: Element): void

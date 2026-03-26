@@ -1,8 +1,9 @@
 import Component from '../base/component'
 import type { Router } from './router'
+import type { RouteMap } from './types'
 import Outlet from './outlet'
 
-export default class RouterView extends Component {
+export default class RouterView extends Component<{ router?: Router; routes?: RouteMap }> {
   __isRouterOutlet = true
   _routerDepth = 0
 
