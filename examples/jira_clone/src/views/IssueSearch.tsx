@@ -1,5 +1,6 @@
-import { Component, Link } from '@geajs/core'
+import { Component } from '@geajs/core'
 import projectStore from '../stores/project-store'
+import { router } from '../router'
 import api from '../utils/api'
 import { sortByNewest } from '../utils/javascript'
 import Icon from '../components/Icon'
@@ -47,7 +48,7 @@ export default class IssueSearch extends Component {
           <input
             class="issue-search-input"
             type="text"
-            autofocus
+            autoFocus
             placeholder="Search issues by summary, description..."
             value={this.searchTerm}
             input={(e: any) => this.handleInput(e)}
@@ -59,17 +60,24 @@ export default class IssueSearch extends Component {
           <div class="issue-search-section">
             <div class="issue-search-section-title">Recent Issues</div>
             {recentIssues.map((issue: any) => (
-              <div key={issue.id}>
-                <Link to={`/project/board/issues/${issue.id}`} class="issue-search-item" onNavigate={() => onClose?.()}>
-                  <IssueTypeIcon type={issue.type} size={22} />
-                  <div class="issue-search-item-data">
-                    <div class="issue-search-item-title">{issue.title}</div>
-                    <div class="issue-search-item-id">
-                      {issue.type}-{issue.id}
-                    </div>
+              <a
+                key={issue.id}
+                href={`/project/board/issues/${issue.id}`}
+                class="issue-search-item"
+                click={(e: MouseEvent) => {
+                  e.preventDefault()
+                  onClose?.()
+                  router.push(`/project/board/issues/${issue.id}`)
+                }}
+              >
+                <IssueTypeIcon type={issue.type} size={22} />
+                <div class="issue-search-item-data">
+                  <div class="issue-search-item-title">{issue.title}</div>
+                  <div class="issue-search-item-id">
+                    {issue.type}-{issue.id}
                   </div>
-                </Link>
-              </div>
+                </div>
+              </a>
             ))}
           </div>
         )}
@@ -78,17 +86,24 @@ export default class IssueSearch extends Component {
           <div class="issue-search-section">
             <div class="issue-search-section-title">Matching Issues</div>
             {this.matchingIssues.map((issue: any) => (
-              <div key={issue.id}>
-                <Link to={`/project/board/issues/${issue.id}`} class="issue-search-item" onNavigate={() => onClose?.()}>
-                  <IssueTypeIcon type={issue.type} size={22} />
-                  <div class="issue-search-item-data">
-                    <div class="issue-search-item-title">{issue.title}</div>
-                    <div class="issue-search-item-id">
-                      {issue.type}-{issue.id}
-                    </div>
+              <a
+                key={issue.id}
+                href={`/project/board/issues/${issue.id}`}
+                class="issue-search-item"
+                click={(e: MouseEvent) => {
+                  e.preventDefault()
+                  onClose?.()
+                  router.push(`/project/board/issues/${issue.id}`)
+                }}
+              >
+                <IssueTypeIcon type={issue.type} size={22} />
+                <div class="issue-search-item-data">
+                  <div class="issue-search-item-title">{issue.title}</div>
+                  <div class="issue-search-item-id">
+                    {issue.type}-{issue.id}
                   </div>
-                </Link>
-              </div>
+                </div>
+              </a>
             ))}
           </div>
         )}

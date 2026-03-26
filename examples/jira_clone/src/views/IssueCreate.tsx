@@ -2,18 +2,27 @@ import { Component } from '@geajs/core'
 import projectStore from '../stores/project-store'
 import authStore from '../stores/auth-store'
 import toastStore from '../stores/toast-store'
-import { IssueType, IssueTypeCopy, IssueStatus, IssuePriority, IssuePriorityCopy } from '../constants/issues'
+import {
+  IssueType,
+  IssueTypeCopy,
+  IssueStatus,
+  IssuePriority,
+  IssuePriorityCopy,
+} from '../constants/issues'
+
+type IssueTypeValue = (typeof IssueType)[keyof typeof IssueType]
+type IssuePriorityValue = (typeof IssuePriority)[keyof typeof IssuePriority]
 import { is, generateErrors } from '../utils/validation'
 import { Button, Select } from '@geajs/ui'
 import Spinner from '../components/Spinner'
 
 export default class IssueCreate extends Component {
-  type = IssueType.TASK
+  type: IssueTypeValue = IssueType.TASK
   title = ''
   description = ''
   reporterId = ''
   userIds: string[] = []
-  priority = IssuePriority.MEDIUM
+  priority: IssuePriorityValue = IssuePriority.MEDIUM
   isCreating = false
   errors: Record<string, string> = {}
 
@@ -77,7 +86,7 @@ export default class IssueCreate extends Component {
             value={[this.type]}
             onValueChange={(d: { value: string[] }) => {
               const v = d.value[0]
-              if (v !== undefined) this.type = v
+              if (v !== undefined) this.type = v as IssueTypeValue
             }}
             placeholder="Type"
           />
@@ -147,7 +156,7 @@ export default class IssueCreate extends Component {
             value={[this.priority]}
             onValueChange={(d: { value: string[] }) => {
               const v = d.value[0]
-              if (v !== undefined) this.priority = v
+              if (v !== undefined) this.priority = v as IssuePriorityValue
             }}
             placeholder="Priority"
           />

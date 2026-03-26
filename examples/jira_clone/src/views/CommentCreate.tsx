@@ -66,7 +66,7 @@ export default class CommentCreate extends Component {
             <textarea
               class="textarea"
               placeholder="Add a comment..."
-              autofocus
+              autoFocus
               value={this.body}
               input={(e: any) => {
                 this.body = e.target.value
