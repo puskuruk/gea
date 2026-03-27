@@ -453,13 +453,19 @@ function buildMapEventBody(handler: EventHandler, paramContext: TemplateParamCon
     extractHandlerBody(handler.handlerExpression, paramContext.propNames),
     paramContext,
   )
-  return [
-    ...jsBlockBody`
-      const ${id(itemVar)} = this.${id(helperName)}(e);
-      if (!${id(itemVar)}) { return; }
-    `,
-    ...handlerBody,
-  ]
+  const preamble = jsBlockBody`
+    const ${id(itemVar)} = this.${id(helperName)}(e);
+    if (!${id(itemVar)}) { return; }
+  `
+  if (ctx.indexVariable) {
+    preamble.push(
+      ...jsBlockBody`
+        const __el = e.target.closest('[data-gea-item-id]');
+        const ${id(ctx.indexVariable)} = __el ? Array.prototype.indexOf.call(__el.parentNode.children, __el) : -1;
+      `,
+    )
+  }
+  return [...preamble, ...handlerBody]
 }
 
 function prependDependentSetupStatements(

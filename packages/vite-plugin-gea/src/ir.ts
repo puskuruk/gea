@@ -47,6 +47,7 @@ export interface EventHandler {
     arrayPathParts: PathParts
     itemIdProperty: string
     itemVariable: string
+    indexVariable?: string
     isImportedState: boolean
     storeVar?: string
     itemRefProperty?: string

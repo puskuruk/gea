@@ -329,6 +329,7 @@ export function generateRenderItemMethod(
       arrayPathParts: arrayMap.arrayPathParts || normalizePathParts((arrayMap as any).arrayPath || ''),
       itemIdProperty: arrayMap.itemIdProperty || 'id',
       itemVariable: arrayMap.itemVariable,
+      indexVariable: arrayMap.indexVariable,
       isImportedState: arrayMap.isImportedState || false,
       storeVar: arrayMap.storeVar,
     }
