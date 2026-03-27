@@ -1,5 +1,11 @@
 # @geajs/vite-plugin
 
+## 1.0.12
+
+### Patch Changes
+
+- [`5ad330a`](https://github.com/dashersw/gea/commit/5ad330a25eae09e1c7c84ba39f6730b51d4ad554) Thanks [@dashersw](https://github.com/dashersw)! - Add jsxImportSource support for editor-native JSX type-checking without dedicated plugins
+
 ## 1.0.11
 
 ### Patch Changes
