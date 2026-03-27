@@ -55,6 +55,40 @@ export default defineConfig({
 })
 ```
 
+## TypeScript
+
+Gea provides full JSX type-checking via TypeScript's `jsxImportSource`. Add this to your `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@geajs/core"
+  }
+}
+```
+
+This gives you prop autocompletion, type errors on invalid attributes, and hover types in any TypeScript-aware editor — VS Code, Cursor, Vim, Zed — without framework-specific plugins.
+
+Use `declare props` on class components for typed props:
+
+```tsx
+export default class UserCard extends Component {
+  declare props: { name: string; email: string; onSelect?: () => void }
+
+  template({ name, email, onSelect }: this['props']) {
+    return (
+      <div class="user-card" click={onSelect}>
+        <span>{name}</span>
+        <span>{email}</span>
+      </div>
+    )
+  }
+}
+```
+
+`declare props` defines the accepted JSX attributes — no JavaScript emitted. `: this['props']` on the `template()` parameter is optional but recommended — it types the destructured variables inside the method for full end-to-end type safety.
+
 ## Core Concepts
 
 ### Stores

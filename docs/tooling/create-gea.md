@@ -42,6 +42,7 @@ my-app/
 - **Class component**: `app.tsx` and `counter-panel.tsx` — `template()` returning JSX, reading from the store
 - **Function component**: `counter-note.tsx` — receives `count` as a prop, returns JSX
 - **Vite plugin**: `vite.config.ts` — minimal configuration, everything handled automatically
+- **TypeScript**: `tsconfig.json` — configured with `jsxImportSource: "@geajs/core"` for editor-native JSX type-checking (prop autocompletion, type errors, hover types) without framework-specific plugins
 - **HMR**: edit any file and see changes reflected without a full page reload
 
 ## After Scaffolding

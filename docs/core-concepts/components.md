@@ -114,13 +114,54 @@ Is this state shared across components?
 | `onAfterRenderAsync()` | Called in the next `requestAnimationFrame` after render. |
 | `dispose()` | Removes the component from the DOM, cleans up observers and child components. |
 
+## Typed Props
+
+Use `declare props` to define the shape of a component's props. This gives you full autocompletion and type-checking in any TypeScript-aware editor — no framework-specific plugin required.
+
+```tsx
+import { Component } from '@geajs/core'
+
+export default class UserCard extends Component {
+  declare props: {
+    name: string
+    email: string
+    avatar?: string
+    onSelect?: () => void
+  }
+
+  template({ name, email, avatar, onSelect }: this['props']) {
+    return (
+      <div class="user-card" click={onSelect}>
+        <img src={avatar} alt={name} />
+        <span>{name}</span>
+        <span>{email}</span>
+      </div>
+    )
+  }
+}
+```
+
+Two things make this fully type-safe:
+
+1. **`declare props`** — an ambient TypeScript declaration that tells the type checker the shape of the component's props without emitting any JavaScript. When another component writes `<UserCard`, the editor knows exactly which attributes are valid, which are required, and what types they expect.
+
+2. **`: this['props']`** on the `template()` parameter — optional, but recommended for full type safety. It types the destructured props inside the method body, so `name` is `string`, `onSelect` is `(() => void) | undefined`, etc. Without it, the destructured variables default to `any`.
+
+Function components get the same type-checking through their parameter type:
+
+```tsx
+export default function Badge({ label, count }: { label: string; count: number }) {
+  return <span class="badge">{label}: {count}</span>
+}
+```
+
 ## Properties
 
 | Property | Type | Description |
 | --- | --- | --- |
 | `id` | `string` | Unique component identifier (auto-generated) |
 | `el` | `HTMLElement` | The root DOM element. Created lazily from `template()`. |
-| `props` | `any` | Properties passed to the component |
+| `props` | (typed via `declare props`) | Properties passed to the component |
 | (reactive properties) | `any` | Reactive properties live directly on the instance (inherited from `Store`) |
 | `rendered` | `boolean` | Whether the component has been rendered to the DOM |
 

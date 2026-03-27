@@ -180,13 +180,39 @@ export default class Counter extends Component {
 | `onAfterRenderAsync()` | Next `requestAnimationFrame` after render |
 | `dispose()` | Removes from DOM, cleans up observers and children |
 
+### Typed Props
+
+Use `declare props` for TypeScript type-checking and prop autocompletion:
+
+```tsx
+export default class TodoItem extends Component {
+  declare props: {
+    todo: { id: string; text: string; done: boolean }
+    onToggle: () => void
+    onRemove: () => void
+  }
+
+  template({ todo, onToggle, onRemove }: this['props']) {
+    return (
+      <li>
+        <input type="checkbox" checked={todo.done} change={onToggle} />
+        <span>{todo.text}</span>
+        <button click={onRemove}>x</button>
+      </li>
+    )
+  }
+}
+```
+
+`declare props` defines the component's accepted attributes (no JavaScript emitted). Adding `: this['props']` to the `template()` parameter is optional but recommended — it types the destructured variables inside the method body for full end-to-end type safety.
+
 ### Properties
 
 | Property | Type | Description |
 | --- | --- | --- |
 | `id` | `string` | Unique component identifier (auto-generated) |
 | `el` | `HTMLElement` | Root DOM element (created lazily from `template()`) |
-| `props` | `any` | Properties passed to the component |
+| `props` | (typed via `declare props`) | Properties passed to the component |
 | `rendered` | `boolean` | Whether the component has been rendered |
 
 ### DOM Helpers

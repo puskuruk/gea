@@ -121,6 +121,30 @@ import TodoItem from './todo-item'
 
 If the kebab-case name collides with a reserved HTML tag, the compiler automatically prefixes it with `gea-`. For example, a component named `Link` becomes `gea-link` instead of `link`, and `Label` becomes `gea-label` instead of `label`. This is handled transparently — you always use the PascalCase import name in JSX.
 
+## Type Safety
+
+Gea provides full JSX type-checking via TypeScript's `jsxImportSource` mechanism. This means prop autocompletion, type errors on invalid attributes, and hover-to-inspect types work out of the box in any TypeScript-aware editor — VS Code, Cursor, Vim, Zed, etc. No framework-specific editor plugin is needed.
+
+The type system understands:
+
+- All standard HTML elements and their attributes (inherited from `@types/react`)
+- Gea-specific attributes: `class` (instead of `className`), `for` (on `<label>`)
+- Short event names: `click`, `input`, `change`, `keydown`, etc.
+- Component props declared with `declare props` on class components (optionally typed inside `template()` via `: this['props']` for full end-to-end type safety) or parameter types on function components
+
+To enable type-checking, your `tsconfig.json` needs:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@geajs/core"
+  }
+}
+```
+
+Projects scaffolded with `create-gea` have this configured automatically.
+
 ## Unsupported Patterns
 
 The compiler throws clear errors at build time for these patterns:

@@ -34,6 +34,21 @@ export default defineConfig({
 })
 ```
 
+## TypeScript Setup
+
+Projects scaffolded with `create-gea` come with TypeScript pre-configured. If you're adding Gea to an existing project, add these settings to your `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@geajs/core"
+  }
+}
+```
+
+This enables full JSX type-checking — prop autocompletion, type errors on invalid attributes, and hover types — in any TypeScript-aware editor, without needing a framework-specific plugin.
+
 ## Create a Store
 
 Stores hold shared application state. Extend `Store`, declare reactive properties as class fields, add methods, and export a singleton instance.

@@ -78,7 +78,9 @@ The plugin injects HMR code that:
 
 ### TypeScript Integration
 
-When a `tsconfig.json` is detected, the plugin adds `gea-env.d.ts` to the `compilerOptions.types` array, providing JSX type definitions.
+Gea provides JSX type-checking via TypeScript's `jsxImportSource` mechanism. When your `tsconfig.json` includes `"jsx": "react-jsx"` and `"jsxImportSource": "@geajs/core"`, editors get full prop autocompletion, type errors on invalid attributes, and hover types — without any framework-specific plugin.
+
+The plugin also adds `gea-env.d.ts` to the `compilerOptions.types` array for additional type support.
 
 ### Virtual Module
 
