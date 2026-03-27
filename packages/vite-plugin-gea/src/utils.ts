@@ -30,10 +30,42 @@ export function camelToKebab(name: string): string {
 }
 
 /**
+ * Returns true when `expr` is guaranteed to evaluate to a string (never null/undefined).
+ * Avoids wrapping known-string expressions in redundant `expr != null ? String(expr) : ""`.
+ */
+function isAlwaysStringExpression(expr: t.Expression): boolean {
+  if (t.isStringLiteral(expr)) return true
+  if (t.isTemplateLiteral(expr)) return true
+  if (t.isConditionalExpression(expr)) {
+    return isAlwaysStringExpression(expr.consequent as t.Expression) && isAlwaysStringExpression(expr.alternate as t.Expression)
+  }
+  if (t.isLogicalExpression(expr) && expr.operator === '??') {
+    return isAlwaysStringExpression(expr.right as t.Expression)
+  }
+  return false
+}
+
+/** Returns true when the expression's string value cannot contain leading/trailing whitespace. */
+function isWhitespaceFree(expr: t.Expression): boolean {
+  if (t.isStringLiteral(expr)) return expr.value === expr.value.trim()
+  if (t.isConditionalExpression(expr)) {
+    return isWhitespaceFree(expr.consequent as t.Expression) && isWhitespaceFree(expr.alternate as t.Expression)
+  }
+  return false
+}
+
+/**
  * Coerce a dynamic `class` expression to string (`expr != null ? String(expr) : ''`) then `.trim()`.
  * Template literals like `base ${cond ? 'x' : ''}` often leave a trailing space when the branch is empty.
+ * When the expression is known to always produce a trimmed string, returns it as-is.
  */
 export function buildTrimmedClassValueExpression(expr: t.Expression): t.Expression {
+  if (isAlwaysStringExpression(expr) && isWhitespaceFree(expr)) return expr
+
+  if (isAlwaysStringExpression(expr)) {
+    return t.callExpression(t.memberExpression(t.cloneNode(expr, true), t.identifier('trim')), [])
+  }
+
   const forCompare = t.cloneNode(expr, true) as t.Expression
   const forString = t.cloneNode(expr, true) as t.Expression
   const coerced = t.conditionalExpression(
