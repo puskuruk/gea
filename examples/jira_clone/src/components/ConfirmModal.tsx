@@ -1,5 +1,6 @@
 import { Component } from '@geajs/core'
-import { Dialog, Button } from '@geajs/ui'
+import Button from '@geajs/ui/button'
+import Dialog from '@geajs/ui/dialog'
 
 export default class ConfirmModal extends Component {
   isOpen = false

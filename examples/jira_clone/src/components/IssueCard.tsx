@@ -2,7 +2,7 @@ import { Component } from '@geajs/core'
 import { router } from '../router'
 import IssueTypeIcon from './IssueTypeIcon'
 import IssuePriorityIcon from './IssuePriorityIcon'
-import { Avatar } from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
 
 export default class IssueCard extends Component {
   handleClick() {

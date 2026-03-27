@@ -1,6 +1,7 @@
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
+import { geaViteAliases } from '../shared/vite-config-base'
 import { geaPlugin } from '../../packages/vite-plugin-gea/src/index.ts'
 import tailwindcss from 'tailwindcss'
 import autoprefixer from 'autoprefixer'
@@ -27,10 +28,7 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      '@geajs/core': resolve(__dirname, '../../packages/gea/src'),
-      '@geajs/ui': resolve(__dirname, '../../packages/gea-ui/src'),
-    },
+    alias: geaViteAliases(__dirname),
   },
   build: {
     outDir: resolve(__dirname, '../../docs/public/gea-ui-showcase'),

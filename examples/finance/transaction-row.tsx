@@ -1,5 +1,6 @@
 import { Component } from '@geajs/core'
-import { Badge, ToastStore } from '@geajs/ui'
+import Badge from '@geajs/ui/badge'
+import { ToastStore } from '@geajs/ui/toast'
 import store, { CATEGORY_COLORS } from './store'
 import type { Transaction } from './store'
 

@@ -1,4 +1,4 @@
-import { ToastStore } from '@geajs/ui'
+import { ToastStore } from '@geajs/ui/toast'
 
 /** Thin adapter so call sites keep `toastStore.success(title)` / `toastStore.error(err)`. */
 const toastStore = {

@@ -15,9 +15,14 @@
       "import": "./dist/index.mjs"
     },
     "./style.css": "./dist/theme.css",
+    "./styles/theme.css": "./dist/theme.css",
     "./tailwind-preset": {
       "types": "./dist/tailwind-preset.d.mts",
       "import": "./dist/tailwind-preset.mjs"
+    },
+    "./*": {
+      "types": "./dist/*.d.mts",
+      "import": "./dist/*.mjs"
     }
   },
   "repository": {

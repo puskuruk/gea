@@ -1,5 +1,7 @@
 import { Component } from '@geajs/core'
-import { Avatar, Button, Separator } from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
+import Button from '@geajs/ui/button'
+import Separator from '@geajs/ui/separator'
 import store from './store'
 import MessageBubble from './message-bubble'
 

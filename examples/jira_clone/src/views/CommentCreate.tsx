@@ -1,7 +1,8 @@
 import { Component } from '@geajs/core'
 import issueStore from '../stores/issue-store'
 import authStore from '../stores/auth-store'
-import { Avatar, Button } from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
+import Button from '@geajs/ui/button'
 import Spinner from '../components/Spinner'
 
 export default class CommentCreate extends Component {

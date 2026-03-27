@@ -1,5 +1,7 @@
 import { Component } from '@geajs/core'
-import { Button, Input, Label } from '@geajs/ui'
+import Button from '@geajs/ui/button'
+import Input from '@geajs/ui/input'
+import Label from '@geajs/ui/label'
 import store from './store'
 
 export default class CheckoutDialog extends Component {

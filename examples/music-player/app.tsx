@@ -1,5 +1,6 @@
 import { Component, router } from '@geajs/core'
-import { Badge, Separator } from '@geajs/ui'
+import Badge from '@geajs/ui/badge'
+import Separator from '@geajs/ui/separator'
 import store from './store'
 import TrackRow from './track-row'
 import NowPlayingBar from './now-playing-bar'

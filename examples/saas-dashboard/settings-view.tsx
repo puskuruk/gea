@@ -1,18 +1,12 @@
 import { Component } from '@geajs/core'
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  Progress,
-  Separator,
-  Switch,
-  Tabs,
-  ToastStore,
-} from '@geajs/ui'
+import Badge from '@geajs/ui/badge'
+import Button from '@geajs/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@geajs/ui/card'
+import Progress from '@geajs/ui/progress'
+import Separator from '@geajs/ui/separator'
+import Switch from '@geajs/ui/switch'
+import Tabs from '@geajs/ui/tabs'
+import { ToastStore } from '@geajs/ui/toast'
 import store from './store'
 
 export default class SettingsView extends Component {

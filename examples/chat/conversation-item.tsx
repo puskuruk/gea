@@ -1,5 +1,6 @@
 import { Component, router } from '@geajs/core'
-import { Avatar, Badge } from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
+import Badge from '@geajs/ui/badge'
 import store from './store'
 
 export default class ConversationItem extends Component {

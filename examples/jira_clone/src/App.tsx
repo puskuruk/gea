@@ -1,5 +1,5 @@
 import { Component, Outlet } from '@geajs/core'
-import { Toaster } from '@geajs/ui'
+import { Toaster } from '@geajs/ui/toast'
 import { router } from './router'
 import authStore from './stores/auth-store'
 import projectStore from './stores/project-store'

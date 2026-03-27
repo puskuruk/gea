@@ -1,48 +1,38 @@
 import { Component } from '@geajs/core'
-import {
-  Button,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-  Input,
-  Textarea,
-  Label,
-  Badge,
-  Alert,
-  AlertTitle,
-  AlertDescription,
-  Separator,
-  Skeleton,
-  Tabs,
-  Dialog,
-  Menu,
-  Popover,
-  Tooltip,
-  HoverCard,
-  Accordion,
-  Collapsible,
-  Combobox,
-  Toaster,
-  ToastStore,
-  Clipboard,
-  ToggleGroup,
-  Pagination,
-  RatingGroup,
-  Select,
-  Switch,
-  Checkbox,
-  RadioGroup,
-  Slider,
-  NumberInput,
-  PinInput,
-  TagsInput,
-  Progress,
-  Avatar,
-  FileUpload,
-} from '@geajs/ui'
+import Accordion from '@geajs/ui/accordion'
+import { Alert, AlertTitle, AlertDescription } from '@geajs/ui/alert'
+import Avatar from '@geajs/ui/avatar'
+import Badge from '@geajs/ui/badge'
+import Button from '@geajs/ui/button'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@geajs/ui/card'
+import Checkbox from '@geajs/ui/checkbox'
+import Clipboard from '@geajs/ui/clipboard'
+import Collapsible from '@geajs/ui/collapsible'
+import Combobox from '@geajs/ui/combobox'
+import Dialog from '@geajs/ui/dialog'
+import FileUpload from '@geajs/ui/file-upload'
+import HoverCard from '@geajs/ui/hover-card'
+import Input from '@geajs/ui/input'
+import Label from '@geajs/ui/label'
+import Menu from '@geajs/ui/menu'
+import NumberInput from '@geajs/ui/number-input'
+import Pagination from '@geajs/ui/pagination'
+import PinInput from '@geajs/ui/pin-input'
+import Popover from '@geajs/ui/popover'
+import Progress from '@geajs/ui/progress'
+import RadioGroup from '@geajs/ui/radio-group'
+import RatingGroup from '@geajs/ui/rating-group'
+import Select from '@geajs/ui/select'
+import Separator from '@geajs/ui/separator'
+import Skeleton from '@geajs/ui/skeleton'
+import Slider from '@geajs/ui/slider'
+import Switch from '@geajs/ui/switch'
+import Tabs from '@geajs/ui/tabs'
+import TagsInput from '@geajs/ui/tags-input'
+import Textarea from '@geajs/ui/textarea'
+import { Toaster, ToastStore } from '@geajs/ui/toast'
+import ToggleGroup from '@geajs/ui/toggle-group'
+import Tooltip from '@geajs/ui/tooltip'
 
 export default class App extends Component {
   template() {

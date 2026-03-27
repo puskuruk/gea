@@ -9,6 +9,19 @@ import tailwindPreset from '../../packages/gea-ui/src/tailwind-preset.ts'
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const geaUiRoot = resolve(repoRoot, 'packages/gea-ui')
 
+/** Resolves `@geajs/ui/name` to component source so dev only loads used modules. */
+export function geaViteAliases(exampleDir: string) {
+  const packagesDir = resolve(exampleDir, '../../packages')
+  return [
+    { find: '@geajs/core', replacement: resolve(packagesDir, 'gea/src') },
+    {
+      find: /^@geajs\/ui\/([a-z][\w-]*)$/,
+      replacement: resolve(packagesDir, 'gea-ui/src/components/$1'),
+    },
+    { find: '@geajs/ui', replacement: resolve(packagesDir, 'gea-ui/src') },
+  ]
+}
+
 export function createConfig(metaUrl: string, port: number) {
   const __dirname = dirname(fileURLToPath(metaUrl))
   return defineConfig({
@@ -27,10 +40,7 @@ export function createConfig(metaUrl: string, port: number) {
       },
     },
     resolve: {
-      alias: {
-        '@geajs/core': resolve(__dirname, '../../packages/gea/src'),
-        '@geajs/ui': resolve(__dirname, '../../packages/gea-ui/src'),
-      },
+      alias: geaViteAliases(__dirname),
     },
     cacheDir: resolve(__dirname, 'node_modules/.vite'),
     optimizeDeps: {

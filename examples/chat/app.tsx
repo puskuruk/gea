@@ -1,5 +1,6 @@
 import { Component, router, RouterView } from '@geajs/core'
-import { Badge, Separator } from '@geajs/ui'
+import Badge from '@geajs/ui/badge'
+import Separator from '@geajs/ui/separator'
 import store from './store'
 import ConversationItem from './conversation-item'
 import MessageThread from './message-thread'

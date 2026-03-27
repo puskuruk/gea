@@ -1,5 +1,6 @@
 import { Component } from '@geajs/core'
-import { Slider, Tooltip } from '@geajs/ui'
+import Slider from '@geajs/ui/slider'
+import Tooltip from '@geajs/ui/tooltip'
 import store from './store'
 
 export default class NowPlayingBar extends Component {

@@ -11,7 +11,8 @@ import {
   IssuePriorityCopy,
 } from '../constants/issues'
 import { formatDateTimeConversational } from '../utils/dateTime'
-import { Button, Dialog } from '@geajs/ui'
+import Button from '@geajs/ui/button'
+import Dialog from '@geajs/ui/dialog'
 import Icon from '../components/Icon'
 import IssueTypeIcon from '../components/IssueTypeIcon'
 import IssuePriorityIcon from '../components/IssuePriorityIcon'

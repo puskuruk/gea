@@ -1,11 +1,22 @@
 import { defineConfig } from 'tsdown'
 import { geaPlugin } from '../vite-plugin-gea/src/index'
-import { copyFileSync } from 'node:fs'
+import { copyFileSync, readdirSync } from 'node:fs'
+import { dirname, parse, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const componentsDir = resolve(__dirname, 'src/components')
+const componentEntries = Object.fromEntries(
+  readdirSync(componentsDir)
+    .filter((f) => f.endsWith('.tsx') || f.endsWith('.ts'))
+    .map((f) => [parse(f).name, `src/components/${f}`]),
+)
 
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
     'tailwind-preset': 'src/tailwind-preset.ts',
+    ...componentEntries,
   },
   plugins: [geaPlugin() as any],
   format: 'esm',

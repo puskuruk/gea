@@ -1,5 +1,9 @@
 import { Component } from '@geajs/core'
-import { Avatar, Badge, Button, Separator, ToastStore } from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
+import Badge from '@geajs/ui/badge'
+import Button from '@geajs/ui/button'
+import Separator from '@geajs/ui/separator'
+import { ToastStore } from '@geajs/ui/toast'
 import store, { LABEL_COLORS } from './store'
 
 export default class EmailDetail extends Component {

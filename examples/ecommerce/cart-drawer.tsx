@@ -1,5 +1,6 @@
 import { Component } from '@geajs/core'
-import { Button, Separator } from '@geajs/ui'
+import Button from '@geajs/ui/button'
+import Separator from '@geajs/ui/separator'
 import store from './store'
 
 export default class CartDrawer extends Component {

@@ -1,5 +1,9 @@
 import { Component } from '@geajs/core'
-import { Badge, Button, Card, CardContent, RatingGroup, ToastStore } from '@geajs/ui'
+import Badge from '@geajs/ui/badge'
+import Button from '@geajs/ui/button'
+import { Card, CardContent } from '@geajs/ui/card'
+import RatingGroup from '@geajs/ui/rating-group'
+import { ToastStore } from '@geajs/ui/toast'
 import store from './store'
 import type { Product } from './store'
 

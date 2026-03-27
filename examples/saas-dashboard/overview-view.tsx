@@ -1,5 +1,9 @@
 import { Component } from '@geajs/core'
-import { Avatar, Card, CardContent, CardHeader, CardTitle, CardDescription, Progress, Separator, Tabs } from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@geajs/ui/card'
+import Progress from '@geajs/ui/progress'
+import Separator from '@geajs/ui/separator'
+import Tabs from '@geajs/ui/tabs'
 import store from './store'
 
 export default class OverviewView extends Component {

@@ -2,19 +2,14 @@ import { Component } from '@geajs/core'
 import projectStore from '../stores/project-store'
 import authStore from '../stores/auth-store'
 import toastStore from '../stores/toast-store'
-import {
-  IssueType,
-  IssueTypeCopy,
-  IssueStatus,
-  IssuePriority,
-  IssuePriorityCopy,
-} from '../constants/issues'
+import { IssueType, IssueTypeCopy, IssueStatus, IssuePriority, IssuePriorityCopy } from '../constants/issues'
+import { is, generateErrors } from '../utils/validation'
+import Button from '@geajs/ui/button'
+import Select from '@geajs/ui/select'
+import Spinner from '../components/Spinner'
 
 type IssueTypeValue = (typeof IssueType)[keyof typeof IssueType]
 type IssuePriorityValue = (typeof IssuePriority)[keyof typeof IssuePriority]
-import { is, generateErrors } from '../utils/validation'
-import { Button, Select } from '@geajs/ui'
-import Spinner from '../components/Spinner'
 
 export default class IssueCreate extends Component {
   type: IssueTypeValue = IssueType.TASK

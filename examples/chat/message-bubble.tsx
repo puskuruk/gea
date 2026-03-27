@@ -1,5 +1,5 @@
 import { Component } from '@geajs/core'
-import { Avatar } from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
 import store from './store'
 import type { Message } from './store'
 

@@ -1,25 +1,19 @@
 import { Component } from '@geajs/core'
-import {
-  Button,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  Input,
-  Textarea,
-  Label,
-  Select,
-  Switch,
-  Checkbox,
-  RadioGroup,
-  Slider,
-  NumberInput,
-  PinInput,
-  TagsInput,
-  Separator,
-  FileUpload,
-} from '@geajs/ui'
+import Button from '@geajs/ui/button'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@geajs/ui/card'
+import Checkbox from '@geajs/ui/checkbox'
+import FileUpload from '@geajs/ui/file-upload'
+import Input from '@geajs/ui/input'
+import Label from '@geajs/ui/label'
+import NumberInput from '@geajs/ui/number-input'
+import PinInput from '@geajs/ui/pin-input'
+import RadioGroup from '@geajs/ui/radio-group'
+import Select from '@geajs/ui/select'
+import Separator from '@geajs/ui/separator'
+import Slider from '@geajs/ui/slider'
+import Switch from '@geajs/ui/switch'
+import TagsInput from '@geajs/ui/tags-input'
+import Textarea from '@geajs/ui/textarea'
 
 export default class App extends Component {
   template() {

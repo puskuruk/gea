@@ -1,19 +1,12 @@
 import { Component } from '@geajs/core'
-import {
-  Button,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-  Badge,
-  Progress,
-  Avatar,
-  Tabs,
-  Separator,
-  Skeleton,
-} from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
+import Badge from '@geajs/ui/badge'
+import Button from '@geajs/ui/button'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@geajs/ui/card'
+import Progress from '@geajs/ui/progress'
+import Separator from '@geajs/ui/separator'
+import Skeleton from '@geajs/ui/skeleton'
+import Tabs from '@geajs/ui/tabs'
 
 const stats = [
   { label: 'Total Revenue', value: '$45,231.89', change: '+20.1% from last month', positive: true },
@@ -44,7 +37,9 @@ export default class App extends Component {
         <div class="dashboard-header">
           <div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Dashboard</h1>
-            <p style={{ color: 'hsl(var(--muted-foreground))', fontSize: '0.875rem' }}>Welcome back, here's your overview.</p>
+            <p style={{ color: 'hsl(var(--muted-foreground))', fontSize: '0.875rem' }}>
+              Welcome back, here's your overview.
+            </p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <Badge>Live</Badge>

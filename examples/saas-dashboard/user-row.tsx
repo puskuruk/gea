@@ -1,5 +1,8 @@
 import { Component } from '@geajs/core'
-import { Badge, Button, Avatar, ToastStore } from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
+import Badge from '@geajs/ui/badge'
+import Button from '@geajs/ui/button'
+import { ToastStore } from '@geajs/ui/toast'
 import store from './store'
 import type { User } from './store'
 

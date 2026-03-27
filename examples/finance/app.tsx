@@ -1,17 +1,10 @@
 import { Component, router } from '@geajs/core'
-import {
-  Button,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  Input,
-  Label,
-  Select,
-  Toaster,
-  ToastStore,
-} from '@geajs/ui'
+import Button from '@geajs/ui/button'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@geajs/ui/card'
+import Input from '@geajs/ui/input'
+import Label from '@geajs/ui/label'
+import Select from '@geajs/ui/select'
+import { Toaster, ToastStore } from '@geajs/ui/toast'
 import store, { CATEGORY_COLORS } from './store'
 import type { Category } from './store'
 import TransactionRow from './transaction-row'

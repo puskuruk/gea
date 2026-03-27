@@ -1,5 +1,11 @@
 import { Component } from '@geajs/core'
-import { Badge, Button, Card, CardContent, Input, Label, Select, ToastStore } from '@geajs/ui'
+import Badge from '@geajs/ui/badge'
+import Button from '@geajs/ui/button'
+import { Card, CardContent } from '@geajs/ui/card'
+import Input from '@geajs/ui/input'
+import Label from '@geajs/ui/label'
+import Select from '@geajs/ui/select'
+import { ToastStore } from '@geajs/ui/toast'
 import store from './store'
 import UserRow from './user-row'
 

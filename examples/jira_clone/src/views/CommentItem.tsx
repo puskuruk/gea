@@ -2,7 +2,8 @@ import { Component } from '@geajs/core'
 import issueStore from '../stores/issue-store'
 import projectStore from '../stores/project-store'
 import { formatDateTimeConversational } from '../utils/dateTime'
-import { Avatar, Button } from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
+import Button from '@geajs/ui/button'
 
 export default class CommentItem extends Component {
   isEditing = false

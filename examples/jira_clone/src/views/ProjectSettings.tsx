@@ -4,7 +4,8 @@ import toastStore from '../stores/toast-store'
 import { ProjectCategory, ProjectCategoryCopy } from '../constants/projects'
 import { is, generateErrors } from '../utils/validation'
 import Breadcrumbs from '../components/Breadcrumbs'
-import { Button, Select } from '@geajs/ui'
+import Button from '@geajs/ui/button'
+import Select from '@geajs/ui/select'
 import Spinner from '../components/Spinner'
 
 export default class ProjectSettings extends Component {

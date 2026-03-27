@@ -1,5 +1,6 @@
 import { Component, router } from '@geajs/core'
-import { Avatar, Toaster } from '@geajs/ui'
+import Avatar from '@geajs/ui/avatar'
+import { Toaster } from '@geajs/ui/toast'
 import store from './store'
 import OverviewView from './overview-view'
 import UsersView from './users-view'

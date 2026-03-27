@@ -1,5 +1,5 @@
 import { Component } from '@geajs/core'
-import { Progress } from '@geajs/ui'
+import Progress from '@geajs/ui/progress'
 import store, { CATEGORY_COLORS, BUDGETS } from './store'
 import type { Category } from './store'
 
