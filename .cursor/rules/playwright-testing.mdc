@@ -21,29 +21,9 @@ npx playwright test --config=tests/e2e/playwright.config.ts --project=music-play
 cd examples/music-player && npx playwright test
 ```
 
-## Example ports and commands
+## Dev server ports (dynamic)
 
-All e2e tests use a single config at `tests/e2e/playwright.config.ts`.
-
-| Example         | Port |
-| --------------- | ---- |
-| todo            | 5291 |
-| kanban          | 5292 |
-| router-simple   | 5293 |
-| router-v2       | 5294 |
-| jira-clone      | 5295 |
-| flight-checkin  | 5296 |
-| mobile-showcase | 5297 |
-| saas-dashboard  | 5298 |
-| ecommerce       | 5299 |
-| chat            | 5300 |
-| music-player    | 5301 |
-| finance         | 5302 |
-| email-client    | 5303 |
-| dashboard       | 5304 |
-| forms           | 5305 |
-| showcase        | 5306 |
-| docs            | 5307 |
+All e2e tests use a single config at `tests/e2e/playwright.config.ts`. Ports are **allocated at runtime** (ephemeral TCP ports on `127.0.0.1`), not fixed. The config coordinates the main process and workers via `tests/e2e/.e2e-ports.json` and, when `E2E_PROJECT` is set, `tests/e2e/.e2e-session.json` (both gitignored). Vite is started with `--host 127.0.0.1 --strictPort` so the server stays on the chosen port.
 
 ## Running a subset of examples
 
@@ -54,6 +34,30 @@ npx playwright test --config=tests/e2e/playwright.config.ts --project=music-play
 # Run multiple projects
 npx playwright test --config=tests/e2e/playwright.config.ts --project=todo --project=kanban --project=chat
 ```
+
+## Fast startup locally: `E2E_PROJECT`
+
+`--project` only chooses which **tests** run. It does **not** limit how many dev servers start.
+
+By default (`E2E_PROJECT` unset), the config starts **every** example’s `vite dev` (one process per row in the examples table) so any project can run without extra setup. That makes a single `--project=sheet-editor` run look “stuck” for tens of seconds before the first test—most of that time is booting many Vite servers.
+
+To iterate on **one** example, set `E2E_PROJECT` to its project name so only that app’s `webServer` is registered:
+
+```bash
+E2E_PROJECT=sheet-editor npx playwright test --config=tests/e2e/playwright.config.ts --project=sheet-editor
+```
+
+CI sets `E2E_PROJECT` per matrix job for the same reason.
+
+## Parallelism (`workers`)
+
+Default is **10 workers** locally and **4** on GitHub Actions (many Chromium processes are heavy). Override anytime:
+
+```bash
+E2E_WORKERS=16 npx playwright test --config=tests/e2e/playwright.config.ts
+```
+
+With the full suite, `fullyParallel` is off so tests **in the same spec file** still run in order; multiple workers mainly parallelize **across spec files**.
 
 ## Do Not Modify Example App Code
 

@@ -15,9 +15,25 @@ npx playwright test --config=tests/e2e/playwright.config.ts
 cd examples/chat && npx playwright test
 ```
 
+## Fast startup locally: `E2E_PROJECT`
+
+`--project` only selects which **tests** run; it does not limit how many dev servers start.
+
+With `E2E_PROJECT` unset, the unified config starts **every** example’s Vite dev server so any `--project` works. That makes a single-project run slow to start (many processes + readiness waits).
+
+For one example, set:
+
+```bash
+E2E_PROJECT=sheet-editor npx playwright test --config=tests/e2e/playwright.config.ts --project=sheet-editor
+```
+
+## Workers (`E2E_WORKERS`)
+
+Default is **10** workers locally and **4** on GitHub Actions. Override: `E2E_WORKERS=16 npx playwright test --config=tests/e2e/playwright.config.ts`.
+
 ## Project structure
 
 - Example apps live in `examples/` at the repo root
 - E2E test specs live in `tests/e2e/*.spec.ts`
 - Central config: `tests/e2e/playwright.config.ts`
-- Ports: 5291-5307 (see config for mapping)
+- Dev server ports are **dynamic** (runtime allocation on `127.0.0.1`); see that config for details

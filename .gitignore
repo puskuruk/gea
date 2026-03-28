@@ -5,6 +5,9 @@ dist
 dist-profile
 coverage
 test-results
+tests/e2e/.e2e-ports.json
+tests/e2e/.e2e-ports.lock
+tests/e2e/.e2e-session.json
 docs/.vitepress/dist
 docs/.vitepress/cache
 docs/public/gea-ui-showcase
