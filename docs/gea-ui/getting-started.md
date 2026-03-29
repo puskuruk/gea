@@ -14,9 +14,31 @@ npm install @geajs/core
 
 ## Tailwind CSS Setup
 
-@geajs/ui uses [Tailwind CSS](https://tailwindcss.com/) for styling and ships a preset that defines the design token system (colors, border radius, etc.).
+@geajs/ui uses [Tailwind CSS](https://tailwindcss.com/) **v3** for styling and ships a preset that defines the design token system (colors, border radius, etc.).
 
-### 1. Add the Tailwind Preset
+::: warning
+Tailwind CSS v4 is **not yet supported**. Make sure you install Tailwind CSS v3.
+:::
+
+### 1. Install Tailwind CSS v3
+
+```bash
+npm install -D tailwindcss@3 postcss autoprefixer
+```
+
+Create a `postcss.config.js` in your project root:
+
+```js
+// postcss.config.js
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+```
+
+### 2. Add the Tailwind Preset
 
 ```js
 // tailwind.config.js
@@ -26,7 +48,7 @@ export default {
   presets: [geaPreset],
   content: [
     './src/**/*.{tsx,ts,jsx,js}',
-    './node_modules/@geajs/ui/dist/**/*.js',
+    './node_modules/@geajs/ui/dist/**/*.mjs',
   ],
 }
 ```
@@ -37,7 +59,7 @@ The preset configures:
 - **Border radius** — `lg`, `md`, `sm` tokens tied to a single `--radius` variable.
 - **Dark mode** — enabled via the `dark` class strategy.
 
-### 2. Import the Theme CSS
+### 3. Import the Theme CSS
 
 The theme stylesheet defines the CSS custom properties that the preset references. Import it once in your entry point:
 
@@ -46,15 +68,24 @@ The theme stylesheet defines the CSS custom properties that the preset reference
 import '@geajs/ui/style.css'
 ```
 
-Or in your main CSS file:
+You also need a CSS file that includes Tailwind's directives. Create a `src/style.css` (or similar) and import it in your entry point:
 
 ```css
-@import '@geajs/ui/style.css';
+/* src/style.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 ```
 
-### 3. Include @geajs/ui in Tailwind's Content Paths
+```ts
+// main.ts
+import '@geajs/ui/style.css'
+import './style.css'
+```
 
-Make sure `node_modules/@geajs/ui/dist/**/*.js` is listed in your `content` array (shown above). This allows Tailwind to scan @geajs/ui's component source and include the utility classes they use.
+### 4. Include @geajs/ui in Tailwind's Content Paths
+
+Make sure `node_modules/@geajs/ui/dist/**/*.mjs` is listed in your `content` array (shown above). This allows Tailwind to scan @geajs/ui's component source and include the utility classes they use.
 
 ## Minimal Example
 
