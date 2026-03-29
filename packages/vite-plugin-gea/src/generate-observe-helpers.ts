@@ -153,7 +153,7 @@ export function buildSimpleUpdate(
 
   if (binding.textNodeIndex !== undefined && binding.type === 'text') {
     const idx = t.numericLiteral(binding.textNodeIndex)
-    return js`if (${el}) { const __tn = ${jsExpr`${el}.childNodes[${idx}]`}; if (__tn && __tn.nodeValue !== ${valueExpr}) __tn.nodeValue = ${valueExpr}; }`
+    return js`if (${el}) { let __tn = ${jsExpr`${el}.childNodes[${idx}]`}; if (!__tn || __tn.nodeType !== 3) { __tn = document.createTextNode(${valueExpr}); ${jsExpr`${el}.insertBefore(__tn, ${el}.childNodes[${idx}] || null)`}; } else if (__tn.nodeValue !== ${valueExpr}) { __tn.nodeValue = ${valueExpr}; } }`
   }
 
   if (target === 'textContent' && binding.bindingId && binding.bindingId !== '' && !binding.userIdExpr) {

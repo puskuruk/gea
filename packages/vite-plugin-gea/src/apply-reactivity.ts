@@ -644,31 +644,70 @@ export function applyStaticReactivity(
             const valueExpr = pb.expression && pb.setupStatements ? t.identifier('__boundValue') : t.identifier('value')
             let updateStmt: t.Statement
             if (pb.type === 'text' && pb.textNodeIndex !== undefined) {
+              const tnIdx = t.numericLiteral(pb.textNodeIndex)
               const tnAccess = t.memberExpression(
                 t.memberExpression(t.identifier('__el'), t.identifier('childNodes')),
-                t.numericLiteral(pb.textNodeIndex),
+                t.cloneNode(tnIdx, true),
                 true,
               )
-              updateStmt = t.blockStatement([
-                t.variableDeclaration('const', [t.variableDeclarator(t.identifier('__tn'), tnAccess)]),
-                t.ifStatement(
-                  t.logicalExpression(
-                    '&&',
+              // Check if the node at the expected index is a text node (nodeType 3).
+              // When the initial value is empty the browser may not create a text node,
+              // so we insert one on first update.
+              const notTextNode = t.logicalExpression(
+                '||',
+                t.unaryExpression('!', t.identifier('__tn')),
+                t.binaryExpression(
+                  '!==',
+                  t.memberExpression(t.identifier('__tn'), t.identifier('nodeType')),
+                  t.numericLiteral(3),
+                ),
+              )
+              const insertNewTextNode = t.blockStatement([
+                t.expressionStatement(
+                  t.assignmentExpression(
+                    '=',
                     t.identifier('__tn'),
-                    t.binaryExpression(
-                      '!==',
-                      t.memberExpression(t.identifier('__tn'), t.identifier('nodeValue')),
-                      valueExpr,
-                    ),
-                  ),
-                  t.expressionStatement(
-                    t.assignmentExpression(
-                      '=',
-                      t.memberExpression(t.identifier('__tn'), t.identifier('nodeValue')),
-                      t.cloneNode(valueExpr, true),
+                    t.callExpression(
+                      t.memberExpression(t.identifier('document'), t.identifier('createTextNode')),
+                      [t.cloneNode(valueExpr, true)],
                     ),
                   ),
                 ),
+                t.expressionStatement(
+                  t.callExpression(
+                    t.memberExpression(t.identifier('__el'), t.identifier('insertBefore')),
+                    [
+                      t.identifier('__tn'),
+                      t.logicalExpression(
+                        '||',
+                        t.memberExpression(
+                          t.memberExpression(t.identifier('__el'), t.identifier('childNodes')),
+                          t.cloneNode(tnIdx, true),
+                          true,
+                        ),
+                        t.nullLiteral(),
+                      ),
+                    ],
+                  ),
+                ),
+              ])
+              const updateExisting = t.ifStatement(
+                t.binaryExpression(
+                  '!==',
+                  t.memberExpression(t.identifier('__tn'), t.identifier('nodeValue')),
+                  t.cloneNode(valueExpr, true),
+                ),
+                t.expressionStatement(
+                  t.assignmentExpression(
+                    '=',
+                    t.memberExpression(t.identifier('__tn'), t.identifier('nodeValue')),
+                    t.cloneNode(valueExpr, true),
+                  ),
+                ),
+              )
+              updateStmt = t.blockStatement([
+                t.variableDeclaration('let', [t.variableDeclarator(t.identifier('__tn'), tnAccess)]),
+                t.ifStatement(notTextNode, insertNewTextNode, updateExisting),
               ])
             } else if (pb.type === 'text') {
               const targetProp = pb.propName === 'children' ? 'innerHTML' : 'textContent'
