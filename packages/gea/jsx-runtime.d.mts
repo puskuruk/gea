@@ -1,5 +1,16 @@
-/* eslint-disable @typescript-eslint/no-namespace, @typescript-eslint/no-empty-object-type */
-import type { JSX as ReactJSX, DOMAttributes } from 'react'
+import type { DetailedHTMLProps, JSX as ReactJSX, Ref, SVGProps } from 'react'
+
+/** Gea: `ref={this.field}` assigns the node to an instance field; the field may be typed `T | null`. */
+type GeaWidenRef<P> =
+  P extends DetailedHTMLProps<infer _E, infer T>
+    ? Omit<P, 'ref'> & { ref?: Ref<T> | (T | null) | undefined }
+    : P extends SVGProps<infer T>
+      ? Omit<P, 'ref'> & { ref?: Ref<T> | (T | null) | undefined }
+      : P
+
+type GeaIntrinsicElements = {
+  [K in keyof ReactJSX.IntrinsicElements]: GeaWidenRef<ReactJSX.IntrinsicElements[K]>
+}
 
 /**
  * Gea wires native DOM listeners (see component-manager); events are browser Events, not React synthetics.
@@ -13,6 +24,8 @@ type GeaNativeHandler<E extends globalThis.Event, T = EventTarget> = {
 }['bivarianceHack']
 
 declare module 'react' {
+  // Generic must match React's `LabelHTMLAttributes<T>` for declaration merge (parameter unused here).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface LabelHTMLAttributes<T> {
     for?: string | undefined
   }
@@ -60,7 +73,7 @@ declare module 'react' {
 
 export declare namespace JSX {
   export type Element = string
-  export interface IntrinsicElements extends ReactJSX.IntrinsicElements {}
+  export interface IntrinsicElements extends GeaIntrinsicElements {}
   export interface IntrinsicAttributes extends ReactJSX.IntrinsicAttributes {}
   export interface ElementAttributesProperty {
     props: {}

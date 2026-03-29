@@ -315,7 +315,7 @@ describe('applyListChanges', () => {
       assert.deepEqual(getTexts(container), ['x', 'y'])
     })
 
-    it('uses bulk render path for root replacements when render is available', () => {
+    it('uses create path for root replacements even when render is available', () => {
       const container = document.createElement('div')
       const changes: StoreChange[] = [
         {
@@ -340,7 +340,7 @@ describe('applyListChanges', () => {
 
       applyListChanges(container, ['x', 'y'], changes, config)
       assert.deepEqual(getTexts(container), ['x', 'y'])
-      assert.equal(createCalls, 0)
+      assert.equal(createCalls, 2)
     })
 
     it('patches rows in place for same-key root replacements when patchRow/getKey are available', () => {

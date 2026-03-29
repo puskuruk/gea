@@ -1,4 +1,5 @@
 import getUid from './uid'
+import { Store } from '../store'
 
 interface GeaEvent extends Event {
   targetEl?: EventTarget | Node | null
@@ -129,9 +130,12 @@ interface ComponentLike {
   constructor: Function & { prototype: any; __geaTagName?: string; displayName?: string; name: string }
   id: string
   el?: HTMLElement
+  /** Component root when mounted; prefer over `el` for hot paths (avoids forcing render). */
+  element_?: HTMLElement | null
   rendered: boolean
   render(rootEl?: any, opt_index?: number): boolean
   __handleItemHandler?: (itemId: string, e: Event) => any
+  events?: Record<string, Record<string, ((this: ComponentLike, e: Event, ...args: any[]) => any) | undefined>>
   [key: string]: any
 }
 
@@ -177,13 +181,42 @@ export default class ComponentManager {
     e.targetEl = e.target
 
     const comps = this.getParentComps(e.target as HTMLElement)
+    const target = e.target as Node
+
+    const bubbleStepMap = new Map<Node, number>()
+    let si = 0
+    for (let n: Node | null = target; n && n !== document.body; n = n.parentNode) {
+      bubbleStepMap.set(n, si++)
+    }
+
+    const compCount = comps.length
+    const eventsByComp: Array<ComponentLike['events'] | undefined> = new Array(compCount)
+    const rootSteps: Array<number | undefined> = new Array(compCount)
+    for (let i = 0; i < compCount; i++) {
+      const c = comps[i]
+      eventsByComp[i] = c?.events
+      if (!c) {
+        rootSteps[i] = undefined
+        continue
+      }
+      const root =
+        (c.element_ as HTMLElement | undefined | null) ??
+        (typeof document !== 'undefined' ? document.getElementById(c.id) : null)
+      rootSteps[i] = root ? bubbleStepMap.get(root) : undefined
+    }
+
     let broken = false
+    let step = 0
+    e.targetEl = e.target
 
     do {
       if (broken || e.cancelBubble) break
 
-      broken = this.callHandlers(comps, e)
+      broken = this.callHandlers(comps, eventsByComp, e, rootSteps, step)
+      step++
     } while ((e.targetEl = (e.targetEl as Node).parentNode) && e.targetEl != document.body)
+
+    Store.flushAll()
   }
 
   onLoad(): void {
@@ -235,17 +268,36 @@ export default class ComponentManager {
     const parentComps = []
 
     if ((ids = node.parentComps)) {
-      ids.split(',').forEach((id) => parentComps.push(this.componentRegistry[id]))
-
-      return parentComps
+      const parts = ids.split(',')
+      let stale = false
+      for (let i = 0; i < parts.length; i++) {
+        const c = this.componentRegistry[parts[i]]
+        if (!c) {
+          stale = true
+          break
+        }
+        parentComps.push(c)
+      }
+      if (!stale) {
+        return parentComps
+      }
+      parentComps.length = 0
+      delete child.parentComps
     }
 
     ids = []
+    node = child
 
     do {
       if ((comp = this.componentRegistry[node.id])) {
         parentComps.push(comp)
         ids.push(node.id)
+      } else if (node.id && node.nodeType === 1) {
+        const cid = (node as HTMLElement).getAttribute('data-gea-cid')
+        if (cid && (comp = this.componentRegistry[cid])) {
+          parentComps.push(comp)
+          ids.push(cid)
+        }
       }
     } while ((node = node.parentNode as GeaHTMLElement))
 
@@ -253,18 +305,28 @@ export default class ComponentManager {
     return parentComps
   }
 
-  callHandlers(comps: ComponentLike[], e: Event): boolean {
+  callHandlers(
+    comps: Array<ComponentLike | undefined>,
+    eventsByComp: Array<ComponentLike['events'] | undefined>,
+    e: Event,
+    rootSteps: Array<number | undefined>,
+    step: number,
+  ): boolean {
     let broken = false
 
     for (let i = 0; i < comps.length; i++) {
       const comp = comps[i]
+      if (!comp) continue
 
-      if (this.callEventsGetterHandler(comp, e) === false) {
+      const rootStep = rootSteps[i]
+      if (rootStep !== undefined && step > rootStep) continue
+
+      if (this.callEventsGetterHandler(comp, e as GeaEvent, eventsByComp[i]) === false) {
         broken = true
         break
       }
 
-      if (this.callItemHandler(comp, e) === false) {
+      if (this.callItemHandler(comp, e as GeaEvent) === false) {
         broken = true
         break
       }
@@ -273,17 +335,18 @@ export default class ComponentManager {
     return broken
   }
 
-  callEventsGetterHandler(comp: ComponentLike, e: GeaEvent): any {
-    if (!comp || !comp.events) return true
+  callEventsGetterHandler(comp: ComponentLike, e: GeaEvent, events?: ComponentLike['events']): any {
+    const ev = events !== undefined ? events : comp.events
+    if (!comp || !ev) return true
 
     const targetEl = e.targetEl as HTMLElement
     if (!targetEl || typeof targetEl.matches !== 'function') return true
 
     const eventType = e.type
-    const handlers = comp.events[eventType]
+    const handlers = ev[eventType]
     if (!handlers) return true
 
-    const geaEvt = targetEl.getAttribute?.('data-gea-event')
+    const geaEvt = (targetEl as any)._geaEvt ?? targetEl.getAttribute?.('data-gea-event')
     if (geaEvt) {
       const selector = `[data-gea-event="${geaEvt}"]`
       const handler = handlers[selector]
@@ -316,11 +379,16 @@ export default class ComponentManager {
     if (!comp || typeof comp.__handleItemHandler !== 'function') return true
 
     const targetEl = e.targetEl as HTMLElement
-    if (!targetEl || typeof targetEl.getAttribute !== 'function') return true
+    if (!targetEl) return true
 
-    const itemEl = targetEl.closest?.('[data-gea-item-id]') as HTMLElement | null
-    if (itemEl && comp.el && comp.el.contains(itemEl)) {
-      const itemId = itemEl.getAttribute('data-gea-item-id')
+    let itemEl: HTMLElement | null = targetEl
+    const root = (comp.element_ as HTMLElement | undefined) ?? comp.el
+    while (itemEl && itemEl !== root) {
+      if ((itemEl as any).__geaKey != null || itemEl.getAttribute?.('data-gea-item-id')) break
+      itemEl = itemEl.parentElement
+    }
+    if (itemEl && itemEl !== root) {
+      const itemId = (itemEl as any).__geaKey ?? itemEl.getAttribute?.('data-gea-item-id')
       if (itemId != null) return comp.__handleItemHandler(itemId, e)
     }
 
@@ -333,6 +401,13 @@ export default class ComponentManager {
       if (current.id) {
         const comp = this.getComponent(current.id)
         if (comp) return comp
+        if (current.nodeType === 1) {
+          const cid = current.getAttribute('data-gea-cid')
+          if (cid) {
+            const comp2 = this.getComponent(cid)
+            if (comp2) return comp2
+          }
+        }
       }
       current = current.parentNode as HTMLElement | null
     }

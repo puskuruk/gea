@@ -134,6 +134,10 @@ export default class Component<P = Record<string, any>> extends Store {
   }
 
   __applyListChanges(container: HTMLElement, array: any[], changes: StoreChange[] | null, config: ListConfig) {
+    if (changes && changes.length > 0 && changes[0].isArrayItemPropUpdate && !config.hasComponentItems) {
+      applyListChanges(container, array, changes, config)
+      return
+    }
     const prevCount = container.childElementCount
     applyListChanges(container, array, changes, config)
     if (container.childElementCount !== prevCount || config.hasComponentItems) {
@@ -347,8 +351,15 @@ export default class Component<P = Record<string, any>> extends Store {
     // Remove old element BEFORE calling template() so that getElementById
     // inside child __geaUpdateProps won't find stale DOM nodes.
     const placeholder = document.createComment('')
-    parent.insertBefore(placeholder, this.element_)
-    parent.removeChild(this.element_)
+    try {
+      if (this.element_.parentNode === parent) {
+        this.element_.replaceWith(placeholder)
+      } else {
+        parent.appendChild(placeholder)
+      }
+    } catch {
+      if (!placeholder.parentNode) parent.appendChild(placeholder)
+    }
 
     const manager = ComponentManager.getInstance()
     const cloneFn = (this as any).__cloneTemplate
@@ -450,13 +461,13 @@ export default class Component<P = Record<string, any>> extends Store {
     this.cleanupBindings_()
   }
 
-  static _register(ctor: any) {
+  static _register(ctor: any, compiledTagName?: string) {
     if (!ctor || !ctor.name || ctor.__geaAutoRegistered) return
     if (Object.getPrototypeOf(ctor.prototype) === Component.prototype) {
       ctor.__geaAutoRegistered = true
       Component.__componentClasses.set(ctor.name, ctor)
       const manager = ComponentManager.getInstance()
-      const tagName = manager.generateTagName_(ctor)
+      const tagName = compiledTagName || manager.generateTagName_(ctor)
       manager.registerComponentClass(ctor, tagName)
     }
   }
@@ -510,7 +521,7 @@ export default class Component<P = Record<string, any>> extends Store {
       child.render(parent, index)
       if (itemId != null && child.el) {
         const wrapper = document.createElement('div')
-        wrapper.setAttribute('data-gea-item-id', itemId)
+        ;(wrapper as any).__geaKey = itemId
         parent.replaceChild(wrapper, child.el)
         wrapper.appendChild(child.el)
       }
@@ -903,14 +914,32 @@ export default class Component<P = Record<string, any>> extends Store {
     if (container.id) {
       let hasDirectItems = false
       for (let n: ChildNode | null = container.firstChild; n; n = n.nextSibling) {
-        if (n.nodeType === 1 && (n as HTMLElement).hasAttribute('data-gea-item-id')) {
+        if (n.nodeType === 1 && ((n as any).__geaKey != null || (n as HTMLElement).hasAttribute('data-gea-item-id'))) {
           hasDirectItems = true
           break
         }
         if (n.nodeType === 8 && !(n as any).data) break
       }
       if (!hasDirectItems) {
-        const nested = container.querySelector(`[id^="${container.id}-"][data-gea-item-id]`)
+        let nested: HTMLElement | null = null
+        const prefix = container.id + '-'
+        const walk = (el: HTMLElement) => {
+          for (let c: ChildNode | null = el.firstChild; c; c = c.nextSibling) {
+            if (c.nodeType !== 1) continue
+            const child = c as HTMLElement
+            if (
+              ((child as any).__geaKey != null || child.hasAttribute('data-gea-item-id')) &&
+              child.id &&
+              child.id.startsWith(prefix)
+            ) {
+              nested = child
+              return
+            }
+            walk(child)
+            if (nested) return
+          }
+        }
+        walk(container)
         if (nested?.parentElement && nested.parentElement !== container) {
           container = nested.parentElement
         } else if (!nested) {
@@ -953,8 +982,8 @@ export default class Component<P = Record<string, any>> extends Store {
       prev = []
       for (let n: ChildNode | null = container.firstChild; n; n = n.nextSibling) {
         if (n.nodeType === 1) {
-          const aid = (n as HTMLElement).getAttribute('data-gea-item-id')
-          if (aid) prev.push(aid)
+          const aid = (n as any).__geaKey ?? (n as HTMLElement).getAttribute('data-gea-item-id')
+          if (aid != null) prev.push(aid)
         } else if (n.nodeType === 8 && !(n as any).data) break
       }
       c.__geaCount = prev.length
@@ -975,7 +1004,11 @@ export default class Component<P = Record<string, any>> extends Store {
         // multiple observers trigger __geaSyncMap in the same flush).
         let child: ChildNode | null = container.firstChild
         for (let j = 0; j < items.length; j++) {
-          while (child && (child.nodeType !== 1 || !(child as HTMLElement).hasAttribute('data-gea-item-id'))) {
+          while (
+            child &&
+            (child.nodeType !== 1 ||
+              ((child as any).__geaKey == null && !(child as HTMLElement).hasAttribute?.('data-gea-item-id')))
+          ) {
             if (child.nodeType === 8 && !(child as any).data) break
             child = child.nextSibling
           }
@@ -1035,8 +1068,8 @@ export default class Component<P = Record<string, any>> extends Store {
       const removals: ChildNode[] = []
       for (let sc: ChildNode | null = container.firstChild; sc; sc = sc.nextSibling) {
         if (sc.nodeType === 1) {
-          const aid = (sc as HTMLElement).getAttribute('data-gea-item-id')
-          if (aid && !newSet.has(aid)) removals.push(sc)
+          const aid = (sc as any).__geaKey ?? (sc as HTMLElement).getAttribute('data-gea-item-id')
+          if (aid != null && !newSet.has(aid)) removals.push(sc)
         } else if (sc.nodeType === 8 && !(sc as any).data) break
       }
       if (removals.length === prev.length - items.length) {
@@ -1101,7 +1134,7 @@ export default class Component<P = Record<string, any>> extends Store {
     }
     const raw = item != null && typeof item === 'object' ? item[idProp] : undefined
     const itemKey = String(raw != null ? raw : item)
-    el.setAttribute('data-gea-item-id', itemKey)
+    ;(el as any).__geaKey = itemKey
     ;(el as any).__geaItem = item
     if (patches) {
       for (let i = 0; i < patches.length; i++) {
@@ -1131,6 +1164,17 @@ export default class Component<P = Record<string, any>> extends Store {
   ): void {
     if (!this.__geaConds) this.__geaConds = {}
     this.__geaConds[idx] = { slotId, getCond, getTruthyHtml, getFalsyHtml }
+  }
+
+  /**
+   * Re-run compiler-generated `__setupRefs()` after incremental DOM updates (e.g. conditional
+   * slots) so `ref={this.x}` targets stay in sync; `querySelector` returns `null` when a marked
+   * node is absent, clearing stale references.
+   */
+  __syncDomRefs(): void {
+    if (typeof (this as any).__setupRefs === 'function') {
+      ;(this as any).__setupRefs()
+    }
   }
 
   __geaPatchCond(idx: number): boolean {
@@ -1168,7 +1212,12 @@ export default class Component<P = Record<string, any>> extends Store {
         let node: ChildNode | null = marker.nextSibling
         while (node && node !== endMarker) {
           const next: ChildNode | null = node.nextSibling
-          node.remove()
+          if (!node.parentNode) break
+          try {
+            node.remove()
+          } catch {
+            /* node detached by sync blur handler */
+          }
           node = next
         }
         return
@@ -1176,15 +1225,20 @@ export default class Component<P = Record<string, any>> extends Store {
       const html = htmlFn()
       // Empty reinjection = no static HTML for this branch; __applyListChanges may already own
       // keyed rows between markers. Remove only non–list nodes (placeholders, text) so patch order
-      // vs list observers does not wipe data-gea-item-id rows (mobile-showcase gesture log).
+      // vs list observers does not wipe __geaKey rows (mobile-showcase gesture log).
       if (html === '') {
         let node: ChildNode | null = marker.nextSibling
         while (node && node !== endMarker) {
           const next: ChildNode | null = node.nextSibling
-          if (node.nodeType !== 1) {
-            node.remove()
-          } else if (!(node as HTMLElement).hasAttribute('data-gea-item-id')) {
-            node.remove()
+          if (!node.parentNode) break
+          try {
+            if (node.nodeType !== 1) {
+              node.remove()
+            } else if ((node as any).__geaKey == null && !(node as HTMLElement).hasAttribute?.('data-gea-item-id')) {
+              node.remove()
+            }
+          } catch {
+            /* node detached by sync blur handler */
           }
           node = next
         }
@@ -1193,7 +1247,12 @@ export default class Component<P = Record<string, any>> extends Store {
       let node: ChildNode | null = marker.nextSibling
       while (node && node !== endMarker) {
         const next: ChildNode | null = node.nextSibling
-        node.remove()
+        if (!node.parentNode) break
+        try {
+          node.remove()
+        } catch {
+          /* node detached by sync blur handler */
+        }
         node = next
       }
       const isSvg = 'namespaceURI' in parent && (parent as Element).namespaceURI === 'http://www.w3.org/2000/svg'
@@ -1280,6 +1339,7 @@ export default class Component<P = Record<string, any>> extends Store {
         idx++
       }
     }
+    this.__syncDomRefs()
     return needsPatch
   }
 

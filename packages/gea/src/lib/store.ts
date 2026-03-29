@@ -117,12 +117,22 @@ function isReciprocalSwap(a: StoreChange, b: StoreChange): boolean {
   return a.previousValue === b.newValue && b.previousValue === a.newValue
 }
 
-const INTERNAL_PROPS = new Set(['props', 'actions', 'parentComponent'])
+/** Props that must bypass Store reactivity (compiler/runtime internals on Component). */
+const INTERNAL_PROPS = new Set(['props', 'actions', 'parentComponent', 'events'])
 
 export function isInternalProp(prop: string): boolean {
   if (prop.charCodeAt(0) === 95) return true // starts with '_'
   if (prop.charCodeAt(prop.length - 1) === 95) return true // ends with '_'
   return INTERNAL_PROPS.has(prop)
+}
+
+/**
+ * Nested paths that must not be wrapped in reactive proxies (delegated event maps,
+ * compiler-generated plain objects, etc.).
+ */
+function shouldSkipReactiveWrapForPath(basePath: string): boolean {
+  if (basePath === 'events' || basePath.startsWith('events.')) return true
+  return false
 }
 
 export function rootGetValue(t: any, prop: string, receiver: any): any {
@@ -134,6 +144,7 @@ export function rootGetValue(t: any, prop: string, receiver: any): any {
   if (value !== null && value !== undefined && typeof value === 'object') {
     const proto = Object.getPrototypeOf(value)
     if (proto !== Object.prototype && !Array.isArray(value)) return value
+    if (shouldSkipReactiveWrapForPath(prop)) return value
     const entry = t._topLevelProxies.get(prop)
     if (entry && entry[0] === value) return entry[1]
     const p = t._createProxy(value, prop, [prop])
@@ -143,12 +154,53 @@ export function rootGetValue(t: any, prop: string, receiver: any): any {
   return value
 }
 
+function getCachedPathParts(t: any, prop: string): string[] {
+  let parts = t._pathPartsCache.get(prop)
+  if (parts === undefined) {
+    parts = [prop]
+    t._pathPartsCache.set(prop, parts)
+  }
+  return parts
+}
+
 export function rootSetValue(t: any, prop: string, value: any): boolean {
   if (typeof value === 'function') {
     t[prop] = value
     return true
   }
-  if (value && typeof value === 'object' && value.__isProxy) {
+
+  // Fast path: primitive value (covers ~90% of mutations)
+  if (value === null || value === undefined || typeof value !== 'object') {
+    const oldValue = t[prop]
+    if (oldValue === value && prop in t) return true
+    const hadProp = prop in t
+    if (oldValue && typeof oldValue === 'object') {
+      t._proxyCache.delete(oldValue)
+      t._arrayIndexProxyCache.delete(oldValue)
+      t._topLevelProxies.delete(prop)
+    }
+    t[prop] = value
+    t._pendingChanges.push({
+      type: hadProp ? 'update' : 'add',
+      property: prop,
+      target: t,
+      pathParts: getCachedPathParts(t, prop),
+      newValue: value,
+      previousValue: oldValue,
+    })
+    if (t._pendingBatchKind !== 2) {
+      t._pendingBatchKind = 2
+      t._pendingBatchArrayPathParts = null
+    }
+    if (!t._flushScheduled) {
+      t._flushScheduled = true
+      Store._pendingStores.add(t)
+      queueMicrotask(t._flushChanges)
+    }
+    return true
+  }
+
+  if (value.__isProxy) {
     const raw = value.__getTarget
     if (raw !== undefined) value = raw
   }
@@ -159,12 +211,12 @@ export function rootSetValue(t: any, prop: string, value: any): boolean {
 
   if (oldValue && typeof oldValue === 'object') {
     t._proxyCache.delete(oldValue)
-    t._clearArrayIndexCache(oldValue)
+    t._arrayIndexProxyCache.delete(oldValue)
   }
   t._topLevelProxies.delete(prop)
   t[prop] = value
 
-  if (Array.isArray(oldValue) && Array.isArray(value) && value.length > oldValue.length) {
+  if (Array.isArray(oldValue) && oldValue.length > 0 && Array.isArray(value) && value.length > oldValue.length) {
     let isAppend = true
     for (let i = 0; i < oldValue.length; i++) {
       if (oldValue[i] !== value[i]) {
@@ -179,7 +231,7 @@ export function rootSetValue(t: any, prop: string, value: any): boolean {
           type: 'append',
           property: prop,
           target: t,
-          pathParts: [prop],
+          pathParts: getCachedPathParts(t, prop),
           start,
           count: value.length - start,
           newValue: value.slice(start),
@@ -189,16 +241,23 @@ export function rootSetValue(t: any, prop: string, value: any): boolean {
     }
   }
 
-  t._emitChanges([
-    {
-      type: hadProp ? 'update' : 'add',
-      property: prop,
-      target: t,
-      pathParts: [prop],
-      newValue: value,
-      previousValue: oldValue,
-    },
-  ])
+  t._pendingChanges.push({
+    type: hadProp ? 'update' : 'add',
+    property: prop,
+    target: t,
+    pathParts: getCachedPathParts(t, prop),
+    newValue: value,
+    previousValue: oldValue,
+  })
+  if (t._pendingBatchKind !== 2) {
+    t._pendingBatchKind = 2
+    t._pendingBatchArrayPathParts = null
+  }
+  if (!t._flushScheduled) {
+    t._flushScheduled = true
+    Store._pendingStores.add(t)
+    queueMicrotask(t._flushChanges)
+  }
   return true
 }
 
@@ -208,7 +267,7 @@ export function rootDeleteProperty(t: any, prop: string): boolean {
   const oldValue = t[prop]
   if (oldValue && typeof oldValue === 'object') {
     t._proxyCache.delete(oldValue)
-    t._clearArrayIndexCache(oldValue)
+    t._arrayIndexProxyCache.delete(oldValue)
   }
   t._topLevelProxies.delete(prop)
   delete t[prop]
@@ -217,7 +276,7 @@ export function rootDeleteProperty(t: any, prop: string): boolean {
       type: 'delete',
       property: prop,
       target: t,
-      pathParts: [prop],
+      pathParts: getCachedPathParts(t, prop),
       previousValue: oldValue,
     },
   ])
@@ -244,8 +303,25 @@ export class Store {
    */
   static _rootProxyHandlerFactory: (() => ProxyHandler<Store>) | null = null
 
+  static _pendingStores: Set<Store> = new Set()
+  private static _flushing = false
+
+  static flushAll(): void {
+    if (Store._flushing) return
+    Store._flushing = true
+    try {
+      for (const store of Store._pendingStores) {
+        store.flushSync()
+      }
+      Store._pendingStores.clear()
+    } finally {
+      Store._flushing = false
+    }
+  }
+
   private _selfProxy?: this
   private _pendingChanges: StoreChange[] = []
+  private _pendingChangesPool: StoreChange[] = []
   private _flushScheduled = false
   private _nextArrayOpId = 0
   private _observerRoot: ObserverNode = createObserverNode([])
@@ -253,6 +329,7 @@ export class Store {
   private _arrayIndexProxyCache = new WeakMap()
   private _internedArrayPaths = new Map<string, string[]>()
   private _topLevelProxies = new Map<string, [raw: any, proxy: any]>()
+  private _pathPartsCache = new Map<string, string[]>()
   private _pendingBatchKind: 0 | 1 | 2 = 0
   private _pendingBatchArrayPathParts: string[] | null = null
 
@@ -329,6 +406,12 @@ export class Store {
   /** Used by vite plugin when passing store to components. Same as `this`. */
   get __store(): this {
     return this
+  }
+
+  flushSync(): void {
+    if (this._pendingChanges.length > 0) {
+      this._flushChanges()
+    }
   }
 
   silent(fn: () => void): void {
@@ -436,21 +519,18 @@ export class Store {
   private _notifyHandlers(node: ObserverNode, relevant: StoreChange[]): void {
     const value = getByPathParts(this, node.pathParts)
     for (const handler of node.handlers) {
-      try {
-        handler(value, relevant)
-      } catch (e) {
-        console.error('[Gea Store] Observer threw:', e)
-      }
+      handler(value, relevant)
     }
   }
 
   private _notifyHandlersWithValue(node: ObserverNode, value: any, relevant: StoreChange[]): void {
-    for (const handler of node.handlers) {
-      try {
-        handler(value, relevant)
-      } catch (e) {
-        console.error('[Gea Store] Observer threw:', e)
-      }
+    const handlers = node.handlers
+    if (handlers.size === 1) {
+      handlers.values().next().value!(value, relevant)
+      return
+    }
+    for (const handler of handlers) {
+      handler(value, relevant)
     }
   }
 
@@ -597,6 +677,29 @@ export class Store {
   private _deliverTopLevelBatch(batch: StoreChange[]): boolean {
     if (this._observerRoot.handlers.size > 0) return false
 
+    if (batch.length === 1) {
+      const change = batch[0]
+      if (change.target !== this || change.pathParts.length !== 1) return false
+      const node = this._observerRoot.children.get(change.property)
+      if (!node) return true
+      if (node.children.size > 0) return false
+      if (node.handlers.size === 0) return true
+      let value: any
+      if (change.type === 'delete') {
+        value = undefined
+      } else {
+        const nv = change.newValue
+        if (nv === null || nv === undefined || typeof nv !== 'object') {
+          value = nv
+        } else {
+          const directValue = this._getDirectTopLevelObservedValue(change)
+          value = directValue !== Store._noDirectTopLevelValue ? directValue : this._getTopLevelObservedValue(change)
+        }
+      }
+      this._notifyHandlersWithValue(node, value, batch)
+      return true
+    }
+
     const deliveries = new Map<ObserverNode, { value: any; relevant: StoreChange[] }>()
     for (let i = 0; i < batch.length; i++) {
       const change = batch[i]
@@ -626,10 +729,13 @@ export class Store {
 
   private _flushChanges = (): void => {
     this._flushScheduled = false
+    Store._pendingStores.delete(this)
     const pendingBatch = this._pendingChanges
     const pendingBatchKind = this._pendingBatchKind
     const pendingBatchArrayPathParts = this._pendingBatchArrayPathParts
-    this._pendingChanges = []
+    this._pendingChangesPool.length = 0
+    this._pendingChanges = this._pendingChangesPool
+    this._pendingChangesPool = pendingBatch
     this._pendingBatchKind = 0
     this._pendingBatchArrayPathParts = null
     if (pendingBatch.length === 0) return
@@ -640,6 +746,80 @@ export class Store {
       this._deliverKnownArrayItemPropBatch(pendingBatch, pendingBatchArrayPathParts)
     ) {
       return
+    }
+
+    // Inlined fast path for single top-level change (covers select-row, clear-rows)
+    if (pendingBatch.length === 1) {
+      const change = pendingBatch[0]
+      if (change.target === this && change.pathParts.length === 1 && this._observerRoot.handlers.size === 0) {
+        const node = this._observerRoot.children.get(change.property)
+        if (node && node.handlers.size > 0) {
+          if (node.children.size === 0) {
+            let value: any
+            if (change.type === 'delete') {
+              value = undefined
+            } else {
+              const nv = change.newValue
+              if (nv === null || nv === undefined || typeof nv !== 'object') {
+                value = nv
+              } else {
+                if (Array.isArray(nv) && nv.length === 0) {
+                  value = nv
+                } else {
+                  value = this._getTopLevelObservedValue(change)
+                }
+              }
+            }
+            const handlers = node.handlers
+            if (handlers.size === 1) {
+              handlers.values().next().value!(value, pendingBatch)
+            } else {
+              for (const handler of handlers) handler(value, pendingBatch)
+            }
+            return
+          }
+        } else if (node) {
+          return
+        }
+      }
+    }
+
+    // Inlined fast path for 2-change array swap
+    if (pendingBatch.length === 2 && this._observerRoot.handlers.size === 0) {
+      const c0 = pendingBatch[0]
+      const c1 = pendingBatch[1]
+      if (
+        c0.target === c1.target &&
+        Array.isArray(c0.target) &&
+        c0.type === 'update' &&
+        c1.type === 'update' &&
+        isNumericIndex(c0.property) &&
+        isNumericIndex(c1.property) &&
+        c0.previousValue === c1.newValue &&
+        c0.newValue === c1.previousValue
+      ) {
+        const opId = `swap:${this._nextArrayOpId++}`
+        const arrayPathParts = c0.pathParts.length > 1 ? c0.pathParts.slice(0, -1) : c0.pathParts
+        c0.arrayOp = 'swap'
+        c1.arrayOp = 'swap'
+        c0.opId = opId
+        c1.opId = opId
+        c0.otherIndex = Number(c1.property)
+        c1.otherIndex = Number(c0.property)
+        c0.arrayPathParts = arrayPathParts
+        c1.arrayPathParts = arrayPathParts
+
+        let node: ObserverNode | undefined = this._observerRoot
+        for (let i = 0; i < arrayPathParts.length; i++) {
+          node = node!.children.get(arrayPathParts[i])
+          if (!node) break
+        }
+        if (node && node.handlers.size > 0) {
+          const value = getByPathParts(this, node.pathParts)
+          for (const handler of node.handlers) handler(value, pendingBatch)
+        }
+        return
+      }
     }
 
     if (this._deliverTopLevelBatch(pendingBatch)) return
@@ -680,8 +860,16 @@ export class Store {
   }
 
   private _emitChanges(changes: StoreChange[]): void {
-    for (let i = 0; i < changes.length; i++) this._queueChange(changes[i])
-    this._scheduleFlush()
+    for (let i = 0; i < changes.length; i++) {
+      const change = changes[i]
+      this._pendingChanges.push(change)
+      this._trackPendingChange(change)
+    }
+    if (!this._flushScheduled) {
+      this._flushScheduled = true
+      Store._pendingStores.add(this)
+      queueMicrotask(this._flushChanges)
+    }
   }
 
   private _queueChange(change: StoreChange): void {
@@ -716,6 +904,7 @@ export class Store {
   private _scheduleFlush(): void {
     if (!this._flushScheduled) {
       this._flushScheduled = true
+      Store._pendingStores.add(this)
       queueMicrotask(this._flushChanges)
     }
   }
@@ -730,7 +919,7 @@ export class Store {
     getPathParts: (prop: string) => string[],
     getLeafPathParts: (prop: string) => string[],
   ): void {
-    this._queueChange({
+    const change: StoreChange = {
       type: isNew ? 'add' : 'update',
       property,
       target,
@@ -741,8 +930,23 @@ export class Store {
       arrayIndex: arrayMeta.arrayIndex,
       leafPathParts: getLeafPathParts(property),
       isArrayItemPropUpdate: true,
-    })
-    this._scheduleFlush()
+    }
+    this._pendingChanges.push(change)
+    if (this._pendingBatchKind === 0) {
+      this._pendingBatchKind = 1
+      this._pendingBatchArrayPathParts = change.arrayPathParts
+    } else if (this._pendingBatchKind === 1) {
+      const pp = this._pendingBatchArrayPathParts
+      if (pp !== change.arrayPathParts && !samePathParts(pp!, change.arrayPathParts)) {
+        this._pendingBatchKind = 2
+        this._pendingBatchArrayPathParts = null
+      }
+    }
+    if (!this._flushScheduled) {
+      this._flushScheduled = true
+      Store._pendingStores.add(this)
+      queueMicrotask(this._flushChanges)
+    }
   }
 
   private _interceptArrayMethod(arr: any[], method: string, _basePath: string, baseParts: string[]): Function | null {
@@ -1042,8 +1246,7 @@ export class Store {
       return parts
     }
 
-    const createProxy = (t: any, bp: string, bps: string[], nextArrayMeta?: ArrayProxyMeta) =>
-      store._createProxy(t, bp, bps, nextArrayMeta)
+    const createProxy = store._createProxy.bind(store)
 
     const proxy = new Proxy(target, {
       get(obj: any, prop: string | symbol) {
@@ -1079,6 +1282,7 @@ export class Store {
         }
 
         if (valType === 'object') {
+          if (shouldSkipReactiveWrapForPath(basePath)) return value
           // Fast path: check array index cache before getPrototypeOf
           if (Array.isArray(obj) && isNumericIndex(prop as string)) {
             const indexCache = store._arrayIndexProxyCache.get(obj)
@@ -1133,7 +1337,7 @@ export class Store {
           const isNew = !(prop in obj)
           if (!isNew && oldValue && typeof oldValue === 'object') {
             store._proxyCache.delete(oldValue)
-            store._clearArrayIndexCache(oldValue)
+            store._arrayIndexProxyCache.delete(oldValue)
           }
           obj[prop] = value
 
@@ -1171,21 +1375,21 @@ export class Store {
         }
 
         // Object value path (less common)
-        if (value.__isProxy) {
+        if (value && typeof value === 'object' && value.__isProxy) {
           const raw = value.__getTarget
           if (raw !== undefined) value = raw
         }
         if (prop === 'length' && Array.isArray(obj)) {
-          store._clearArrayIndexCache(obj)
+          store._arrayIndexProxyCache.delete(obj)
           obj[prop] = value
           return true
         }
 
         const isNew = !Object.prototype.hasOwnProperty.call(obj, prop)
-        if (Array.isArray(obj) && isNumericIndex(prop)) store._clearArrayIndexCache(obj)
+        if (Array.isArray(obj) && isNumericIndex(prop)) store._arrayIndexProxyCache.delete(obj)
         if (oldValue && typeof oldValue === 'object') {
           store._proxyCache.delete(oldValue)
-          store._clearArrayIndexCache(oldValue)
+          store._arrayIndexProxyCache.delete(oldValue)
         }
         obj[prop] = value
 
@@ -1219,8 +1423,16 @@ export class Store {
               change.leafPathParts = getCachedLeafPathParts(prop)
               change.isArrayItemPropUpdate = true
             }
-            store._queueChange(change)
-            store._scheduleFlush()
+            store._pendingChanges.push(change)
+            if (store._pendingBatchKind !== 2) {
+              store._pendingBatchKind = 2
+              store._pendingBatchArrayPathParts = null
+            }
+            if (!store._flushScheduled) {
+              store._flushScheduled = true
+              Store._pendingStores.add(store)
+              queueMicrotask(store._flushChanges)
+            }
             return true
           }
         }
@@ -1239,8 +1451,16 @@ export class Store {
           change.leafPathParts = getCachedLeafPathParts(prop)
           change.isArrayItemPropUpdate = true
         }
-        store._queueChange(change)
-        store._scheduleFlush()
+        store._pendingChanges.push(change)
+        if (store._pendingBatchKind !== 2) {
+          store._pendingBatchKind = 2
+          store._pendingBatchArrayPathParts = null
+        }
+        if (!store._flushScheduled) {
+          store._flushScheduled = true
+          Store._pendingStores.add(store)
+          queueMicrotask(store._flushChanges)
+        }
         return true
       },
 
@@ -1250,10 +1470,10 @@ export class Store {
           return true
         }
         const oldValue = obj[prop]
-        if (Array.isArray(obj) && isNumericIndex(prop)) store._clearArrayIndexCache(obj)
+        if (Array.isArray(obj) && isNumericIndex(prop)) store._arrayIndexProxyCache.delete(obj)
         if (oldValue && typeof oldValue === 'object') {
           store._proxyCache.delete(oldValue)
-          store._clearArrayIndexCache(oldValue)
+          store._arrayIndexProxyCache.delete(oldValue)
         }
         delete obj[prop]
         const change: StoreChange = {

@@ -788,9 +788,9 @@ describe('Component – __geaCloneItem', () => {
     const renderFn = (item: any) => `<li>${item.label}</li>`
     const el1 = c.__geaCloneItem(list, { id: 1, label: 'a' }, renderFn, 'list1')
     assert.ok(el1)
-    assert.equal(el1.getAttribute('data-gea-item-id'), '1')
+    assert.equal((el1 as any).__geaKey, '1')
     const el2 = c.__geaCloneItem(list, { id: 2, label: 'b' }, renderFn, 'list1')
-    assert.equal(el2.getAttribute('data-gea-item-id'), '2')
+    assert.equal((el2 as any).__geaKey, '2')
   })
 
   it('applies patches to cloned items', () => {
@@ -845,7 +845,7 @@ describe('Component – __geaCloneItem', () => {
     const list = document.createElement('ul')
     const renderFn = () => `<li>item</li>`
     const el = c.__geaCloneItem(list, { key: 'abc', label: '' }, renderFn, undefined, 'key')
-    assert.equal(el.getAttribute('data-gea-item-id'), 'abc')
+    assert.equal((el as any).__geaKey, 'abc')
   })
 })
 
@@ -930,6 +930,33 @@ describe('Component – __geaRegisterCond and __geaPatchCond', () => {
     assert.equal(changed, false)
   })
 
+  it('__geaPatchCond invokes __setupRefs after patching (ref targets stay in sync)', () => {
+    let setupCalls = 0
+    class C extends Component {
+      template() {
+        return '<div><!--' + this.id_ + '-condRef--><!--' + this.id_ + '-condRef-end--></div>'
+      }
+    }
+    const c = new C()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    c.render(container)
+    ;(c as any).__setupRefs = () => {
+      setupCalls++
+    }
+    c.__geaRegisterCond(
+      6,
+      'condRef',
+      () => true,
+      () => '<span data-gea-ref="x">yes</span>',
+      () => '<span>no</span>',
+    )
+    c.__geaPatchCond(6)
+    assert.equal(setupCalls, 1)
+    c.__geaPatchCond(6)
+    assert.equal(setupCalls, 2)
+  })
+
   it('removes old content and inserts new on condition flip', () => {
     let condition = true
     class C extends Component {
@@ -1010,7 +1037,13 @@ describe('Component – __geaRegisterCond and __geaPatchCond', () => {
     row.setAttribute('data-gea-item-id', '1')
     row.textContent = 'row'
     root.insertBefore(row, endMarker)
-    c.__geaRegisterCond(5, 'cond5', () => false, () => '<span>t</span>', () => '')
+    c.__geaRegisterCond(
+      5,
+      'cond5',
+      () => false,
+      () => '<span>t</span>',
+      () => '',
+    )
     ;(c as any).__geaCond_5 = true
     c.__geaPatchCond(5)
     assert.ok(root.querySelector('[data-gea-item-id="1"]'))
@@ -1504,7 +1537,7 @@ describe('Component – __geaCloneItem fallback branch', () => {
     }
     const el = c.__geaCloneItem(list, { id: 1, label: 'a' }, renderFn)
     assert.ok(el)
-    assert.equal(el.getAttribute('data-gea-item-id'), '1')
+    assert.equal((el as any).__geaKey, '1')
   })
 })
 
@@ -1877,7 +1910,7 @@ describe('Component – __geaCloneItem with non-object item', () => {
     const list = document.createElement('ul')
     const renderFn = (item: any) => `<li>${item}</li>`
     const el = c.__geaCloneItem(list, 'hello', renderFn)
-    assert.equal(el.getAttribute('data-gea-item-id'), 'hello')
+    assert.equal((el as any).__geaKey, 'hello')
   })
 
   it('handles null item id gracefully', () => {
@@ -1893,7 +1926,7 @@ describe('Component – __geaCloneItem with non-object item', () => {
     const list = document.createElement('ul')
     const renderFn = (item: any) => `<li>${item?.label}</li>`
     const el = c.__geaCloneItem(list, { id: null, label: 'test' }, renderFn)
-    assert.ok(el.hasAttribute('data-gea-item-id'))
+    assert.ok((el as any).__geaKey != null)
   })
 })
 

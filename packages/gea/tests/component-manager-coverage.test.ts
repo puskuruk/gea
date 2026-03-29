@@ -123,6 +123,86 @@ describe('ComponentManager – event handling', () => {
       assert.equal(called, true)
     })
 
+    it('invokes events getter at most once per component per handleEvent', () => {
+      const mgr = ComponentManager.getInstance()
+      mgr.loaded_ = false
+      let eventsGets = 0
+      const comp = {
+        id: 'ev-cache',
+        rendered: true,
+        render: () => true,
+        constructor: Object,
+        get events() {
+          eventsGets++
+          return {
+            click: {
+              '.leaf': () => {},
+            },
+          }
+        },
+      }
+      mgr.setComponent(comp)
+
+      const outer = document.createElement('div')
+      outer.id = 'ev-cache'
+      document.body.appendChild(outer)
+      const mid = document.createElement('div')
+      outer.appendChild(mid)
+      const leaf = document.createElement('button')
+      leaf.className = 'leaf'
+      mid.appendChild(leaf)
+
+      const event = new Event('click', { bubbles: true })
+      Object.defineProperty(event, 'target', { value: leaf })
+      mgr.handleEvent(event)
+      assert.equal(eventsGets, 1)
+    })
+
+    it('skips inner component handlers after synthetic bubble passes its root', () => {
+      const mgr = ComponentManager.getInstance()
+      let innerBroadDivCalls = 0
+      const inner = {
+        id: 'inner-broad',
+        rendered: true,
+        render: () => true,
+        constructor: Object,
+        events: {
+          click: {
+            div: () => {
+              innerBroadDivCalls++
+            },
+          },
+        },
+      }
+      const outer = {
+        id: 'outer-broad',
+        rendered: true,
+        render: () => true,
+        constructor: Object,
+        events: { click: {} },
+      }
+      mgr.setComponent(inner)
+      mgr.setComponent(outer)
+
+      const outerEl = document.createElement('div')
+      outerEl.id = 'outer-broad'
+      document.body.appendChild(outerEl)
+      const innerEl = document.createElement('div')
+      innerEl.id = 'inner-broad'
+      outerEl.appendChild(innerEl)
+      const span = document.createElement('span')
+      innerEl.appendChild(span)
+
+      const event = new Event('click', { bubbles: true })
+      Object.defineProperty(event, 'target', { value: span })
+      mgr.handleEvent(event)
+      assert.equal(
+        innerBroadDivCalls,
+        1,
+        'inner delegated handler should only run while targetEl is still inside that component root',
+      )
+    })
+
     it('stops propagation when handler returns false', () => {
       const mgr = ComponentManager.getInstance()
       let secondCalled = false
@@ -209,6 +289,39 @@ describe('ComponentManager – event handling', () => {
       mgr.getParentComps(child)
       const secondCall = mgr.getParentComps(child)
       assert.equal(secondCall.length, 1)
+    })
+
+    it('recomputes when cached parentComps references a removed component', () => {
+      const mgr = ComponentManager.getInstance()
+      const gone = {
+        id: 'gone',
+        rendered: true,
+        render: () => true,
+        constructor: Object,
+      }
+      const kept = {
+        id: 'kept',
+        rendered: true,
+        render: () => true,
+        constructor: Object,
+      }
+      mgr.setComponent(gone)
+      mgr.setComponent(kept)
+
+      const outer = document.createElement('div')
+      outer.id = 'kept'
+      document.body.appendChild(outer)
+      const inner = document.createElement('div')
+      inner.id = 'gone'
+      outer.appendChild(inner)
+      const leaf = document.createElement('span')
+      inner.appendChild(leaf)
+
+      mgr.getParentComps(leaf)
+      mgr.removeComponent(gone)
+      const parents = mgr.getParentComps(leaf)
+      assert.equal(parents.length, 1)
+      assert.equal(parents[0], kept)
     })
   })
 
