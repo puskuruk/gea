@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { geaPlugin } from '../../src/index'
+import { __escapeHtml, __sanitizeAttr } from '../../../gea/src/lib/base/component'
 
 const HELPERS_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -43,16 +44,22 @@ export async function transformGeaSourceToEvalBody(source: string, id: string): 
  * Compile a source file that defines multiple top-level classes (e.g. gea-ui `card.tsx`).
  * `exportNames` must list every class identifier to return from the eval closure.
  */
+const _xssHelpers = { __escapeHtml, __sanitizeAttr }
+
 export async function compileJsxModule(
   source: string,
   id: string,
   exportNames: string[],
   bindings: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
+  const allBindings = { ..._xssHelpers, ...bindings }
   const body = await transformGeaSourceToEvalBody(source, id)
   const compiledSource = `${body}
 return { ${exportNames.join(', ')} };`
-  return new Function(...Object.keys(bindings), compiledSource)(...Object.values(bindings)) as Record<string, unknown>
+  return new Function(...Object.keys(allBindings), compiledSource)(...Object.values(allBindings)) as Record<
+    string,
+    unknown
+  >
 }
 
 export async function compileJsxComponent(
@@ -61,10 +68,11 @@ export async function compileJsxComponent(
   className: string,
   bindings: Record<string, unknown>,
 ) {
+  const allBindings = { ..._xssHelpers, ...bindings }
   const body = await transformGeaSourceToEvalBody(source, id)
   const compiledSource = `${body}
 return ${className};`
-  return new Function(...Object.keys(bindings), compiledSource)(...Object.values(bindings))
+  return new Function(...Object.keys(allBindings), compiledSource)(...Object.values(allBindings))
 }
 
 export async function loadRuntimeModules(seed: string) {

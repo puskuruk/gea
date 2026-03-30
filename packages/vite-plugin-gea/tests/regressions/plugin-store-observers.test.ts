@@ -480,7 +480,7 @@ test('transitive getter-to-getter deps produce __via observers for underlying st
     /this\.__observe_local_showIssueDetail\((?:this\.showIssueDetail|undefined), null\)/,
     'showIssueDetail (transitive via issueMatch → routeStore.path) must route through the merged observer',
   )
-  assert.match(output, /Issue \$\{this\.issueId\}/, 'issueId must still participate in the truthy branch HTML')
+  assert.match(output, /Issue \$\{.*this\.issueId/, 'issueId must still participate in the truthy branch HTML')
   assert.doesNotMatch(
     output,
     /__geaRequestRender/,

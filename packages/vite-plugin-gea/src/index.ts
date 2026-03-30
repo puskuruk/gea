@@ -5,7 +5,7 @@ import { parseSource } from './parse.ts'
 import { injectHMR } from './hmr.ts'
 import { transformComponentFile, transformNonComponentJSX } from './transform-component.ts'
 import { convertFunctionalToClass } from './transform-functional.ts'
-import { isComponentTag } from './utils.ts'
+import { ensureImport, isComponentTag } from './utils.ts'
 import { pascalToKebabCase } from './transform-jsx.ts'
 import * as t from '@babel/types'
 import { dirname, relative, resolve } from 'node:path'
@@ -571,6 +571,11 @@ export function geaPlugin(): Plugin {
         }
 
         if (!transformed) return null
+
+        // Inject XSS prevention helper imports when the compiled output uses them
+        ensureImport(ast, '@geajs/core', '__escapeHtml')
+        ensureImport(ast, '@geajs/core', '__sanitizeAttr')
+
         const output = generate(ast, { sourceMaps: true, sourceFileName: cleanId }, code)
         return { code: output.code, map: output.map }
       } catch (error: any) {

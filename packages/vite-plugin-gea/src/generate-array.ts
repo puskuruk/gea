@@ -1,4 +1,6 @@
 import * as t from '@babel/types'
+
+const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'data', 'cite', 'poster', 'background'])
 import { appendToBody, id, js, jsBlockBody, jsExpr, jsMethod } from 'eszter'
 import type { ArrayMapBinding, ConditionalMapBinding, RelationalMapBinding } from './ir.ts'
 import { ITEM_IS_KEY } from './analyze-helpers.ts'
@@ -152,7 +154,12 @@ function buildPropPatcherFunction(
         : t.expressionStatement(
             t.callExpression(t.memberExpression(target, t.identifier('setAttribute')), [
               t.stringLiteral(attrName),
-              t.callExpression(t.identifier('String'), [t.identifier('__attrValue')]),
+              URL_ATTRS.has(attrName)
+                ? t.callExpression(t.identifier('__sanitizeAttr'), [
+                    t.stringLiteral(attrName),
+                    t.callExpression(t.identifier('String'), [t.identifier('__attrValue')]),
+                  ])
+                : t.callExpression(t.identifier('String'), [t.identifier('__attrValue')]),
             ]),
           )
     return t.arrowFunctionExpression(

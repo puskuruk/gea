@@ -701,6 +701,28 @@ function analyzeAttributes(
       ].includes(name)
     )
       return
+    if (name === 'dangerouslySetInnerHTML') {
+      // Track as a state-dependent binding for reactive innerHTML updates
+      const expr = attr.value.expression
+      if (templateSetupContext && !t.isJSXEmptyExpression(expr)) {
+        const setupStatements = collectTemplateSetupStatements(expr, templateSetupContext)
+        const dependencies = collectExpressionDependencies(expr, stateRefs, setupStatements)
+        const stateDeps = dependencies.filter((d) => d.storeVar || (d.pathParts.length > 0 && d.pathParts[0] !== 'props'))
+        if (stateDeps.length > 0) {
+          const selector = generateSelector(elementPath)
+          propBindings.push({
+            propName: '__state__',
+            selector,
+            type: 'attribute',
+            attributeName: 'dangerouslySetInnerHTML',
+            elementPath: [...elementPath],
+            expression: t.cloneNode(expr, true) as t.Expression,
+            setupStatements: setupStatements.length > 0 ? setupStatements : undefined,
+          })
+        }
+      }
+      return
+    }
     const expr = attr.value.expression
 
     const propName = resolvePropRef(expr, propsParamName, destructuredPropNames)

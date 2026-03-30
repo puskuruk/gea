@@ -324,11 +324,70 @@ function extractChildInstanceRef(expr: t.Expression): { instanceVar: string; gua
   return { instanceVar, guardExpr: expr.left as t.Expression }
 }
 
+/**
+ * True if expression contains any JSX elements or fragments.
+ * Such expressions produce HTML strings after compilation and must NOT be escaped.
+ */
+function expressionContainsJSX(expr: t.Expression): boolean {
+  let found = false
+  const check = (node: t.Node) => {
+    if (found) return
+    if (t.isJSXElement(node) || t.isJSXFragment(node)) {
+      found = true
+      return
+    }
+    for (const key of t.VISITOR_KEYS[node.type] || []) {
+      const child = (node as any)[key]
+      if (Array.isArray(child)) {
+        for (const c of child) {
+          if (c && typeof c === 'object' && 'type' in c) check(c)
+          if (found) return
+        }
+      } else if (child && typeof child === 'object' && 'type' in child) {
+        check(child)
+      }
+      if (found) return
+    }
+  }
+  check(expr)
+  return found
+}
+
+/**
+ * True if expression accesses `props.children` or `this.props.children`.
+ * The `children` prop contains compiler-generated HTML from the parent and must not be escaped.
+ */
+function isChildrenPropAccess(expr: t.Expression): boolean {
+  // props.children
+  if (
+    t.isMemberExpression(expr) &&
+    t.isIdentifier(expr.property) &&
+    expr.property.name === 'children' &&
+    t.isIdentifier(expr.object) &&
+    expr.object.name === 'props'
+  )
+    return true
+  // this.props.children
+  if (
+    t.isMemberExpression(expr) &&
+    t.isIdentifier(expr.property) &&
+    expr.property.name === 'children' &&
+    t.isMemberExpression(expr.object) &&
+    t.isThisExpression(expr.object.object) &&
+    t.isIdentifier(expr.object.property) &&
+    expr.object.property.name === 'props'
+  )
+    return true
+  return false
+}
+
 /** True if expression can evaluate to false when rendered in template (needs || '' to avoid "false" string). */
 function expressionMayBeFalsy(expr: t.Expression): boolean {
   if (t.isLogicalExpression(expr) && expr.operator === '&&') return true
   if (t.isConditionalExpression(expr)) return true
   if (t.isBooleanLiteral(expr) && !expr.value) return true
+  if (t.isOptionalMemberExpression(expr)) return true
+  if (t.isOptionalCallExpression(expr)) return true
   return false
 }
 
@@ -380,6 +439,16 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
+}
+
+const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'data', 'cite', 'poster', 'background'])
+
+function wrapWithSanitizeAttr(attrName: string, expr: t.Expression): t.Expression {
+  if (!URL_ATTRS.has(attrName)) return expr
+  return t.callExpression(t.identifier('__sanitizeAttr'), [
+    t.stringLiteral(attrName),
+    t.callExpression(t.identifier('String'), [expr]),
+  ])
 }
 
 function getStaticStringValue(expr: t.Expression): string | null {
@@ -982,6 +1051,7 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
   }
   let generatedEventSuffix: string | undefined
   let generatedEventToken: string | undefined
+  let dangerouslySetInnerHTMLExpr: t.Expression | undefined
   node.openingElement.attributes.forEach((attr) => {
     if (t.isJSXSpreadAttribute(attr)) {
       const err = new Error(
@@ -994,6 +1064,13 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
     const attrName = attr.name.name
     if (attrName === 'key') return
     if (attrName === 'id' && hasBindingId) return
+    if (attrName === 'dangerouslySetInnerHTML') {
+      const dsiValue = attr.value
+      if (t.isJSXExpressionContainer(dsiValue) && !t.isJSXEmptyExpression(dsiValue.expression)) {
+        dangerouslySetInnerHTMLExpr = dsiValue.expression as t.Expression
+      }
+      return
+    }
     if (attrName === 'ref') {
       const attrValue = attr.value
       if (
@@ -1210,7 +1287,8 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
         parts.push({ type: 'string', value: html })
         const expr = transformJSXExpression(rawExpr, ctx)
         const skipCondition = buildAttrSkipCondition(expr, rawExpr)
-        const templateExpr = propAttrName === 'class' ? buildTrimmedClassValueExpression(expr) : expr
+        const sanitizedExpr = wrapWithSanitizeAttr(propAttrName, expr)
+        const templateExpr = propAttrName === 'class' ? buildTrimmedClassValueExpression(expr) : sanitizedExpr
         if (t.isBooleanLiteral(skipCondition) && !skipCondition.value) {
           // Attribute is always present — inline it without a conditional wrapper
           parts.push({ type: 'string', value: ` ${propAttrName}="` })
@@ -1241,7 +1319,12 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
     }
   })
 
-  if (node.openingElement.selfClosing) {
+  if (dangerouslySetInnerHTMLExpr) {
+    html += '>'
+    parts.push({ type: 'string', value: html })
+    parts.push({ type: 'expression', value: dangerouslySetInnerHTMLExpr })
+    appendString(parts, `</${effectiveTag}>`)
+  } else if (node.openingElement.selfClosing) {
     if (isComp) {
       parts.push({ type: 'string', value: html + `></${effectiveTag}>` })
     } else if (VOID_ELEMENTS.has(effectiveTag!)) {
@@ -1355,7 +1438,21 @@ function processChildren(
         if (expressionMayBeFalsy(rawExpr)) {
           expr = t.logicalExpression('||', expr, t.stringLiteral(''))
         }
-        parts.push({ type: 'expression', value: expr })
+        // Wrap plain text expressions with __escapeHtml to prevent XSS.
+        // Skip escaping for:
+        // - State child slot expressions (childCallInfo != null): compiler-generated HTML
+        // - props.children references: contain HTML from parent component
+        // - Expressions containing JSX: produce compiler-generated HTML
+        // - Map callback expressions: item properties may hold component instances
+        //   whose toString() returns HTML (e.g. {item.content} in Tabs)
+        const skipEscape =
+          childCallInfo || isChildrenPropAccess(rawExpr) || expressionContainsJSX(rawExpr) || ctx.inMapCallback
+        const safeExpr = skipEscape
+          ? expr
+          : t.callExpression(t.identifier('__escapeHtml'), [
+              t.callExpression(t.identifier('String'), [expr]),
+            ])
+        parts.push({ type: 'expression', value: safeExpr })
       }
     }
   })

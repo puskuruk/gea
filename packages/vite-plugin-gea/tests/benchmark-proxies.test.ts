@@ -4,6 +4,7 @@ import test from 'node:test'
 import { JSDOM } from 'jsdom'
 
 import { geaPlugin } from '../src/index'
+import { __escapeHtml, __sanitizeAttr } from '../../gea/src/lib/base/component'
 
 function installDom() {
   const dom = new JSDOM('<!doctype html><html><body></body></html>')
@@ -53,6 +54,7 @@ async function flushMicrotasks() {
 }
 
 async function compileJsxComponent(source: string, id: string, className: string, bindings: Record<string, unknown>) {
+  const allBindings = { __escapeHtml, __sanitizeAttr, ...bindings }
   const plugin = geaPlugin()
   const transform = typeof plugin.transform === 'function' ? plugin.transform : plugin.transform?.handler
   const result = await transform?.call({} as never, source, id)
@@ -66,7 +68,7 @@ async function compileJsxComponent(source: string, id: string, className: string
     .replace(/export default class\s+/, 'class ')}
 return ${className};`
 
-  return new Function(...Object.keys(bindings), compiledSource)(...Object.values(bindings))
+  return new Function(...Object.keys(allBindings), compiledSource)(...Object.values(allBindings))
 }
 
 async function loadRuntimeModules(seed: string) {

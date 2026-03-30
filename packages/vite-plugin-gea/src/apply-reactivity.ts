@@ -2,6 +2,8 @@ import babelGenerator from '@babel/generator'
 import * as t from '@babel/types'
 
 const generate = 'default' in babelGenerator ? babelGenerator.default : babelGenerator
+
+const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'data', 'cite', 'poster', 'background'])
 import { appendToBody, id, js, jsBlockBody, jsExpr, jsMethod } from 'eszter'
 import type { NodePath } from '@babel/traverse'
 import type { ClassMethod } from '@babel/types'
@@ -907,6 +909,15 @@ export function applyStaticReactivity(
                     ),
                   ),
                 )
+              } else if (attrName === 'dangerouslySetInnerHTML') {
+                // dangerouslySetInnerHTML: assign directly to innerHTML (no escaping)
+                updateStmt = t.expressionStatement(
+                  t.assignmentExpression(
+                    '=',
+                    t.memberExpression(t.identifier('__el'), t.identifier('innerHTML')),
+                    t.callExpression(t.identifier('String'), [valueExpr]),
+                  ),
+                )
               } else {
                 const isBooleanAttr = BOOLEAN_HTML_ATTRS.has(attrName)
                 const removeCondition = isBooleanAttr
@@ -926,7 +937,14 @@ export function applyStaticReactivity(
                   t.expressionStatement(
                     t.callExpression(t.memberExpression(t.identifier('__el'), t.identifier('setAttribute')), [
                       t.stringLiteral(attrName),
-                      isBooleanAttr ? t.stringLiteral('') : t.callExpression(t.identifier('String'), [valueExpr]),
+                      isBooleanAttr
+                        ? t.stringLiteral('')
+                        : URL_ATTRS.has(attrName)
+                          ? t.callExpression(t.identifier('__sanitizeAttr'), [
+                              t.stringLiteral(attrName),
+                              t.callExpression(t.identifier('String'), [valueExpr]),
+                            ])
+                          : t.callExpression(t.identifier('String'), [valueExpr]),
                     ]),
                   ),
                 )
