@@ -600,6 +600,9 @@ export default class Component<P = Record<string, any>> extends Store {
       child.mountCompiledChildComponents_()
       child.instantiateChildComponents_()
       child.setupEventDirectives_()
+      if (typeof (child as any).__setupRefs === 'function') {
+        ;(child as any).__setupRefs()
+      }
       child.onAfterRender()
       child.onAfterRenderHooks()
       child.__syncUnrenderedListItems()
