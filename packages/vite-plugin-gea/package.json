@@ -40,6 +40,7 @@
     "gea-env.d.ts"
   ],
   "scripts": {
+    "prepublishOnly": "tsup src/index.ts --format esm --dts --clean --external vite",
     "build": "tsup src/index.ts --format esm --dts --clean --external vite",
     "test": "tsx --test 'tests/**/*.test.ts'",
     "test:e2e": "npx playwright test --config=../../tests/e2e/playwright.config.ts",
