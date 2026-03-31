@@ -4,29 +4,28 @@
 
 ### @geajs/vite-plugin (minor)
 
-**Modular compiler architecture rewrite — 20,467 → 17,390 lines (15% reduction), all 410 tests pass.**
+**Modular compiler architecture rewrite — 20,467 → 17,197 lines (16% reduction), all 410 tests pass.**
 
-#### Architecture changes
+#### New architecture
 
-- **Emitter registry** (`src/emit/`): Pluggable `PatchEmitter` interface for binding-type dispatch. Each binding type (text, class, attribute, style, checked, value) is a self-contained emitter module. Adding new binding types: create emitter file + 1-line registration.
+- **Emitter registry** (`src/emit/`): Pluggable `PatchEmitter` interface for binding-type dispatch. Adding new binding types: create emitter + 1-line registration. No orchestrator changes needed.
 
-- **Split gen-reactivity.ts** (2,285 lines → 5 focused modules):
-  - `reactivity.ts` — orchestrator with main state props loop
-  - `reactivity-arrays.ts` — array map processing
-  - `reactivity-bindings.ts` — prop binding analysis
-  - `reactivity-wiring.ts` — observer registration + createdHooks
-  - `reactivity-types.ts` — shared ReactivityContext type
+- **Reactivity split**: Monolithic `gen-reactivity.ts` (2,285 lines) → 5 focused modules: `reactivity.ts` (orchestrator), `reactivity-arrays.ts`, `reactivity-bindings.ts`, `reactivity-wiring.ts`, `reactivity-types.ts`.
 
-- **Shared JSX walker** (`analyze/jsx-walker.ts`): Shared `walkJSX()`, `classifyAttribute()`, `isEventAttribute()`, `isMapCall()` utilities used by both template-walker (analysis) and gen-template (codegen).
+- **Shared JSX walker** (`analyze/jsx-walker.ts`): `walkJSX()`, `classifyAttribute()`, `isEventAttribute()` shared between analysis and codegen walkers.
 
-- **Merged map-analyzer into template-walker**: Eliminated module boundary; one unified analysis walker.
+- **Shared template params** (`codegen/template-params.ts`): Deduplicated prop name/param analysis.
 
-#### Code quality improvements
+#### Eliminated dead code and indirection
 
-- **Generic AST deep-map**: Replaced 7+ hand-rolled 150-300 line recursive visitors with one 25-line `deepMap` using `t.VISITOR_KEYS`. Applied across prop-ref-utils.ts (-347), optionalize-utils.ts (-200), subpath-cache.ts (-283).
+- Deleted `ast-helpers.ts` barrel (62 lines of pure re-exports) — all 20 consumers updated to import directly
+- Merged `gen-observe.ts` (78-line wrapper) into `gen-observe-helpers.ts`
+- Deleted dead `postprocess/map-join.ts` and `postprocess/xss-imports.ts` (117 lines)
+- Merged `map-analyzer.ts` into `template-walker.ts`
 
-- **Unified array create/patch**: Shared `buildRefCacheAndApply` eliminates duplicated ref-cache + emit loops between createItem and patchItem.
+#### Code quality
 
-- **eszter tagged templates**: All codegen files converted from verbose `t.*` AST builders to readable eszter templates.
-
-- **Compressed all codegen + analyze files**: gen-events (-153), event-helpers (-148), gen-map-helpers (-203), gen-observer-wiring (-89), gen-clone (-56), generator (-57), dependency-collector (-109), binding-resolver (-80), helpers (-96), array subsystem (-376).
+- Generic `deepMap`/`walk` helpers replace 7+ hand-rolled 150-300 line recursive visitors
+- All codegen converted to eszter tagged templates
+- Unified array create/patch loop via `buildRefCacheAndApply`
+- Compressed all codegen + analyze files (event helpers -30%, map helpers -28%, array subsystem -19%, analyze files -23%)
