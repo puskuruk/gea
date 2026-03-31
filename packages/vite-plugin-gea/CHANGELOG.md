@@ -1,5 +1,11 @@
 # @geajs/vite-plugin
 
+## 1.0.24
+
+### Patch Changes
+
+- [`fe1a433`](https://github.com/dashersw/gea/commit/fe1a4336462a4d99faee1bd6a561f96fb06c3c1f) Thanks [@dashersw](https://github.com/dashersw)! - Fix destructured `{children}` prop being double-escaped in template output. `isChildrenPropAccess` only recognized `props.children` and `this.props.children` but not the bare `children` identifier from `template({ children })`. The children HTML from the parent was wrapped with `__escapeHtml(String(children))`, rendering it as visible HTML text instead of parsed DOM.
+
 ## 1.0.23
 
 ### Patch Changes
