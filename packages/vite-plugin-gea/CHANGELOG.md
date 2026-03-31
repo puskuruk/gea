@@ -1,5 +1,11 @@
 # @geajs/vite-plugin
 
+## 1.0.19
+
+### Patch Changes
+
+- [`471c0c0`](https://github.com/dashersw/gea/commit/471c0c0f92a211af633a6038170c522cba6c23a2) Thanks [@dashersw](https://github.com/dashersw)! - Add equality guards for setAttribute, style.cssText, and innerHTML in compiled observer methods to skip redundant DOM writes when the value has not changed
+
 ## 1.0.18
 
 ### Patch Changes
