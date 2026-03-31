@@ -7,8 +7,8 @@ import test from 'node:test'
 import babelGenerator from '@babel/generator'
 import { JSDOM } from 'jsdom'
 
-import { parseSource } from '../src/parse'
-import { transformComponentFile } from '../src/transform-component'
+import { parseSource } from '../src/parse/parser.ts'
+import { transformComponentFile } from '../src/codegen/generator.ts'
 import { geaPlugin } from '../src/index'
 import { buildEvalPrelude, mergeEvalBindings } from './helpers/compile'
 

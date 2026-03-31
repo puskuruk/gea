@@ -7,7 +7,8 @@
  */
 import { t } from '../utils/babel-interop.ts'
 import { escapeHtml, normalizeJSXText, toHtmlAttrName, camelToKebab } from '../utils/html.ts'
-import { VOID_ELEMENTS, EVENT_TYPES, RESERVED_HTML_TAG_NAMES, toGeaEventType } from '../ir/constants.ts'
+import { VOID_ELEMENTS, EVENT_TYPES, RESERVED_HTML_TAG_NAMES } from '../ir/constants.ts'
+import { toGeaEventType } from './event-helpers.ts'
 import {
   getJSXTagName,
   isComponentTag as isCompTag,

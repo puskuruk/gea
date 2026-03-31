@@ -1,6 +1,6 @@
 import { t } from '../utils/babel-interop.ts'
 import { id, js, jsExpr } from 'eszter'
-import { ensureImport } from '../utils.ts'
+import { ensureImport } from '../codegen/member-chain.ts'
 
 const hot = () =>
   t.memberExpression(

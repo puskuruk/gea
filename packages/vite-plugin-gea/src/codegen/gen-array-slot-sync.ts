@@ -7,9 +7,9 @@ import type { NodePath } from '@babel/traverse'
 import { id, jsMethod } from 'eszter'
 import type { UnresolvedMapInfo } from '../ir/types.ts'
 import { ITEM_IS_KEY } from '../analyze/helpers.ts'
-import { buildComponentPropsExpression, collectTemplateSetupStatements } from '../transform-attributes.ts'
-import type { TemplateSetupContext } from '../transform-attributes.ts'
-import { transformJSXExpression, transformJSXFragmentToTemplate } from '../transform-jsx.ts'
+import { buildComponentPropsExpression, collectTemplateSetupStatements } from '../analyze/binding-resolver.ts'
+import type { TemplateSetupContext } from '../analyze/binding-resolver.ts'
+import { transformJSXExpression, transformJSXFragmentToTemplate } from './gen-template.ts'
 import {
   getJSXTagName,
   isComponentTag,

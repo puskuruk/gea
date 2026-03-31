@@ -14,8 +14,8 @@ import {
   t,
 } from './plugin-helpers'
 import type { ArrayMapBinding } from './plugin-helpers'
-import { generateCreateItemMethod } from '../../src/generate-array-patch'
-import { generateEnsureArrayConfigsMethod } from '../../src/generate-array'
+import { generateCreateItemMethod } from '../../src/codegen/gen-array-patch.ts'
+import { generateEnsureArrayConfigsMethod } from '../../src/codegen/gen-array.ts'
 
 test('array observer preserves DOM order for unshift insertions', () => {
   withDom(() => {

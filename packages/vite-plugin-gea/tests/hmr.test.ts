@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { parse } from '@babel/parser'
 import _generate from '@babel/generator'
-import { injectHMR } from '../src/hmr.ts'
+import { injectHMR } from '../src/postprocess/hmr.ts'
 
 const generate = typeof (_generate as any).default === 'function' ? (_generate as any).default : _generate
 

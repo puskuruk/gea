@@ -9,7 +9,7 @@
 import { t } from '../utils/babel-interop.ts'
 import type { AnalysisResult } from '../analyze/analyzer.ts'
 import { buildElementNavExpr, childPathRefName, templateRequiresRerender } from './gen-array-patch.ts'
-import { transformJSXExpression, type Ctx } from '../transform-jsx.ts'
+import { transformJSXExpression, type Ctx } from './gen-template.ts'
 import {
   getHoistableRootEvent,
   getPropContext,

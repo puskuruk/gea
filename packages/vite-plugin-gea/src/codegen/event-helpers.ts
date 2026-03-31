@@ -10,7 +10,7 @@ import type { NodePath } from '@babel/traverse'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { parseSource } from '../parse/parser.ts'
-import { getTemplateParamBinding } from '../template-param-utils.ts'
+import { getTemplateParamBinding } from '../analyze/template-param-utils.ts'
 
 // ─── Public types ───────────────────────────────────────────────────
 

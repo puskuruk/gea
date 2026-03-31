@@ -3,13 +3,6 @@ export const VOID_ELEMENTS = new Set([
   'link', 'meta', 'param', 'source', 'track', 'wbr',
 ])
 
-export const EVENT_NAMES = new Set([
-  'onClick', 'onDblclick', 'onChange', 'onInput', 'onKeydown', 'onKeyup',
-  'onBlur', 'onFocus', 'onMousedown', 'onMouseup', 'onSubmit',
-  'onTap', 'onLongTap', 'onSwipeRight', 'onSwipeUp', 'onSwipeLeft', 'onSwipeDown',
-  'onDragstart', 'onDragend', 'onDragover', 'onDragleave', 'onDrop',
-])
-
 export const EVENT_TYPES = new Set([
   'click', 'dblclick', 'change', 'input', 'keydown', 'keyup',
   'blur', 'focus', 'mousedown', 'mouseup', 'submit',
@@ -26,14 +19,6 @@ export const BOOLEAN_HTML_ATTRS = new Set([
 ])
 
 export const INTERNAL_PROPS = new Set(['key', 'ref', 'dangerouslySetInnerHTML'])
-
-/** Convert an onXxx JSX event attribute name to its DOM event type. */
-export function toGeaEventType(attrName: string): string {
-  if (attrName.startsWith('on')) {
-    return attrName.charAt(2).toLowerCase() + attrName.slice(3)
-  }
-  return attrName
-}
 
 export const RESERVED_HTML_TAG_NAMES = new Set([
   'a', 'abbr', 'address', 'area', 'article', 'aside', 'audio',

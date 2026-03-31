@@ -19,7 +19,7 @@ import {
   getDirectChildElements,
   getJSXTagName,
 } from '../codegen/ast-helpers.ts'
-import { EVENT_NAMES, toGeaEventType } from '../component-event-helpers.ts'
+import { EVENT_NAMES, toGeaEventType } from '../codegen/event-helpers.ts'
 import { analyzeJSXInMap } from './map-analyzer.ts'
 import {
   resolveExpr,

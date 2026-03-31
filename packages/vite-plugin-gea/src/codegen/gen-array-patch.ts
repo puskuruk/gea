@@ -22,6 +22,7 @@ import {
   replacePropRefsInExpression,
 } from './ast-helpers.ts'
 import { ITEM_IS_KEY } from '../analyze/helpers.ts'
+import { EVENT_NAMES } from './event-helpers.ts'
 
 // ─── Patch entry types ─────────────────────────────────────────────
 
@@ -36,19 +37,6 @@ interface PatchPlan {
   entries: PatchEntry[]
   requiresRerender: boolean
 }
-
-// ─── Event name set ────────────────────────────────────────────────
-
-const EVENT_NAMES = new Set([
-  'click', 'dblclick',
-  'mousedown', 'mouseup', 'mouseover', 'mouseout', 'mousemove',
-  'keydown', 'keyup', 'keypress',
-  'focus', 'blur', 'input', 'change', 'submit', 'scroll',
-  'touchstart', 'touchmove', 'touchend',
-  'tap', 'longTap',
-  'swipeRight', 'swipeUp', 'swipeLeft', 'swipeDown',
-  'dragstart', 'dragend', 'dragover', 'dragleave', 'drop',
-])
 
 // ─── Dummy prop tree ───────────────────────────────────────────────
 

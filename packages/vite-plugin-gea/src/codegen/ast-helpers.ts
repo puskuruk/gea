@@ -9,7 +9,6 @@ export {
   getJSXTagName,
   isUpperCase,
   isComponentTag,
-  camelToKebab,
   isAlwaysStringExpression,
   isWhitespaceFree,
   buildTrimmedClassValueExpression,
@@ -17,6 +16,8 @@ export {
   generateSelector,
   getDirectChildElements,
 } from './jsx-utils.ts'
+
+export { camelToKebab } from '../utils/html.ts'
 
 export {
   ensureImport,
