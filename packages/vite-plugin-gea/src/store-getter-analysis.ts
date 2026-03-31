@@ -31,10 +31,6 @@ function resolveImportPath(importer: string, source: string): string | null {
 const getterDepsCache = new Map<string, Map<string, PathParts[]>>()
 const storeFieldsCache = new Map<string, Set<string>>()
 
-function isPrivateName(name: string): boolean {
-  return name.charCodeAt(0) === 95 || name.charCodeAt(name.length - 1) === 95
-}
-
 function extractGetterStatePaths(method: t.ClassMethod): PathParts[] | null {
   if (!t.isBlockStatement(method.body)) return null
   const paths = new Map<string, PathParts>()
@@ -48,7 +44,6 @@ function extractGetterStatePaths(method: t.ClassMethod): PathParts[] | null {
         return
       }
       const propName = node.property.name
-      if (isPrivateName(propName)) return
       if (!paths.has(propName)) {
         paths.set(propName, [propName])
       }
@@ -58,7 +53,6 @@ function extractGetterStatePaths(method: t.ClassMethod): PathParts[] | null {
       for (const prop of path.node.id.properties) {
         if (!t.isObjectProperty(prop) || !t.isIdentifier(prop.key)) continue
         const propName = prop.key.name
-        if (isPrivateName(propName)) continue
         if (!paths.has(propName)) {
           paths.set(propName, [propName])
         }

@@ -16,8 +16,7 @@ export type JsonSerializable = JsonPrimitive | JsonSerializable[] | { [key: stri
 
 /**
  * The minimal shape SSR expects from a reactive store instance.
- * Stores are plain objects whose *own* enumerable properties hold
- * serializable data alongside internal (underscore-prefixed) bookkeeping.
+ * Stores are plain objects whose *own* enumerable properties hold serializable data.
  */
 export interface GeaStore {
   [key: string]: unknown
@@ -31,6 +30,23 @@ export type StoreSnapshotEntry = [store: GeaStore, data: Record<string, unknown>
 
 /** Full snapshot array returned by `snapshotStores`. */
 export type StoreSnapshot = StoreSnapshotEntry[]
+
+/** Own keys on @geajs/core `Store` that are implementation details (not user data). */
+export const STORE_IMPL_OWN_KEYS = new Set([
+  '_selfProxy',
+  '_pendingChanges',
+  '_pendingChangesPool',
+  '_flushScheduled',
+  '_nextArrayOpId',
+  '_observerRoot',
+  '_proxyCache',
+  '_arrayIndexProxyCache',
+  '_internedArrayPaths',
+  '_topLevelProxies',
+  '_pathPartsCache',
+  '_pendingBatchKind',
+  '_pendingBatchArrayPathParts',
+])
 
 // ── Component types ─────────────────────────────────────────────────────────
 
@@ -122,11 +138,6 @@ export function isComponentConstructor(value: RouteEntry): value is GeaComponent
 /** Narrows a `RouteEntry` to a route group with children. */
 export function isRouteGroup(entry: RouteEntry): entry is RouteGroup {
   return typeof entry === 'object' && entry !== null && 'children' in entry
-}
-
-/** Check if a property key is internal (starts or ends with underscore). */
-export function isInternalProp(key: string): boolean {
-  return key.charCodeAt(0) === 95 || key.charCodeAt(key.length - 1) === 95
 }
 
 // ── Window augmentation (hydration state) ───────────────────────────────────

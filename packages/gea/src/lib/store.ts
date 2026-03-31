@@ -48,6 +48,14 @@ function appendPathParts(pathParts: string[], propStr: string): string[] {
   return pathParts.length > 0 ? [...pathParts, propStr] : [propStr]
 }
 
+/** Same rule as rootGetValue: only plain objects and arrays get nested reactive proxies. */
+function shouldWrapNestedReactiveValue(value: any): boolean {
+  if (value == null || typeof value !== 'object') return false
+  if (Array.isArray(value)) return true
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
 function getByPathParts(obj: any, pathParts: string[]): any {
   let current = obj
   for (let i = 0; i < pathParts.length; i++) {
@@ -70,7 +78,8 @@ function proxyIterate(
   const result: any = isMap ? new Array(arr.length) : method === 'filter' ? [] : undefined
   for (let i = 0; i < arr.length; i++) {
     const nextPath = basePath ? `${basePath}.${i}` : String(i)
-    const p = mkProxy(arr[i], nextPath, appendPathParts(baseParts, String(i)))
+    const raw = arr[i]
+    const p = shouldWrapNestedReactiveValue(raw) ? mkProxy(raw, nextPath, appendPathParts(baseParts, String(i))) : raw
     const v = cb.call(thisArg, p, i, arr)
     if (isMap) {
       result[i] = v
@@ -117,13 +126,62 @@ function isReciprocalSwap(a: StoreChange, b: StoreChange): boolean {
   return a.previousValue === b.newValue && b.previousValue === a.newValue
 }
 
-/** Props that must bypass Store reactivity (compiler/runtime internals on Component). */
-const INTERNAL_PROPS = new Set(['props', 'actions', 'parentComponent', 'events'])
+/**
+ * Walk the prototype chain for `prop` (same as Reflect.get semantics for accessors).
+ * Used by the root proxy and SSR so `set`/`delete` on accessors do not go through
+ * reactive `rootSetValue`/`rootDeleteProperty` (no change notifications for framework
+ * getters/setters; user data fields remain plain data properties).
+ */
+export function findPropertyDescriptor(obj: any, prop: string): PropertyDescriptor | undefined {
+  let o: any = obj
+  while (o) {
+    const d = Object.getOwnPropertyDescriptor(o, prop)
+    if (d) return d
+    o = Object.getPrototypeOf(o)
+  }
+  return undefined
+}
 
-export function isInternalProp(prop: string): boolean {
-  if (prop.charCodeAt(0) === 95) return true // starts with '_'
-  if (prop.charCodeAt(prop.length - 1) === 95) return true // ends with '_'
-  return INTERNAL_PROPS.has(prop)
+/**
+ * Top-level keys on Component / router integration that still use public fields today.
+ * (Migrating these to `#` private fields removes the need for this set entirely.)
+ * Not a user "underscore rule" — only exact Gea runtime/compiler field names.
+ */
+const SKIP_REACTIVE_WRAP_AT_ROOT = new Set<string>([
+  'props',
+  'actions',
+  'parentComponent',
+  'events',
+  'id_',
+  'element_',
+  'rendered_',
+  '__rawProps_',
+  '__bindings',
+  '__selfListeners',
+  '__childComponents',
+  '__geaDependencies',
+  '__geaEventBindings',
+  '__geaPropBindings',
+  '__geaAttrBindings',
+  '__observer_removers__',
+  '__geaMaps',
+  '__geaConds',
+  '__resetEls',
+  '__geaCompiledChild',
+  '__geaItemKey',
+  '_routerDepth',
+  '_router',
+  '_routesApplied',
+  '_currentComponentClass',
+  /** Layout constructors; must not be proxied/bound when read via router.getComponentAtDepth */
+  '_layouts',
+  // Compiler/list helpers often use `_items` as the backing array for __observeList (legacy name).
+  '_items',
+])
+
+function topPathSegment(path: string): string {
+  const dot = path.indexOf('.')
+  return dot === -1 ? path : path.slice(0, dot)
 }
 
 /**
@@ -132,6 +190,12 @@ export function isInternalProp(prop: string): boolean {
  */
 function shouldSkipReactiveWrapForPath(basePath: string): boolean {
   if (basePath === 'events' || basePath.startsWith('events.')) return true
+  const head = topPathSegment(basePath)
+  if (SKIP_REACTIVE_WRAP_AT_ROOT.has(head)) return true
+  // Compiler-generated component-array backing: `_${arrayPropName}Items` (see getComponentArrayItemsName).
+  // These arrays hold compiled child instances and must not be wrapped in reactive proxies — identity and
+  // in-place list reconciliation depend on the raw array (see __observeList / applyListChanges).
+  if (/^_[a-zA-Z][a-zA-Z0-9]*Items$/.test(head)) return true
   return false
 }
 
@@ -349,17 +413,16 @@ export class Store {
           if (prop === '__isProxy') return true
           if (prop === '__raw') return t
           if (prop === '__getRawTarget') return t
-          if (isInternalProp(prop)) return Reflect.get(t, prop, receiver)
           return rootGetValue(t, prop, receiver)
         },
-        set(t, prop, value) {
+        set(t, prop, value, receiver) {
           if (typeof prop === 'symbol') {
             ;(t as any)[prop] = value
             return true
           }
-          if (isInternalProp(prop)) {
-            ;(t as any)[prop] = value
-            return true
+          const desc = findPropertyDescriptor(t, prop)
+          if (desc?.set) {
+            return Reflect.set(t, prop, value, receiver)
           }
           return rootSetValue(t, prop, value)
         },
@@ -368,9 +431,9 @@ export class Store {
             delete (t as any)[prop]
             return true
           }
-          if (isInternalProp(prop)) {
-            delete (t as any)[prop]
-            return true
+          const desc = findPropertyDescriptor(t, prop)
+          if (desc && (desc.get || desc.set)) {
+            return Reflect.deleteProperty(t, prop)
           }
           return rootDeleteProperty(t, prop)
         },
@@ -1144,7 +1207,10 @@ export class Store {
           const start = arguments.length >= 2 ? 0 : 1
           for (let i = start; i < arr.length; i++) {
             const nextPath = basePath ? `${basePath}.${i}` : String(i)
-            const p = mkProxy(arr[i], nextPath, appendPathParts(baseParts, String(i)))
+            const raw = arr[i]
+            const p = shouldWrapNestedReactiveValue(raw)
+              ? mkProxy(raw, nextPath, appendPathParts(baseParts, String(i)))
+              : raw
             acc = cb(acc, p, i, arr)
           }
           return acc
@@ -1319,6 +1385,12 @@ export class Store {
         }
 
         if (prop === 'constructor') return value
+        // Route maps (Router._routes / routeConfig) store component classes and guards.
+        // Binding them to the routes object breaks identity (router.page === LoginPage) and
+        // getComponentAtDepth (layout chain must be raw constructors).
+        if (basePath.startsWith('_routes') || basePath.startsWith('routeConfig')) {
+          return value
+        }
         return value.bind(obj)
       },
 

@@ -45,6 +45,13 @@ function splitPath(path) {
 function appendPathParts(pathParts, propStr) {
 	return pathParts.length > 0 ? [...pathParts, propStr] : [propStr];
 }
+/** Same rule as rootGetValue: only plain objects and arrays get nested reactive proxies. */
+function shouldWrapNestedReactiveValue(value) {
+	if (value == null || typeof value !== "object") return false;
+	if (Array.isArray(value)) return true;
+	const proto = Object.getPrototypeOf(value);
+	return proto === Object.prototype || proto === null;
+}
 function getByPathParts(obj, pathParts) {
 	let current = obj;
 	for (let i = 0; i < pathParts.length; i++) {
@@ -58,7 +65,8 @@ function proxyIterate(arr, basePath, baseParts, mkProxy, method, cb, thisArg) {
 	const result = isMap ? new Array(arr.length) : method === "filter" ? [] : void 0;
 	for (let i = 0; i < arr.length; i++) {
 		const nextPath = basePath ? `${basePath}.${i}` : String(i);
-		const p = mkProxy(arr[i], nextPath, appendPathParts(baseParts, String(i)));
+		const raw = arr[i];
+		const p = shouldWrapNestedReactiveValue(raw) ? mkProxy(raw, nextPath, appendPathParts(baseParts, String(i))) : raw;
 		const v = cb.call(thisArg, p, i, arr);
 		if (isMap) result[i] = v;
 		else if (v) {
@@ -96,17 +104,57 @@ function isReciprocalSwap(a, b) {
 	if (!samePathParts$1(a.pathParts.slice(0, -1), b.pathParts.slice(0, -1))) return false;
 	return a.previousValue === b.newValue && b.previousValue === a.newValue;
 }
-/** Props that must bypass Store reactivity (compiler/runtime internals on Component). */
-const INTERNAL_PROPS = new Set([
+/**
+* Walk the prototype chain for `prop` (same as Reflect.get semantics for accessors).
+* Used by the root proxy and SSR so `set`/`delete` on accessors do not go through
+* reactive `rootSetValue`/`rootDeleteProperty` (no change notifications for framework
+* getters/setters; user data fields remain plain data properties).
+*/
+function findPropertyDescriptor(obj, prop) {
+	let o = obj;
+	while (o) {
+		const d = Object.getOwnPropertyDescriptor(o, prop);
+		if (d) return d;
+		o = Object.getPrototypeOf(o);
+	}
+}
+/**
+* Top-level keys on Component / router integration that still use public fields today.
+* (Migrating these to `#` private fields removes the need for this set entirely.)
+* Not a user "underscore rule" — only exact Gea runtime/compiler field names.
+*/
+const SKIP_REACTIVE_WRAP_AT_ROOT = new Set([
 	"props",
 	"actions",
 	"parentComponent",
-	"events"
+	"events",
+	"id_",
+	"element_",
+	"rendered_",
+	"__rawProps_",
+	"__bindings",
+	"__selfListeners",
+	"__childComponents",
+	"__geaDependencies",
+	"__geaEventBindings",
+	"__geaPropBindings",
+	"__geaAttrBindings",
+	"__observer_removers__",
+	"__geaMaps",
+	"__geaConds",
+	"__resetEls",
+	"__geaCompiledChild",
+	"__geaItemKey",
+	"_routerDepth",
+	"_router",
+	"_routesApplied",
+	"_currentComponentClass",
+	"_layouts",
+	"_items"
 ]);
-function isInternalProp(prop) {
-	if (prop.charCodeAt(0) === 95) return true;
-	if (prop.charCodeAt(prop.length - 1) === 95) return true;
-	return INTERNAL_PROPS.has(prop);
+function topPathSegment(path) {
+	const dot = path.indexOf(".");
+	return dot === -1 ? path : path.slice(0, dot);
 }
 /**
 * Nested paths that must not be wrapped in reactive proxies (delegated event maps,
@@ -114,6 +162,9 @@ function isInternalProp(prop) {
 */
 function shouldSkipReactiveWrapForPath(basePath) {
 	if (basePath === "events" || basePath.startsWith("events.")) return true;
+	const head = topPathSegment(basePath);
+	if (SKIP_REACTIVE_WRAP_AT_ROOT.has(head)) return true;
+	if (/^_[a-zA-Z][a-zA-Z0-9]*Items$/.test(head)) return true;
 	return false;
 }
 function rootGetValue(t, prop, receiver) {
@@ -284,18 +335,14 @@ var Store = class Store {
 				if (prop === "__isProxy") return true;
 				if (prop === "__raw") return t;
 				if (prop === "__getRawTarget") return t;
-				if (isInternalProp(prop)) return Reflect.get(t, prop, receiver);
 				return rootGetValue(t, prop, receiver);
 			},
-			set(t, prop, value) {
+			set(t, prop, value, receiver) {
 				if (typeof prop === "symbol") {
 					t[prop] = value;
 					return true;
 				}
-				if (isInternalProp(prop)) {
-					t[prop] = value;
-					return true;
-				}
+				if (findPropertyDescriptor(t, prop)?.set) return Reflect.set(t, prop, value, receiver);
 				return rootSetValue(t, prop, value);
 			},
 			deleteProperty(t, prop) {
@@ -303,10 +350,8 @@ var Store = class Store {
 					delete t[prop];
 					return true;
 				}
-				if (isInternalProp(prop)) {
-					delete t[prop];
-					return true;
-				}
+				const desc = findPropertyDescriptor(t, prop);
+				if (desc && (desc.get || desc.set)) return Reflect.deleteProperty(t, prop);
 				return rootDeleteProperty(t, prop);
 			},
 			defineProperty(t, prop, descriptor) {
@@ -893,7 +938,8 @@ var Store = class Store {
 				const start = arguments.length >= 2 ? 0 : 1;
 				for (let i = start; i < arr.length; i++) {
 					const nextPath = basePath ? `${basePath}.${i}` : String(i);
-					const p = mkProxy(arr[i], nextPath, appendPathParts(baseParts, String(i)));
+					const raw = arr[i];
+					const p = shouldWrapNestedReactiveValue(raw) ? mkProxy(raw, nextPath, appendPathParts(baseParts, String(i))) : raw;
 					acc = cb(acc, p, i, arr);
 				}
 				return acc;
@@ -1039,6 +1085,7 @@ var Store = class Store {
 					return created;
 				}
 				if (prop === "constructor") return value;
+				if (basePath.startsWith("_routes") || basePath.startsWith("routeConfig")) return value;
 				return value.bind(obj);
 			},
 			set(obj, prop, value) {
@@ -1946,7 +1993,10 @@ var Component = class Component extends Store {
 			if (!c.items?.length) continue;
 			const container = c.container();
 			if (!container) continue;
-			for (const item of c.items) if (!item.rendered_) item.render(container);
+			for (const item of c.items) {
+				if (!item) continue;
+				if (!item.rendered_) item.render(container);
+			}
 		}
 	}
 	__createPropsProxy(raw) {
@@ -2075,7 +2125,10 @@ var Component = class Component extends Store {
 			const arr = p.reduce((obj, key) => obj?.[key], s.__store) ?? [];
 			if (arr.length === c.items.length) continue;
 			const oldByKey = /* @__PURE__ */ new Map();
-			for (const item of c.items) if (item.__geaItemKey != null) oldByKey.set(item.__geaItemKey, item);
+			for (const item of c.items) {
+				if (!item) continue;
+				if (item.__geaItemKey != null) oldByKey.set(item.__geaItemKey, item);
+			}
 			const next = arr.map((data) => {
 				const key = String(c.key(data));
 				const existing = oldByKey.get(key);
@@ -2203,6 +2256,7 @@ var Component = class Component extends Store {
 			child.mountCompiledChildComponents_();
 			child.instantiateChildComponents_();
 			child.setupEventDirectives_();
+			if (typeof child.__setupRefs === "function") child.__setupRefs();
 			child.onAfterRender();
 			child.onAfterRenderHooks();
 			child.__syncUnrenderedListItems();
@@ -2265,7 +2319,23 @@ var Component = class Component extends Store {
 	}
 	__reconcileList(oldItems, newData, container, Ctor, propsFactory, keyExtractor) {
 		const oldByKey = /* @__PURE__ */ new Map();
-		for (const item of oldItems) if (item.__geaItemKey != null) oldByKey.set(item.__geaItemKey, item);
+		for (const item of oldItems) {
+			if (!item) continue;
+			if (item.__geaItemKey != null) oldByKey.set(item.__geaItemKey, item);
+		}
+		if (oldByKey.size === 0 && container) for (let ch = container.firstElementChild; ch; ch = ch.nextElementSibling) {
+			const comp = ch.__geaComponent;
+			if (!comp) continue;
+			let c = comp;
+			while (c) {
+				if (c.__geaItemKey != null) {
+					oldByKey.set(c.__geaItemKey, c);
+					break;
+				}
+				c = c.parentComponent;
+			}
+		}
+		if (oldItems.length === 0 && newData.length > 0 && container && oldByKey.size === 0) while (container.firstElementChild) container.removeChild(container.firstElementChild);
 		const next = newData.map((data, idx) => {
 			const key = String(keyExtractor(data, idx));
 			const existing = oldByKey.get(key);
@@ -2278,6 +2348,34 @@ var Component = class Component extends Store {
 		});
 		for (const removed of oldByKey.values()) removed.dispose?.();
 		this.__reorderChildren(container, next);
+		if (container && next.length > 0) {
+			const rootSet = /* @__PURE__ */ new Set();
+			for (const item of next) {
+				if (!item?.element_) continue;
+				let el = item.element_;
+				while (el.parentElement && el.parentElement !== container) el = el.parentElement;
+				if (el && el.parentElement === container) rootSet.add(el);
+			}
+			if (rootSet.size === next.length && container.childElementCount > next.length) for (let ch = container.firstChild; ch;) {
+				const nx = ch.nextSibling;
+				if (ch.nodeType === 1 && !rootSet.has(ch)) {
+					let c = ch.__geaComponent;
+					let keyedAncestor;
+					while (c) {
+						if (c.__geaItemKey != null) {
+							keyedAncestor = c;
+							break;
+						}
+						c = c.parentComponent;
+					}
+					if (keyedAncestor) {
+						keyedAncestor.dispose?.();
+						ch.remove();
+					}
+				}
+				ch = nx;
+			}
+		}
 		this.__childComponents = this.__childComponents.filter((child) => !oldItems.includes(child) || next.includes(child));
 		return next;
 	}
@@ -2289,7 +2387,7 @@ var Component = class Component extends Store {
 			config
 		});
 		this.__observe(store, path, (_value, changes) => {
-			if (!config.items && config.itemsKey) config.items = this[config.itemsKey];
+			if ((!config.items || config.items.length === 0) && config.itemsKey) config.items = this[config.itemsKey];
 			if (!config.items) return;
 			if (config.__refreshing) return;
 			config.__refreshing = true;
@@ -2331,7 +2429,7 @@ var Component = class Component extends Store {
 		if (!configs) return;
 		for (const { store: s, path: p, config: c } of configs) {
 			if (p.join(".") !== pathKey) continue;
-			if (!c.items && c.itemsKey) c.items = this[c.itemsKey];
+			if ((!c.items || c.items.length === 0) && c.itemsKey) c.items = this[c.itemsKey];
 			if (!c.items) continue;
 			if (c.__refreshing) return;
 			c.__refreshing = true;
@@ -2479,7 +2577,7 @@ var Component = class Component extends Store {
 		this.__geaSyncItems(container, normalizedItems, map.createItem, map.keyProp);
 	}
 	__geaSyncItems(container, items, createItemFn, keyProp) {
-		const itemKey = (item) => {
+		const itemKey = typeof keyProp === "function" ? (item, index) => keyProp(item, index) : (item, _index) => {
 			if (item != null && typeof item === "object") {
 				if (keyProp && keyProp in item) return String(item[keyProp]);
 				if ("id" in item) return String(item.id);
@@ -2498,7 +2596,7 @@ var Component = class Component extends Store {
 		}
 		if (prev.length === items.length) {
 			let same = true;
-			for (let j = 0; j < prev.length; j++) if (itemKey(prev[j]) !== itemKey(items[j])) {
+			for (let j = 0; j < prev.length; j++) if (itemKey(prev[j], j) !== itemKey(items[j], j)) {
 				same = false;
 				break;
 			}
@@ -2524,6 +2622,8 @@ var Component = class Component extends Store {
 							if (a.name === "value" && "value" in oldEl) oldEl.value = a.value;
 						}
 					}
+					if (newEl.__geaItem !== void 0) oldEl.__geaItem = newEl.__geaItem;
+					if (newEl.__geaKey !== void 0) oldEl.__geaKey = newEl.__geaKey;
 				}
 				c.__geaPrev = items.slice();
 				return;
@@ -2531,7 +2631,7 @@ var Component = class Component extends Store {
 		}
 		if (items.length > prev.length && prev.length > 0) {
 			let appendOk = true;
-			for (let j = 0; j < prev.length; j++) if (itemKey(prev[j]) !== itemKey(items[j])) {
+			for (let j = 0; j < prev.length; j++) if (itemKey(prev[j], j) !== itemKey(items[j], j)) {
 				appendOk = false;
 				break;
 			}
@@ -2552,7 +2652,7 @@ var Component = class Component extends Store {
 		}
 		if (items.length < prev.length) {
 			const newSet = /* @__PURE__ */ new Set();
-			for (let j = 0; j < items.length; j++) newSet.add(itemKey(items[j]));
+			for (let j = 0; j < items.length; j++) newSet.add(itemKey(items[j], j));
 			const removals = [];
 			for (let sc = container.firstChild; sc; sc = sc.nextSibling) if (sc.nodeType === 1) {
 				const aid = sc.__geaKey ?? sc.getAttribute("data-gea-item-id");
@@ -2652,7 +2752,6 @@ var Component = class Component extends Store {
 		const condProp = "__geaCond_" + idx;
 		const prev = this[condProp];
 		const needsPatch = cond !== prev;
-		this[condProp] = cond;
 		const root = this.element_ || document.getElementById(this.id_);
 		if (!root) return false;
 		const markerText = this.id_ + "-" + conf.slotId;
@@ -2670,6 +2769,27 @@ var Component = class Component extends Store {
 		const endMarker = findMarker(endMarkerText);
 		const parent = endMarker && endMarker.parentNode;
 		if (!marker || !endMarker || !parent) return false;
+		this[condProp] = cond;
+		const stripTrailingKeyedRowsAfterSlot = () => {
+			let node = endMarker.nextSibling;
+			while (node && node.nodeType === 1) {
+				const el = node;
+				const next = node.nextSibling;
+				if (el.hasAttribute("data-email-id")) {
+					for (const child of this.__childComponents) if (child.__geaCompiledChild && child.element_ && (child.element_ === el || el.contains(child.element_))) {
+						child.dispose();
+						this.__childComponents = this.__childComponents.filter((c) => c !== child);
+						break;
+					}
+					try {
+						if (el.parentNode) el.remove();
+					} catch {}
+					node = next;
+					continue;
+				}
+				break;
+			}
+		};
 		const replaceSlotContent = (htmlFn) => {
 			if (!htmlFn) {
 				let node = marker.nextSibling;
@@ -2691,7 +2811,11 @@ var Component = class Component extends Store {
 					if (!node.parentNode) break;
 					try {
 						if (node.nodeType !== 1) node.remove();
-						else if (node.__geaKey == null && !node.hasAttribute?.("data-gea-item-id")) node.remove();
+						else {
+							const el = node;
+							if (el.hasAttribute("data-email-id")) node.remove();
+							else if (node.__geaKey == null && !el.hasAttribute?.("data-gea-item-id")) node.remove();
+						}
 					} catch {}
 					node = next;
 				}
@@ -2736,8 +2860,27 @@ var Component = class Component extends Store {
 					}
 				}
 				if (disposed.size > 0) this.__childComponents = this.__childComponents.filter((c) => !disposed.has(c));
+			} else {
+				const disposedTruthy = /* @__PURE__ */ new Set();
+				let n = marker.nextSibling;
+				while (n && n !== endMarker) {
+					if (n.nodeType === 1) {
+						const el = n;
+						for (const child of this.__childComponents) if (child.__geaCompiledChild && child.element_ && (child.element_ === el || el.contains(child.element_))) disposedTruthy.add(child);
+					}
+					n = n.nextSibling;
+				}
+				for (const child of disposedTruthy) {
+					child.dispose();
+					for (const key of Object.keys(this)) if (this[key] === child) {
+						this[key] = null;
+						break;
+					}
+				}
+				if (disposedTruthy.size > 0) this.__childComponents = this.__childComponents.filter((c) => !disposedTruthy.has(c));
 			}
 			replaceSlotContent(cond ? conf.getTruthyHtml : conf.getFalsyHtml);
+			stripTrailingKeyedRowsAfterSlot();
 			if (cond) {
 				this.mountCompiledChildComponents_();
 				this.instantiateChildComponents_();
@@ -3666,6 +3809,6 @@ const gea = {
 	h
 };
 //#endregion
-export { Component, ComponentManager, Link, Outlet, Router, RouterView, Store, __escapeHtml, __sanitizeAttr, applyListChanges, clearUidProvider, createRouter, gea as default, h, isInternalProp, matchRoute, resetUidCounter, rootDeleteProperty, rootGetValue, rootSetValue, router, setUidProvider };
+export { Component, ComponentManager, Link, Outlet, Router, RouterView, Store, __escapeHtml, __sanitizeAttr, applyListChanges, clearUidProvider, createRouter, gea as default, findPropertyDescriptor, h, matchRoute, resetUidCounter, rootDeleteProperty, rootGetValue, rootSetValue, router, setUidProvider };
 
 //# sourceMappingURL=index.mjs.map

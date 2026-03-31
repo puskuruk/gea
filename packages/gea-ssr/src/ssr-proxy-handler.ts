@@ -1,4 +1,4 @@
-import { isInternalProp, rootDeleteProperty, rootGetValue, rootSetValue, type Store } from '@geajs/core'
+import { findPropertyDescriptor, rootDeleteProperty, rootGetValue, rootSetValue, type Store } from '@geajs/core'
 import { resolveOverlay } from './ssr-context'
 
 /** Sentinel for SSR overlay deletes — must match overlay checks in traps below */
@@ -18,7 +18,6 @@ export function createSSRRootProxyHandler(): ProxyHandler<Store> {
         if (prop === '__isProxy') return true
         if (prop === '__raw') return t
         if (prop === '__getRawTarget') return t
-        if (isInternalProp(prop)) return Reflect.get(t, prop, receiver)
         const overlay = resolveOverlay(t)
         if (overlay !== undefined) {
           if (Object.prototype.hasOwnProperty.call(overlay, prop)) {
@@ -29,14 +28,14 @@ export function createSSRRootProxyHandler(): ProxyHandler<Store> {
         }
         return rootGetValue(t, prop, receiver)
       },
-      set(t, prop, value) {
+      set(t, prop, value, receiver) {
         if (typeof prop === 'symbol') {
           ;(t as any)[prop] = value
           return true
         }
-        if (isInternalProp(prop)) {
-          ;(t as any)[prop] = value
-          return true
+        const desc = findPropertyDescriptor(t, prop)
+        if (desc?.set) {
+          return Reflect.set(t, prop, value, receiver)
         }
         const overlay = resolveOverlay(t)
         if (overlay !== undefined) {
@@ -50,9 +49,9 @@ export function createSSRRootProxyHandler(): ProxyHandler<Store> {
           delete (t as any)[prop]
           return true
         }
-        if (isInternalProp(prop)) {
-          delete (t as any)[prop]
-          return true
+        const desc = findPropertyDescriptor(t, prop)
+        if (desc && (desc.get || desc.set)) {
+          return Reflect.deleteProperty(t, prop)
         }
         const overlay = resolveOverlay(t)
         if (overlay !== undefined) {
@@ -63,7 +62,6 @@ export function createSSRRootProxyHandler(): ProxyHandler<Store> {
       },
       has(t, prop) {
         if (typeof prop === 'symbol') return Reflect.has(t, prop)
-        if (isInternalProp(prop)) return Reflect.has(t, prop)
         const overlay = resolveOverlay(t)
         if (overlay !== undefined) {
           if (Object.prototype.hasOwnProperty.call(overlay, prop)) {
@@ -79,7 +77,7 @@ export function createSSRRootProxyHandler(): ProxyHandler<Store> {
           const overlayKeys = Object.keys(overlay)
           const combined = new Set<string | symbol>([...targetKeys, ...overlayKeys])
           for (const key of combined) {
-            if (typeof key === 'string' && !isInternalProp(key) && key !== 'constructor') {
+            if (typeof key === 'string' && key !== 'constructor') {
               if (Object.prototype.hasOwnProperty.call(overlay, key) && overlay[key] === SSR_DELETED) {
                 combined.delete(key)
               }
@@ -90,7 +88,7 @@ export function createSSRRootProxyHandler(): ProxyHandler<Store> {
         return Reflect.ownKeys(t)
       },
       getOwnPropertyDescriptor(t, prop) {
-        if (typeof prop === 'string' && !isInternalProp(prop)) {
+        if (typeof prop === 'string') {
           const overlay = resolveOverlay(t)
           if (overlay !== undefined) {
             if (Object.prototype.hasOwnProperty.call(overlay, prop)) {

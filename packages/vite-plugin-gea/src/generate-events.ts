@@ -175,6 +175,19 @@ function isDirectThisMethodRef(handler: EventHandler): boolean {
   )
 }
 
+/**
+ * ComponentManager invokes cached handlers as `handler.call(comp, e)` (and may pass a third arg).
+ * A bare `this.__event_*` reference can lose the correct receiver across delegated dispatch; wrap in an
+ * arrow so lexical `this` from `get events()` always matches the component that defined the handler.
+ */
+function wrapEventsGetterHandlerRef(methodProperty: t.Identifier): t.ArrowFunctionExpression {
+  const callee = t.memberExpression(t.thisExpression(), methodProperty)
+  return t.arrowFunctionExpression(
+    [t.identifier('e'), t.identifier('targetComponent')],
+    t.callExpression(callee, [t.identifier('e'), t.identifier('targetComponent')]),
+  )
+}
+
 function appendEventsGetterHandlers(
   classBody: t.ClassBody,
   handlers: EventHandler[],
@@ -190,7 +203,7 @@ function appendEventsGetterHandlers(
 
     if (isDirectThisMethodRef(handler)) {
       const prop = (handler.handlerExpression as t.MemberExpression).property as t.Identifier
-      handlerRef = t.memberExpression(t.thisExpression(), t.cloneNode(prop) as t.Identifier)
+      handlerRef = wrapEventsGetterHandlerRef(t.cloneNode(prop) as t.Identifier)
     } else {
       let methodName = handler.methodName || `__event_${handler.eventType}_${index}`
       let uniqueIndex = 1
@@ -203,7 +216,7 @@ function appendEventsGetterHandlers(
         classBody.body.push(buildSelectorHandlerMethod(handler, methodName, paramContext, setupStatements))
       }
 
-      handlerRef = t.memberExpression(t.thisExpression(), t.identifier(methodName))
+      handlerRef = wrapEventsGetterHandlerRef(t.identifier(methodName))
     }
 
     const selectorExpr = handler.selectorExpression

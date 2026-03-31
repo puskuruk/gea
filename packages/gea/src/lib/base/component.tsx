@@ -252,6 +252,7 @@ export default class Component<P = Record<string, any>> extends Store {
       const container = c.container()
       if (!container) continue
       for (const item of c.items) {
+        if (!item) continue
         if (!item.rendered_) item.render(container)
       }
     }
@@ -429,6 +430,7 @@ export default class Component<P = Record<string, any>> extends Store {
         if (arr.length === c.items.length) continue
         const oldByKey = new Map<string, AnyComponent>()
         for (const item of c.items) {
+          if (!item) continue
           if (item.__geaItemKey != null) oldByKey.set(item.__geaItemKey, item)
         }
         const next = arr.map((data: any) => {
@@ -697,7 +699,34 @@ export default class Component<P = Record<string, any>> extends Store {
   ): AnyComponent[] {
     const oldByKey = new Map<string, AnyComponent>()
     for (const item of oldItems) {
+      if (!item) continue
       if (item.__geaItemKey != null) oldByKey.set(item.__geaItemKey, item)
+    }
+
+    // Backing `_*Items` can be a stale [] while keyed rows are already mounted (getter-backed
+    // lists refreshed via __refreshList). Recover instances from the DOM before deciding to
+    // clear the container; otherwise we wipe every row (DOM stability / foreign attributes).
+    if (oldByKey.size === 0 && container) {
+      for (let ch = container.firstElementChild; ch; ch = ch.nextElementSibling) {
+        const comp = (ch as HTMLElement & { __geaComponent?: AnyComponent }).__geaComponent
+        if (!comp) continue
+        let c: any = comp
+        while (c) {
+          if (c.__geaItemKey != null) {
+            oldByKey.set(c.__geaItemKey, c)
+            break
+          }
+          c = c.parentComponent
+        }
+      }
+    }
+
+    // First reconcile from an empty component list: the container may still hold static
+    // template HTML for the same map rows; rendering would append duplicate rows.
+    if (oldItems.length === 0 && newData.length > 0 && container && oldByKey.size === 0) {
+      while (container.firstElementChild) {
+        container.removeChild(container.firstElementChild)
+      }
     }
 
     const next = newData.map((data, idx) => {
@@ -716,6 +745,44 @@ export default class Component<P = Record<string, any>> extends Store {
     }
 
     this.__reorderChildren(container, next)
+
+    // Extra element children (duplicate map output) that are not roots for any item in `next`.
+    // Only when every reconciled item has a container root: otherwise element_ may not be ready yet
+    // and stripping would remove the whole list (e.g. todo filter / first paint).
+    if (container && next.length > 0) {
+      const rootSet = new Set<HTMLElement>()
+      for (const item of next) {
+        if (!item?.element_) continue
+        let el: HTMLElement | null = item.element_
+        while (el.parentElement && el.parentElement !== container) el = el.parentElement
+        if (el && el.parentElement === container) rootSet.add(el)
+      }
+      if (rootSet.size === next.length && container.childElementCount > next.length) {
+        for (let ch: ChildNode | null = container.firstChild; ch; ) {
+          const nx = ch.nextSibling
+          if (ch.nodeType === 1 && !rootSet.has(ch as HTMLElement)) {
+            const comp = (ch as HTMLElement & { __geaComponent?: AnyComponent }).__geaComponent
+            // Strip duplicate map rows: the DOM node may host a child component (e.g. Card)
+            // while the list key lives on the parent (e.g. ProductCard). Static siblings like
+            // CommentCreate have no keyed ancestor up to the list owner.
+            let c: any = comp
+            let keyedAncestor: AnyComponent | undefined
+            while (c) {
+              if (c.__geaItemKey != null) {
+                keyedAncestor = c
+                break
+              }
+              c = c.parentComponent
+            }
+            if (keyedAncestor) {
+              keyedAncestor.dispose?.()
+              ;(ch as HTMLElement).remove()
+            }
+          }
+          ch = nx
+        }
+      }
+    }
 
     // Clean up __childComponents
     this.__childComponents = this.__childComponents.filter((child) => !oldItems.includes(child) || next.includes(child))
@@ -742,8 +809,10 @@ export default class Component<P = Record<string, any>> extends Store {
     ;(this as any).__geaListConfigs.push({ store, path, config })
 
     this.__observe(store, path, (_value, changes) => {
-      // Lazily resolve items from the instance property if not yet available
-      if (!config.items && config.itemsKey) config.items = (this as any)[config.itemsKey]
+      // Lazily resolve items from the instance property if not yet available ([] is truthy — still sync)
+      if ((!config.items || config.items.length === 0) && config.itemsKey) {
+        config.items = (this as any)[config.itemsKey]
+      }
       if (!config.items) return
       if (config.__refreshing) return
       config.__refreshing = true
@@ -801,7 +870,9 @@ export default class Component<P = Record<string, any>> extends Store {
     if (!configs) return
     for (const { store: s, path: p, config: c } of configs) {
       if (p.join('.') !== pathKey) continue
-      if (!c.items && c.itemsKey) c.items = (this as any)[c.itemsKey]
+      if ((!c.items || c.items.length === 0) && c.itemsKey) {
+        c.items = (this as any)[c.itemsKey]
+      }
       if (!c.items) continue
       if (c.__refreshing) return
       c.__refreshing = true
@@ -1010,7 +1081,7 @@ export default class Component<P = Record<string, any>> extends Store {
     container: HTMLElement,
     items: any[],
     createItemFn: (item: any, index?: number) => HTMLElement,
-    keyProp?: string | ((item: any) => string),
+    keyProp?: string | ((item: any, index?: number) => string),
   ): void {
     const itemKey =
       typeof keyProp === 'function'
@@ -1250,7 +1321,6 @@ export default class Component<P = Record<string, any>> extends Store {
     const condProp = '__geaCond_' + idx
     const prev = (this as any)[condProp]
     const needsPatch = cond !== prev
-    ;(this as any)[condProp] = cond
     const root = (this as any).element_ || document.getElementById(this.id_)
     if (!root) return false
     const markerText = this.id_ + '-' + conf.slotId
@@ -1267,7 +1337,42 @@ export default class Component<P = Record<string, any>> extends Store {
     const marker = findMarker(markerText)
     const endMarker = findMarker(endMarkerText)
     const parent = endMarker && endMarker.parentNode
-    if (!marker || !endMarker || !parent) return false
+    if (!marker || !endMarker || !parent)
+      return false
+      // Commit only after markers exist; otherwise a failed patch would leave __geaCond_* out of sync
+      // with the DOM and the next call could skip the full replace (email-client: Sent → Travel → empty).
+    ;(this as any)[condProp] = cond
+    // Keyed list rows can mount just after the slot end marker when the list container is the
+    // parent element (e.g. .email-list) rather than strictly between markers; strip those orphans
+    // after any conditional slot replace so empty-state branches do not leave stale rows.
+    // Only email rows are mounted after the slot end marker in the folder-empty case; stripping
+    // `data-gea-item-id` here removed legitimate keyed list rows (todo, ecommerce, playground) that
+    // follow conditional markers in other layouts.
+    const stripTrailingKeyedRowsAfterSlot = () => {
+      let node: ChildNode | null = endMarker.nextSibling
+      while (node && node.nodeType === 1) {
+        const el = node as HTMLElement
+        const next = node.nextSibling
+        if (el.hasAttribute('data-email-id')) {
+          for (const child of this.__childComponents) {
+            if (child.__geaCompiledChild && child.element_ && (child.element_ === el || el.contains(child.element_))) {
+              child.dispose()
+              this.__childComponents = this.__childComponents.filter((c) => c !== child)
+              break
+            }
+          }
+          try {
+            if (el.parentNode) el.remove()
+          } catch {
+            /* detached by dispose */
+          }
+          node = next
+          continue
+        }
+        break
+      }
+    }
+
     const replaceSlotContent = (htmlFn: (() => string) | null) => {
       if (!htmlFn) {
         let node: ChildNode | null = marker.nextSibling
@@ -1295,8 +1400,17 @@ export default class Component<P = Record<string, any>> extends Store {
           try {
             if (node.nodeType !== 1) {
               node.remove()
-            } else if ((node as any).__geaKey == null && !(node as HTMLElement).hasAttribute?.('data-gea-item-id')) {
-              node.remove()
+            } else {
+              const el = node as HTMLElement
+              // Compiled .map() rows carry data-gea-item-id; we normally preserve those for
+              // list-only empty reinjection (mobile-showcase). Email list rows also set
+              // data-email-id on the row root — remove those so truthy-branch empty-state HTML
+              // that compiles to '' does not leave stale rows in the DOM.
+              if (el.hasAttribute('data-email-id')) {
+                node.remove()
+              } else if ((node as any).__geaKey == null && !el.hasAttribute?.('data-gea-item-id')) {
+                node.remove()
+              }
             }
           } catch {
             /* node detached by sync blur handler */
@@ -1360,8 +1474,41 @@ export default class Component<P = Record<string, any>> extends Store {
         if (disposed.size > 0) {
           this.__childComponents = this.__childComponents.filter((c) => !disposed.has(c))
         }
+      } else {
+        // Falsy→truthy (e.g. map → empty placeholder): compiled map rows must be disposed before
+        // replaceSlotContent; the `!cond` path only covers truthy→falsy.
+        const disposedTruthy = new Set<AnyComponent>()
+        let n: ChildNode | null = marker.nextSibling
+        while (n && n !== endMarker) {
+          if (n.nodeType === 1) {
+            const el = n as HTMLElement
+            for (const child of this.__childComponents) {
+              if (
+                child.__geaCompiledChild &&
+                child.element_ &&
+                (child.element_ === el || el.contains(child.element_))
+              ) {
+                disposedTruthy.add(child)
+              }
+            }
+          }
+          n = n.nextSibling
+        }
+        for (const child of disposedTruthy) {
+          child.dispose()
+          for (const key of Object.keys(this)) {
+            if ((this as any)[key] === child) {
+              ;(this as any)[key] = null
+              break
+            }
+          }
+        }
+        if (disposedTruthy.size > 0) {
+          this.__childComponents = this.__childComponents.filter((c) => !disposedTruthy.has(c))
+        }
       }
       replaceSlotContent(cond ? conf.getTruthyHtml : conf.getFalsyHtml)
+      stripTrailingKeyedRowsAfterSlot()
       if (cond) {
         this.mountCompiledChildComponents_()
         this.instantiateChildComponents_()
