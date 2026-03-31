@@ -27,6 +27,7 @@ import {
 } from './ast-helpers.ts'
 import { escapeHtml, normalizeJSXText, toHtmlAttrName } from '../utils/html.ts'
 import { EVENT_TYPES, VOID_ELEMENTS } from '../ir/constants.ts'
+import { setTextContent, setClassName, setChecked, setAttribute, setStyleCssText } from './dom-update.ts'
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -701,98 +702,30 @@ function buildCloneTemplateBody(
     const expr = transformJSXExpression(t.cloneNode(entry.expression, true) as t.Expression, cloneCtx, true)
     switch (entry.type) {
       case 'className':
-        stmts.push(
-          t.expressionStatement(
-            t.assignmentExpression(
-              '=',
-              t.memberExpression(navExpr, t.identifier('className')),
-              buildTrimmedClassValueExpression(expr),
-            ),
-          ),
-        )
+        stmts.push(setClassName(navExpr, buildTrimmedClassValueExpression(expr)))
         break
       case 'text':
-        stmts.push(
-          t.expressionStatement(
-            t.assignmentExpression('=', t.memberExpression(navExpr, t.identifier('textContent')), expr),
-          ),
-        )
+        stmts.push(setTextContent(navExpr, expr))
         break
       case 'checked':
-        stmts.push(
-          t.expressionStatement(
-            t.assignmentExpression('=', t.memberExpression(navExpr, t.identifier('checked')), expr),
-          ),
-        )
+        stmts.push(setChecked(navExpr, expr))
         break
       case 'attribute': {
-        const attrVal = t.identifier('__av')
         const attrName = entry.attributeName!
         if (attrName === 'style') {
-          stmts.push(
-            t.variableDeclaration('var', [t.variableDeclarator(attrVal, expr)]),
-            t.ifStatement(
-              t.logicalExpression(
-                '||',
-                t.binaryExpression('==', attrVal, t.nullLiteral()),
-                t.binaryExpression('===', attrVal, t.booleanLiteral(false)),
-              ),
-              t.expressionStatement(
-                t.callExpression(t.memberExpression(navExpr, t.identifier('removeAttribute')), [
-                  t.stringLiteral('style'),
-                ]),
-              ),
-              t.expressionStatement(
-                t.assignmentExpression(
-                  '=',
-                  t.memberExpression(t.memberExpression(navExpr, t.identifier('style')), t.identifier('cssText')),
-                  t.conditionalExpression(
-                    t.binaryExpression('===', t.unaryExpression('typeof', attrVal), t.stringLiteral('object')),
-                    t.callExpression(
-                      t.memberExpression(
-                        t.callExpression(
-                          t.memberExpression(
-                            t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [
-                              attrVal,
-                            ]),
-                            t.identifier('map'),
-                          ),
-                          [
-                            t.arrowFunctionExpression(
-                              [t.arrayPattern([t.identifier('k'), t.identifier('v')])],
-                              t.binaryExpression(
-                                '+',
-                                t.binaryExpression(
-                                  '+',
-                                  t.callExpression(t.memberExpression(t.identifier('k'), t.identifier('replace')), [
-                                    t.regExpLiteral('[A-Z]', 'g'),
-                                    t.stringLiteral('-$&'),
-                                  ]),
-                                  t.stringLiteral(': '),
-                                ),
-                                t.identifier('v'),
-                              ),
-                            ),
-                          ],
-                        ),
-                        t.identifier('join'),
-                      ),
-                      [t.stringLiteral('; ')],
-                    ),
-                    t.callExpression(t.identifier('String'), [attrVal]),
-                  ),
-                ),
-              ),
-            ),
-          )
+          stmts.push(...setStyleCssText(navExpr, expr))
         } else {
+          // In gen-clone, the non-style attribute case uses a simpler
+          // removeAttribute / setAttribute(String(val)) pattern without the
+          // getAttribute equality guard that gen-array-patch uses.
+          const attrVal = t.identifier('__av')
           stmts.push(
             t.variableDeclaration('var', [t.variableDeclarator(attrVal, expr)]),
             t.ifStatement(
               t.logicalExpression(
                 '||',
-                t.binaryExpression('==', attrVal, t.nullLiteral()),
-                t.binaryExpression('===', attrVal, t.booleanLiteral(false)),
+                t.binaryExpression('==', t.cloneNode(attrVal), t.nullLiteral()),
+                t.binaryExpression('===', t.cloneNode(attrVal), t.booleanLiteral(false)),
               ),
               t.expressionStatement(
                 t.callExpression(t.memberExpression(navExpr, t.identifier('removeAttribute')), [
@@ -800,9 +733,9 @@ function buildCloneTemplateBody(
                 ]),
               ),
               t.expressionStatement(
-                t.callExpression(t.memberExpression(navExpr, t.identifier('setAttribute')), [
+                t.callExpression(t.memberExpression(t.cloneNode(navExpr, true), t.identifier('setAttribute')), [
                   t.stringLiteral(attrName),
-                  t.callExpression(t.identifier('String'), [attrVal]),
+                  t.callExpression(t.identifier('String'), [t.cloneNode(attrVal)]),
                 ]),
               ),
             ),

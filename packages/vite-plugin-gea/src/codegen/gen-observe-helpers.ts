@@ -13,6 +13,7 @@ import {
   normalizePathParts,
 } from './ast-helpers.ts'
 import type { StateRefMeta } from '../parse/state-refs.ts'
+import { toggleClass } from './dom-update.ts'
 
 // ─── Path-parts equality test ──────────────────────────────────────
 
@@ -259,10 +260,8 @@ function buildElementUpdate(
   if (binding.type === 'class') {
     const pathParts = binding.pathParts || normalizePathParts((binding as any).path || '')
     const cls = binding.classToggleName || pathParts[pathParts.length - 1] || 'active'
-    return t.callExpression(
-      t.memberExpression(t.memberExpression(el, t.identifier('classList')), t.identifier('toggle')),
-      [t.stringLiteral(cls), param],
-    )
+    // toggleClass returns a t.Statement (expressionStatement); unwrap to expression for this context
+    return (toggleClass(el, cls, param) as t.ExpressionStatement).expression
   }
 
   let targetEl: t.Expression
