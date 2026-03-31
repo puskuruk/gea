@@ -1,258 +1,181 @@
-/**
- * Component Intermediate Representation.
- *
- * This is the data boundary between analysis and code generation.
- * All types here are plain data — no Babel AST nodes, no side effects.
- * Expressions are stored as source strings so the IR is serializable,
- * loggable, and decoupled from the AST toolchain.
- */
+import type * as t from '@babel/types'
 
-// ─── StorePath ──────────────────────────────────────────────────────────────
+export type PathParts = string[]
 
-/** Identifies a reactive data path in a store or local state. */
-export interface StorePath {
-  /** Local variable name of the store (e.g. 'counterStore') */
-  storeVar: string
-  /** Property path parts (e.g. ['todos', '0', 'title']) */
-  pathParts: string[]
-  /** True when path contains '*' (array item wildcard) */
-  isWildcard: boolean
-  /** True when the path accesses a store getter */
-  isGetter: boolean
-  /** For getters: resolved to their underlying state deps */
-  getterDeps?: StorePath[]
-}
-
-// ─── Template Tree ──────────────────────────────────────────────────────────
-
-export interface TemplateIR {
-  root: TemplateNodeIR
-  cloneEligible: boolean
-  earlyReturns: EarlyReturnIR[]
-  /** Template-local const declarations before the return statement */
-  setupStatements: SetupStatementIR[]
-}
-
-export interface TemplateNodeIR {
-  kind: 'element' | 'text' | 'expression' | 'component' | 'conditional' | 'map' | 'fragment'
-  /** HTML tag name (for 'element') or component class name (for 'component') */
-  tag?: string
-  attributes: AttributeIR[]
-  children: TemplateNodeIR[]
-  /** Binding suffix for getElementById (e.g. 'b0') */
+export interface ReactiveBinding {
+  pathParts: PathParts
+  type: 'text' | 'attribute' | 'class' | 'checked' | 'value'
+  selector: string
+  /** Unique id suffix for getElementById (this.id + '-' + bindingId). Empty for root. */
   bindingId?: string
-  /** User-provided id attribute expression (use instead of generated id) */
-  userIdExpr?: string
-  /** For 'expression' nodes: the JS expression string */
-  expression?: string
-  /** Whether to wrap expression in __escapeHtml */
-  isEscaped?: boolean
-  /** For 'text' nodes: the static text content (already HTML-escaped) */
-  text?: string
-  /** For 'component' nodes: index into ComponentIR.children */
-  childIndex?: number
-  /** For 'conditional' nodes: index into ComponentIR.conditionalSlots */
-  condIndex?: number
-  /** For 'map' nodes: index into ComponentIR.arrayMaps */
-  mapIndex?: number
-}
-
-export interface AttributeIR {
-  name: string
-  kind: 'static' | 'dynamic' | 'boolean' | 'class-static' | 'class-dynamic' | 'class-object'
-    | 'style-static' | 'style-dynamic' | 'style-object'
-    | 'event' | 'ref' | 'dangerous-html' | 'key' | 'value' | 'checked'
-  /** Static value string or dynamic expression string */
-  value?: string
-  /** For events: index into ComponentIR.eventHandlers */
-  eventHandlerIndex?: number
-  /** For refs: index into ComponentIR.refs */
-  refIndex?: number
-  /** For href/src/action: wrap value in __sanitizeAttr */
-  isSanitized?: boolean
-}
-
-export interface EarlyReturnIR {
-  /** Guard expression (e.g. '!project') */
-  condition: string
-  /** Template for the early-return branch */
-  template: TemplateNodeIR
-  setupStatements: SetupStatementIR[]
-}
-
-export interface SetupStatementIR {
-  /** The raw source code of the statement */
-  source: string
-  /** Variable names this statement declares */
-  declaredNames: string[]
-}
-
-// ─── Bindings ───────────────────────────────────────────────────────────────
-
-export interface BindingIR {
-  /** Binding suffix for getElementById */
-  id: string
-  type: 'text' | 'attribute' | 'class' | 'checked' | 'value' | 'style' | 'html'
-  storePath: StorePath
-  /** The JS expression that produces the new value */
-  expression: string
+  /** When set, the user provided an explicit `id` attribute — use this for getElementById lookups instead of the framework-generated ID. */
+  userIdExpr?: t.Expression
   attributeName?: string
-  isImportedState: boolean
-  isBooleanAttribute: boolean
-  userIdExpression?: string
-  /** For text nodes with mixed static/dynamic content */
-  templateParts?: { statics: string[]; expressions: string[] }
-  /** Generate setAttribute equality check before writing */
-  equalityGuard: boolean
+  elementPath: string[]
+  isImportedState?: boolean
+  storeVar?: string
+  classToggleName?: string
+  itemIdProperty?: string
+  textTemplate?: string
+  textExpressionIndex?: number
+  textExpressions?: TextExpression[]
+  childPath?: number[]
+  expression?: t.Expression
 }
 
-// ─── Array Maps ─────────────────────────────────────────────────────────────
+export interface TextExpression {
+  pathParts: PathParts
+  isImportedState?: boolean
+  storeVar?: string
+  expression?: t.Expression
+}
 
-export interface ArrayMapIR {
-  id: string
-  storePath: StorePath
-  itemVar: string
-  indexVar?: string
-  keyExpression: string
-  containerBindingId: string
-  containerUserIdExpression?: string
-  hasComponentItems: boolean
-  itemTemplate: TemplateNodeIR
-  itemBindings: BindingIR[]
-  relationalBindings: RelationalBindingIR[]
-  conditionalBindings: ConditionalMapBindingIR[]
-  isUnresolved: boolean
-  getItemsExpression?: string
-  derivedStages?: DerivedStageIR[]
-  setupStatements: SetupStatementIR[]
+export interface HandlerPropInMap {
+  propName: string
+  handlerExpression: t.ArrowFunctionExpression | t.FunctionExpression
   itemIdProperty: string
 }
 
-export interface DerivedStageIR {
-  method: 'filter' | 'slice' | 'sort' | 'reverse'
-  predicateExpression?: string
-  callbackParams?: string[]
-  args?: string[]
+export interface EventHandler {
+  eventType: string
+  handlerExpression?: t.Expression
+  elementId?: number
+  selector?: string
+  selectorExpression?: t.Expression
+  methodName?: string
+  delegatedPropName?: string
+  usesTargetComponent?: boolean
+  mapContext?: {
+    arrayPathParts: PathParts
+    itemIdProperty: string
+    itemVariable: string
+    indexVariable?: string
+    isImportedState: boolean
+    storeVar?: string
+    itemRefProperty?: string
+  }
 }
 
-export interface RelationalBindingIR {
-  id: string
+export interface ObserveDependency {
+  observeKey: string
+  pathParts: PathParts
+  storeVar?: string
+}
+
+export interface RelationalMapBinding {
+  observePathParts: PathParts
+  storeVar?: string
+  selector: string
   type: 'class'
-  expression: string
-  attributeName: string
-  comparesItemId: boolean
+  itemIdProperty: string
+  classToggleName: string
+  classWhenMatch: boolean
 }
 
-export interface ConditionalMapBindingIR {
-  condition: string
-  truthyExpression: string
-  falsyExpression?: string
+export interface ConditionalMapBinding {
+  observe: ObserveDependency
+  type: 'text' | 'className' | 'attribute'
+  childPath: number[]
+  selector: string
+  expression: t.Expression
+  attributeName?: string
+  requiresRerender?: boolean
 }
 
-// ─── Child Components ───────────────────────────────────────────────────────
+export interface ArrayMapBinding {
+  arrayPathParts: PathParts
+  storeVar?: string
+  itemVariable: string
+  indexVariable?: string
+  itemBindings: ReactiveBinding[]
+  relationalBindings?: RelationalMapBinding[]
+  containerSelector: string
+  /** Path for id injection; when set, containerBindingId is assigned and getElementById is used */
+  containerElementPath?: string[]
+  containerBindingId?: string
+  containerUserIdExpr?: t.Expression
+  itemTemplate?: t.JSXElement | t.JSXFragment
+  isImportedState?: boolean
+  isKeyed?: boolean
+  itemIdProperty?: string
+  classToggleName?: string
+  conditionalBindings?: ConditionalMapBinding[]
+}
 
-export interface ChildComponentIR {
-  className: string
+export interface ChildComponent {
   tagName: string
   instanceVar: string
-  propsExpression: string
-  observeDeps: StorePath[]
-  isLazy: boolean
-  isInMap: boolean
-  buildPropsMethod?: string
-  earlyReturnGuard?: EarlyReturnGuardIR
-  dfsIndex: number
-  directMappings?: DirectPropMappingIR[]
+  slotId: string
+  propsExpression: t.ObjectExpression
+  dependencies: ObserveDependency[]
+  setupStatements?: t.Statement[]
+  earlyReturnGuards?: t.IfStatement[]
+  guardSetupStatements?: t.Statement[]
+  lazy?: boolean
+  directMappings?: { parentPropName: string; childPropName: string }[]
+  /** DFS traversal index — used to order constructor instantiation (leaves before parents) */
+  dfsIndex?: number
 }
 
-export interface EarlyReturnGuardIR {
-  condition: string
-  setupStatements: SetupStatementIR[]
-}
-
-export interface DirectPropMappingIR {
-  parentPropName: string
-  childPropName: string
-}
-
-// ─── Conditional Slots ──────────────────────────────────────────────────────
-
-export interface ConditionalSlotIR {
-  id: string
-  kind: 'and' | 'ternary' | 'state-child-swap'
-  condition: string
-  truthyTemplate: TemplateNodeIR
-  falsyTemplate?: TemplateNodeIR
-  truthyExpression?: string
-  falsyExpression?: string
-  dependentProps: string[]
-  dependentStorePaths: StorePath[]
-  setupStatements: SetupStatementIR[]
-  lazyChildren: number[]
-  swapChildren?: {
-    truthyChildIndex: number
-    falsyChildIndex: number
-  }
-}
-
-// ─── Events ─────────────────────────────────────────────────────────────────
-
-export interface EventHandlerIR {
-  id: string
-  eventType: string
-  targetBindingId: string
-  handlerExpression: string
-  isPropCallback: boolean
-  mapContext?: {
-    mapIndex: number
-    itemVar: string
-    indexVar?: string
-  }
-  setupStatements: SetupStatementIR[]
-}
-
-// ─── Refs ───────────────────────────────────────────────────────────────────
-
-export interface RefIR {
-  id: string
-  fieldName: string
-  markerAttribute: string
-}
-
-// ─── Prop Bindings ──────────────────────────────────────────────────────────
-
-export interface PropBindingIR {
+export interface PropBinding {
   propName: string
-  bindingId: string
+  selector: string
   type: 'text' | 'class' | 'attribute' | 'value' | 'checked'
-  expression: string
   attributeName?: string
-  userIdExpression?: string
-  stateOnly?: boolean
-  setupStatements: SetupStatementIR[]
-}
-
-// ─── Observers ──────────────────────────────────────────────────────────────
-
-export interface ObserverIR {
-  id: string
-  storePath: StorePath
-  storeVar: string
-  updates: ObserverUpdateIR[]
-  isWildcard: boolean
-}
-
-export interface ObserverUpdateIR {
-  type: 'text' | 'attribute' | 'class' | 'checked' | 'value' | 'style' | 'html'
-    | 'child-props' | 'conditional-patch' | 'rerender'
+  expression?: t.Expression
+  setupStatements?: t.Statement[]
+  /** Path for id injection; when set, bindingId is assigned and getElementById is used */
+  elementPath?: string[]
   bindingId?: string
-  expression: string
-  attributeName?: string
-  childInstanceVar?: string
-  condSlotId?: string
-  equalityGuard: boolean
-  isBooleanAttribute?: boolean
-  templateParts?: { statics: string[]; expressions: string[] }
+  /** When set, the user provided an explicit `id` attribute — use this for getElementById lookups instead of the framework-generated ID. */
+  userIdExpr?: t.Expression
+  /** When true, the binding depends solely on local/imported state, not on props */
+  stateOnly?: boolean
+}
+
+export interface ConditionalSlot {
+  slotId: string
+  conditionExpr: t.Expression
+  setupStatements: t.Statement[]
+  /** Setup statements needed by the truthy/falsy HTML expressions (may include extra vars) */
+  htmlSetupStatements?: t.Statement[]
+  dependentPropNames: string[]
+  dependencies: ObserveDependency[]
+  /** The original JSX expression from the template (the full conditional expression) */
+  originalExpr: t.Expression
+  /** The transformed HTML expression for the truthy branch (populated after template transform) */
+  truthyHtmlExpr?: t.Expression
+  /** The transformed HTML expression for the falsy branch when present */
+  falsyHtmlExpr?: t.Expression
+}
+
+export interface UnresolvedRelationalClassBinding {
+  observeKey: string
+  classToggleName: string
+  matchWhenEqual: boolean
+  /** Property on the item to compare (e.g. 'id'). undefined means the item itself is the key (primitives). */
+  itemProperty?: string
+}
+
+export interface UnresolvedMapInfo {
+  containerSelector: string
+  itemTemplate?: t.JSXElement | t.JSXFragment
+  itemVariable: string
+  indexVariable?: string
+  itemIdProperty?: string
+  computationExpr?: t.Expression
+  /** Expression that appears as the map's object in the template (for replacement matching). When computationExpr is inlined from const x = y, this stays as identifier x. */
+  mapObjectExpr?: t.Expression
+  computationSetupStatements?: t.Statement[]
+  /** Path for id injection; when set, containerBindingId is assigned and getElementById is used */
+  containerElementPath?: string[]
+  containerBindingId?: string
+  containerUserIdExpr?: t.Expression
+  dependencies?: ObserveDependency[]
+  /** Statements from the map callback body that precede the JSX return (e.g. variable lookups, early-return guards) */
+  callbackBodyStatements?: t.Statement[]
+  /** Per-item class toggles that can be patched surgically without full list rebuild */
+  relationalClassBindings?: UnresolvedRelationalClassBinding[]
 }
 
 // ─── State Refs ─────────────────────────────────────────────────────────────
@@ -273,44 +196,4 @@ export interface StateRefMeta {
   getterDeps?: Map<string, string[][]>
   reactiveFields?: Set<string>
   initExpression?: string
-}
-
-// ─── ComponentIR ────────────────────────────────────────────────────────────
-
-export interface ComponentIR {
-  className: string
-  isDefaultExport: boolean
-
-  template: TemplateIR
-  bindings: BindingIR[]
-  observers: ObserverIR[]
-  children: ChildComponentIR[]
-  arrayMaps: ArrayMapIR[]
-  conditionalSlots: ConditionalSlotIR[]
-  eventHandlers: EventHandlerIR[]
-  refs: RefIR[]
-
-  propBindings: PropBindingIR[]
-  rerenderProps: string[]
-  rerenderConditions: string[]
-
-  userCreatedHooks: boolean
-
-  imports: Map<string, string>
-  storeImports: Map<string, string>
-  stateRefs: Map<string, StateRefMeta>
-  knownComponentImports: Set<string>
-}
-
-// ─── File-level metadata ────────────────────────────────────────────────────
-
-export interface FileMetadata {
-  componentClassNames: string[]
-  imports: Map<string, string>
-  importKinds: Map<string, 'default' | 'named' | 'namespace'>
-  isDefaultExport: Map<string, boolean>
-  storeImports: Map<string, string>
-  knownComponentImports: Set<string>
-  hasJSX: boolean
-  functionalComponentName?: string
 }

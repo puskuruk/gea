@@ -1,14 +1,10 @@
-import * as t from '@babel/types'
+import { traverse, t } from '../utils/babel-interop.ts'
+import type { NodePath } from '../utils/babel-interop.ts'
 import { getTemplateParamBinding } from './template-param-utils.ts'
-import type { NodePath } from '@babel/traverse'
 import type { EventHandler } from '../ir.ts'
 import type { ChildComponent, ObserveDependency } from '../ir.ts'
 import { buildObserveKey, resolvePath } from '../utils.ts'
 import type { StateRefMeta } from '../parse.ts'
-import { createRequire } from 'module'
-
-const require = createRequire(import.meta.url)
-const traverse = require('@babel/traverse').default
 
 export interface TemplateSetupContext {
   params: Array<t.Identifier | t.Pattern | t.RestElement>

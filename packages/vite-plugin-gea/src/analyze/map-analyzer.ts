@@ -1,4 +1,5 @@
-import * as t from '@babel/types'
+import { traverse, t } from '../utils/babel-interop.ts'
+import type { NodePath } from '../utils/babel-interop.ts'
 import type {
   ConditionalMapBinding,
   ObserveDependency,
@@ -9,11 +10,6 @@ import type {
 import { buildObserveKey, resolvePath, generateSelector, getDirectChildElements } from '../utils.ts'
 import { ITEM_IS_KEY } from './helpers.ts'
 import type { StateRefMeta } from '../parse.ts'
-import type { NodePath } from '@babel/traverse'
-import { createRequire } from 'module'
-
-const require = createRequire(import.meta.url)
-const traverse = require('@babel/traverse').default
 
 function getItemMemberPath(expr: t.Expression, itemVar: string): string | null {
   const parts: string[] = []

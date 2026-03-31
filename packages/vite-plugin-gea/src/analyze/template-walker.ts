@@ -1,5 +1,5 @@
-import * as t from '@babel/types'
-import type { NodePath } from '@babel/traverse'
+import { traverse, t } from '../utils/babel-interop.ts'
+import type { NodePath } from '../utils/babel-interop.ts'
 import type {
   ConditionalMapBinding,
   ObserveDependency,
@@ -37,16 +37,12 @@ import {
 } from './helpers.ts'
 import { collectExpressionDependencies, collectTemplateSetupStatements } from './binding-resolver.ts'
 import type { StateRefMeta } from '../parse.ts'
-import { createRequire } from 'module'
 import {
   resolveHelperCallExpression,
   collectUnresolvedComputationDependencies,
   collectItemTemplateStoreDependencies,
   detectUnresolvedRelationalClassBindings,
 } from './dependency-collector.ts'
-
-const require = createRequire(import.meta.url)
-const traverse = require('@babel/traverse').default
 
 export function buildTextTemplateExpressionFromParts(
   textTemplate: string,

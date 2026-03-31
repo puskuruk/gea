@@ -1,28 +1,10 @@
 import type { Plugin, ResolvedConfig } from 'vite'
-import babelGenerator from '@babel/generator'
-import babelTraverse from '@babel/traverse'
-import { parseSource } from './parse.ts'
-import { injectHMR } from './hmr.ts'
-import { transformComponentFile, transformNonComponentJSX } from './transform-component.ts'
-import { convertFunctionalToClass } from './transform-functional.ts'
-import { ensureImport, isComponentTag } from './utils.ts'
-import { pascalToKebabCase } from './transform-jsx.ts'
-import * as t from '@babel/types'
+import { transform } from './pipeline.ts'
 import { dirname, relative, resolve } from 'node:path'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const pluginDir = dirname(fileURLToPath(import.meta.url))
-// CJS/ESM interop: some bundlers wrap the export in { default: fn }
-function resolveDefault(mod: unknown): Function {
-  if (typeof mod === 'function') return mod
-  if (typeof mod === 'object' && mod !== null && 'default' in mod && typeof mod.default === 'function') {
-    return mod.default
-  }
-  throw new Error('resolveDefault: expected a function or module with default export')
-}
-const traverse = resolveDefault(babelTraverse)
-const generate = resolveDefault(babelGenerator)
 
 function hasSSREnvironment(ctx: object): boolean {
   if (!('environment' in ctx)) return false
@@ -262,27 +244,6 @@ export function handleComponentUpdate(moduleId, newModule) {
 }
 `
 
-function isComponentImportSource(source: string): boolean {
-  if (source.startsWith('.')) return true
-  // Skip Node built-ins and known non-component packages
-  if (source.startsWith('node:')) return false
-  // Package imports — could contain Gea components
-  return true
-}
-
-/**
- * Gea functional components compile to classes but their **source** has no `extends Component`.
- * `isComponentModule` must still treat them as components so HMR wraps imports in
- * `createHotComponentProxy` and tab switches don't reconstruct stale constructors.
- */
-function looksLikeGeaFunctionalComponentSource(source: string): boolean {
-  if (!source.includes('<') || !source.includes('>')) return false
-  if (/export\s+default\s+async\s+function\b/.test(source)) return true
-  if (/export\s+default\s+function\b/.test(source)) return true
-  if (/export\s+default\s*\([^)]*\)\s*=>\s*/.test(source)) return true
-  return false
-}
-
 export function geaPlugin(): Plugin {
   const storeModules = new Set<string>()
   const componentModules = new Set<string>()
@@ -420,6 +381,7 @@ export function geaPlugin(): Plugin {
       const cleanId = id.split('?')[0]
       if (!cleanId.match(/\.(js|jsx|ts|tsx)$/) || cleanId.includes('node_modules')) return null
 
+      // Register stores (must happen before pipeline for cross-file tracking)
       if (code.includes('extends Store') || code.includes('new Store(')) {
         storeModules.add(cleanId)
         const storeClassName = extractStoreClassName(code)
@@ -431,184 +393,18 @@ export function geaPlugin(): Plugin {
 
       if (/\bclass\s+Component\s+extends\s+Store\b/.test(code)) return null
 
-      const hasAngleBrackets = code.includes('<') && code.includes('>')
-
-      if (!hasAngleBrackets) return null
-
-      try {
-        const parsed = parseSource(code)
-        if (!parsed) return null
-        const { functionalComponentInfo, hasJSX } = parsed
-        let { ast, componentClassName, imports } = parsed
-        let { componentClassNames } = parsed
-
-        if (!hasJSX) return null
-
-        if (functionalComponentInfo) {
-          convertFunctionalToClass(ast, functionalComponentInfo, imports)
-          componentClassName = functionalComponentInfo.name
-          componentClassNames = [functionalComponentInfo.name]
-          const freshCode = generate(ast, { retainLines: true }).code
-          const freshParsed = parseSource(freshCode)
-          if (freshParsed) {
-            ast = freshParsed.ast
-            imports = freshParsed.imports
-          }
-        }
-
-        if (componentClassNames.length > 0) {
-          componentModules.add(cleanId)
-        }
-
-        let transformed = false
-        const componentImportSet = new Set<string>()
-        const componentImportsUsedAsTags = new Set<string>()
-        let isDefaultExport = false
-
-        imports.forEach((source) => {
-          if (!isComponentImportSource(source)) return
-          componentImportSet.add(source)
-        })
-        const componentImports = Array.from(componentImportSet)
-
-        const storeImports = new Map<string, string>()
-        const knownComponentImports = new Set<string>()
-        const namedImportSources = new Map<string, string>()
-        traverse(ast, {
-          ExportDefaultDeclaration() {
-            isDefaultExport = true
-          },
-          ImportDeclaration(path) {
-            const source = path.node.source.value
-            if (!isComponentImportSource(source)) return
-            const resolvedImport = source.startsWith('.') ? resolveImportPath(cleanId, source) : null
-            const isComp = resolvedImport ? isComponentModule(resolvedImport) : false
-            path.node.specifiers.forEach(
-              (spec: { type: string; imported?: { name?: string }; local: { name: string } }) => {
-                if (isComp) knownComponentImports.add(spec.local.name)
-                if (spec.type === 'ImportDefaultSpecifier') {
-                  if (resolvedImport && !isStoreModule(resolvedImport)) return
-                  storeImports.set(spec.local.name, source)
-                } else if (spec.type === 'ImportSpecifier') {
-                  namedImportSources.set(spec.local.name, source)
-                  if (resolvedImport && isStoreModule(resolvedImport)) {
-                    storeImports.set(spec.local.name, source)
-                  } else if (!resolvedImport && source.startsWith('@geajs/core') && spec.local.name === 'router') {
-                    storeImports.set(spec.local.name, source)
-                  }
-                  // Recognize PascalCase exports from @geajs/core as components
-                  // (exclude base classes — they're not child component tags)
-                  const importedName = spec.imported?.name ?? spec.local.name
-                  const geaCoreBaseClasses = ['Component', 'Store']
-                  if (
-                    source === '@geajs/core' &&
-                    isComponentTag(importedName) &&
-                    !geaCoreBaseClasses.includes(importedName)
-                  ) {
-                    knownComponentImports.add(spec.local.name)
-                  }
-                }
-              },
-            )
-          },
-          VariableDeclarator(path: any) {
-            const init = path.node.init
-            if (
-              init &&
-              init.type === 'NewExpression' &&
-              init.callee?.type === 'Identifier' &&
-              namedImportSources.has(init.callee.name) &&
-              path.node.id?.type === 'Identifier'
-            ) {
-              const source = namedImportSources.get(init.callee.name)!
-              storeImports.set(path.node.id.name, source)
-            }
-          },
-        })
-
-        if (hasJSX) {
-          const originalAST = parseSource(code)!.ast
-          if (componentClassNames.length > 0) {
-            for (const cn of componentClassNames) {
-              if (!imports.has(cn)) imports.set(cn, cleanId)
-            }
-            for (const cn of componentClassNames) {
-              const result = transformComponentFile(
-                ast,
-                imports,
-                storeImports,
-                cn,
-                cleanId,
-                originalAST,
-                componentImportsUsedAsTags,
-                knownComponentImports,
-                isSSR,
-              )
-              if (result) transformed = true
-            }
-            // Static [GEA_CTOR_TAG_NAME] so the tag name survives minification.
-            for (const cn of componentClassNames) {
-              const kebab = pascalToKebabCase(cn)
-              traverse(ast, {
-                noScope: true,
-                ClassDeclaration(path: any) {
-                  if (!path.node.id || path.node.id.name !== cn) return
-                  const prop = t.classProperty(
-                    t.identifier('GEA_CTOR_TAG_NAME'),
-                    t.stringLiteral(kebab),
-                    undefined,
-                    undefined,
-                    true,
-                  )
-                  prop.static = true
-                  path.node.body.body.unshift(prop)
-                  path.stop()
-                },
-              })
-              transformed = true
-            }
-            ensureImport(ast, '@geajs/core', 'GEA_CTOR_TAG_NAME')
-          } else {
-            transformed = transformNonComponentJSX(ast, imports)
-          }
-        }
-
-        if (isServeCommand) {
-          const shouldProxyDep = (source: string): boolean => {
-            if (!source.startsWith('.')) return false
-            const resolved = resolveImportPath(cleanId, source)
-            if (!resolved) return false
-            if (isStoreModule(resolved)) return false
-            if (isComponentModule(resolved)) return true
-            return false
-          }
-          const hmrAdded = injectHMR(
-            ast,
-            componentClassName,
-            componentImports,
-            componentImportsUsedAsTags,
-            isDefaultExport,
-            HMR_RUNTIME_ID,
-            shouldProxyDep,
-          )
-          if (hmrAdded) transformed = true
-        }
-
-        if (!transformed) return null
-
-        // Inject XSS prevention helper imports when the compiled output uses them
-        ensureImport(ast, '@geajs/core', 'geaEscapeHtml')
-        ensureImport(ast, '@geajs/core', 'geaSanitizeAttr')
-
-        const output = generate(ast, { sourceMaps: true, sourceFileName: cleanId }, code)
-        return { code: output.code, map: output.map }
-      } catch (error: any) {
-        if (error?.__geaCompileError) {
-          throw error
-        }
-        console.warn(`[gea-plugin] Failed to transform ${cleanId}:`, error.message, '\n', error.stack)
-        return null
-      }
+      return transform({
+        sourceFile: cleanId,
+        code,
+        isServe: isServeCommand,
+        isSSR,
+        hmrImportSource: HMR_RUNTIME_ID,
+        isStoreModule,
+        isComponentModule,
+        resolveImportPath: (importer, source) => resolveImportPath(importer, source),
+        registerStoreModule: (fp) => storeModules.add(fp),
+        registerComponentModule: (fp) => componentModules.add(fp),
+      })
     },
   }
 }

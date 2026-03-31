@@ -1,6 +1,6 @@
-import * as t from '@babel/types'
+import { traverse, t } from '../utils/babel-interop.ts'
+import type { NodePath } from '../utils/babel-interop.ts'
 import type { ClassMethod } from '@babel/types'
-import type { NodePath } from '@babel/traverse'
 import type {
   ObserveDependency,
   PathParts,
@@ -15,10 +15,6 @@ import {
 } from './helpers.ts'
 import { collectExpressionDependencies, collectTemplateSetupStatements } from './binding-resolver.ts'
 import type { StateRefMeta } from '../parse.ts'
-import { createRequire } from 'module'
-
-const require = createRequire(import.meta.url)
-const traverse = require('@babel/traverse').default
 
 /** Derived filter/slice/sort/reverse chain descriptor for unresolved maps. */
 export interface DerivedUnresolvedMapDescriptor {
