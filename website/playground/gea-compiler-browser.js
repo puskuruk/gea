@@ -54857,28 +54857,24 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
                   libExports.assignmentExpression(
                     "=",
                     libExports.identifier("__tn"),
-                    libExports.callExpression(
-                      libExports.memberExpression(libExports.identifier("document"), libExports.identifier("createTextNode")),
-                      [libExports.cloneNode(valueExpr, true)]
-                    )
+                    libExports.callExpression(libExports.memberExpression(libExports.identifier("document"), libExports.identifier("createTextNode")), [
+                      libExports.cloneNode(valueExpr, true)
+                    ])
                   )
                 ),
                 libExports.expressionStatement(
-                  libExports.callExpression(
-                    libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("insertBefore")),
-                    [
-                      libExports.identifier("__tn"),
-                      libExports.logicalExpression(
-                        "||",
-                        libExports.memberExpression(
-                          libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("childNodes")),
-                          libExports.cloneNode(tnIdx, true),
-                          true
-                        ),
-                        libExports.nullLiteral()
-                      )
-                    ]
-                  )
+                  libExports.callExpression(libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("insertBefore")), [
+                    libExports.identifier("__tn"),
+                    libExports.logicalExpression(
+                      "||",
+                      libExports.memberExpression(
+                        libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("childNodes")),
+                        libExports.cloneNode(tnIdx, true),
+                        true
+                      ),
+                      libExports.nullLiteral()
+                    )
+                  ])
                 )
               ]);
               const updateExisting = libExports.ifStatement(
@@ -55027,6 +55023,41 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
             } else if (pb.type === "attribute" && pb.attributeName) {
               const attrName = pb.attributeName;
               if (attrName === "style") {
+                const cssTextExpr = libExports.conditionalExpression(
+                  libExports.binaryExpression("===", libExports.unaryExpression("typeof", valueExpr), libExports.stringLiteral("object")),
+                  libExports.callExpression(
+                    libExports.memberExpression(
+                      libExports.callExpression(
+                        libExports.memberExpression(
+                          libExports.callExpression(libExports.memberExpression(libExports.identifier("Object"), libExports.identifier("entries")), [
+                            valueExpr
+                          ]),
+                          libExports.identifier("map")
+                        ),
+                        [
+                          libExports.arrowFunctionExpression(
+                            [libExports.arrayPattern([libExports.identifier("k"), libExports.identifier("v")])],
+                            libExports.binaryExpression(
+                              "+",
+                              libExports.binaryExpression(
+                                "+",
+                                libExports.callExpression(libExports.memberExpression(libExports.identifier("k"), libExports.identifier("replace")), [
+                                  libExports.regExpLiteral("[A-Z]", "g"),
+                                  libExports.stringLiteral("-$&")
+                                ]),
+                                libExports.stringLiteral(": ")
+                              ),
+                              libExports.identifier("v")
+                            )
+                          )
+                        ]
+                      ),
+                      libExports.identifier("join")
+                    ),
+                    [libExports.stringLiteral("; ")]
+                  ),
+                  libExports.callExpression(libExports.identifier("String"), [valueExpr])
+                );
                 updateStmt = libExports.ifStatement(
                   libExports.logicalExpression(
                     "||",
@@ -55038,59 +55069,53 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
                       libExports.stringLiteral("style")
                     ])
                   ),
-                  libExports.expressionStatement(
-                    libExports.assignmentExpression(
-                      "=",
-                      libExports.memberExpression(
-                        libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("style")),
-                        libExports.identifier("cssText")
-                      ),
-                      libExports.conditionalExpression(
-                        libExports.binaryExpression("===", libExports.unaryExpression("typeof", valueExpr), libExports.stringLiteral("object")),
-                        libExports.callExpression(
-                          libExports.memberExpression(
-                            libExports.callExpression(
-                              libExports.memberExpression(
-                                libExports.callExpression(libExports.memberExpression(libExports.identifier("Object"), libExports.identifier("entries")), [
-                                  valueExpr
-                                ]),
-                                libExports.identifier("map")
-                              ),
-                              [
-                                libExports.arrowFunctionExpression(
-                                  [libExports.arrayPattern([libExports.identifier("k"), libExports.identifier("v")])],
-                                  libExports.binaryExpression(
-                                    "+",
-                                    libExports.binaryExpression(
-                                      "+",
-                                      libExports.callExpression(libExports.memberExpression(libExports.identifier("k"), libExports.identifier("replace")), [
-                                        libExports.regExpLiteral("[A-Z]", "g"),
-                                        libExports.stringLiteral("-$&")
-                                      ]),
-                                      libExports.stringLiteral(": ")
-                                    ),
-                                    libExports.identifier("v")
-                                  )
-                                )
-                              ]
-                            ),
-                            libExports.identifier("join")
-                          ),
-                          [libExports.stringLiteral("; ")]
+                  libExports.blockStatement([
+                    libExports.variableDeclaration("const", [libExports.variableDeclarator(libExports.identifier("__newCss"), cssTextExpr)]),
+                    libExports.ifStatement(
+                      libExports.binaryExpression(
+                        "!==",
+                        libExports.memberExpression(
+                          libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("style")),
+                          libExports.identifier("cssText")
                         ),
-                        libExports.callExpression(libExports.identifier("String"), [valueExpr])
+                        libExports.identifier("__newCss")
+                      ),
+                      libExports.expressionStatement(
+                        libExports.assignmentExpression(
+                          "=",
+                          libExports.memberExpression(
+                            libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("style")),
+                            libExports.identifier("cssText")
+                          ),
+                          libExports.identifier("__newCss")
+                        )
+                      )
+                    )
+                  ])
+                );
+              } else if (attrName === "dangerouslySetInnerHTML") {
+                updateStmt = libExports.blockStatement([
+                  libExports.variableDeclaration("const", [
+                    libExports.variableDeclarator(
+                      libExports.identifier("__newHtml"),
+                      libExports.callExpression(libExports.identifier("String"), [valueExpr])
+                    )
+                  ]),
+                  libExports.ifStatement(
+                    libExports.binaryExpression(
+                      "!==",
+                      libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("innerHTML")),
+                      libExports.identifier("__newHtml")
+                    ),
+                    libExports.expressionStatement(
+                      libExports.assignmentExpression(
+                        "=",
+                        libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("innerHTML")),
+                        libExports.identifier("__newHtml")
                       )
                     )
                   )
-                );
-              } else if (attrName === "dangerouslySetInnerHTML") {
-                updateStmt = libExports.expressionStatement(
-                  libExports.assignmentExpression(
-                    "=",
-                    libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("innerHTML")),
-                    libExports.callExpression(libExports.identifier("String"), [valueExpr])
-                  )
-                );
+                ]);
               } else {
                 const isBooleanAttr = BOOLEAN_HTML_ATTRS.has(attrName);
                 const removeCondition = isBooleanAttr ? libExports.unaryExpression("!", valueExpr) : libExports.logicalExpression(
@@ -55098,6 +55123,10 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
                   libExports.binaryExpression("===", valueExpr, libExports.nullLiteral()),
                   libExports.binaryExpression("===", valueExpr, libExports.identifier("undefined"))
                 );
+                const newAttrValueExpr = isBooleanAttr ? libExports.stringLiteral("") : URL_ATTRS.has(attrName) ? libExports.callExpression(libExports.identifier("__sanitizeAttr"), [
+                  libExports.stringLiteral(attrName),
+                  libExports.callExpression(libExports.identifier("String"), [valueExpr])
+                ]) : libExports.callExpression(libExports.identifier("String"), [valueExpr]);
                 updateStmt = libExports.ifStatement(
                   removeCondition,
                   libExports.expressionStatement(
@@ -55105,15 +55134,24 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
                       libExports.stringLiteral(attrName)
                     ])
                   ),
-                  libExports.expressionStatement(
-                    libExports.callExpression(libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("setAttribute")), [
-                      libExports.stringLiteral(attrName),
-                      isBooleanAttr ? libExports.stringLiteral("") : URL_ATTRS.has(attrName) ? libExports.callExpression(libExports.identifier("__sanitizeAttr"), [
-                        libExports.stringLiteral(attrName),
-                        libExports.callExpression(libExports.identifier("String"), [valueExpr])
-                      ]) : libExports.callExpression(libExports.identifier("String"), [valueExpr])
-                    ])
-                  )
+                  libExports.blockStatement([
+                    libExports.variableDeclaration("const", [libExports.variableDeclarator(libExports.identifier("__newAttr"), newAttrValueExpr)]),
+                    libExports.ifStatement(
+                      libExports.binaryExpression(
+                        "!==",
+                        libExports.callExpression(libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("getAttribute")), [
+                          libExports.stringLiteral(attrName)
+                        ]),
+                        libExports.identifier("__newAttr")
+                      ),
+                      libExports.expressionStatement(
+                        libExports.callExpression(libExports.memberExpression(libExports.identifier("__el"), libExports.identifier("setAttribute")), [
+                          libExports.stringLiteral(attrName),
+                          libExports.identifier("__newAttr")
+                        ])
+                      )
+                    )
+                  ])
                 );
               }
             } else {
