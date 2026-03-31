@@ -1,4 +1,11 @@
-import { findPropertyDescriptor, rootDeleteProperty, rootGetValue, rootSetValue, type Store } from '@geajs/core'
+import {
+  findPropertyDescriptor,
+  isClassConstructorValue,
+  rootDeleteProperty,
+  rootGetValue,
+  rootSetValue,
+  type Store,
+} from '@geajs/core'
 import { resolveOverlay } from './ssr-context'
 
 /** Sentinel for SSR overlay deletes — must match overlay checks in traps below */
@@ -24,9 +31,13 @@ export function createSSRRootProxyHandler(): ProxyHandler<Store> {
             const val = overlay[prop]
             return val === SSR_DELETED ? undefined : val
           }
-          return Reflect.get(t, prop, receiver)
+          const v = Reflect.get(t, prop, receiver)
+          if (typeof v !== 'function') return v
+          return isClassConstructorValue(v) ? v : v.bind(receiver)
         }
-        return rootGetValue(t, prop, receiver)
+        const v = rootGetValue(t, prop, receiver)
+        if (typeof v !== 'function') return v
+        return isClassConstructorValue(v) ? v : v.bind(receiver)
       },
       set(t, prop, value, receiver) {
         if (typeof prop === 'symbol') {

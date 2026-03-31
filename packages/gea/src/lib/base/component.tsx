@@ -7,6 +7,13 @@ type AnyComponent = Component<any>
 
 const _URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'data', 'cite', 'poster', 'background'])
 
+/** Compare component refs whether held as the Store proxy or the raw instance (methods are bound to target). */
+function sameComponentIdentity(a: unknown, b: unknown): boolean {
+  const ra = a && typeof a === 'object' ? ((a as any).__getRawTarget ?? a) : a
+  const rb = b && typeof b === 'object' ? ((b as any).__getRawTarget ?? b) : b
+  return ra === rb
+}
+
 export function __escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -545,7 +552,7 @@ export default class Component<P = Record<string, any>> extends Store {
       const props = this.extractComponentProps_(el)
       const itemId = el.getAttribute('data-prop-item-id')
       const child = new (Ctor as new (props: any) => AnyComponent)(props)
-      child.parentComponent = this as AnyComponent
+      child.parentComponent = ((this as any).__selfProxy ?? this) as AnyComponent
       this.__childComponents.push(child)
 
       const parent = el.parentElement
@@ -575,7 +582,12 @@ export default class Component<P = Record<string, any>> extends Store {
         value.forEach(collect)
         return
       }
-      if (value && typeof value === 'object' && value.__geaCompiledChild && value.parentComponent === this) {
+      if (
+        value &&
+        typeof value === 'object' &&
+        value.__geaCompiledChild &&
+        sameComponentIdentity(value.parentComponent, this)
+      ) {
         if (!seen.has(value)) {
           seen.add(value)
           if (!this.__childComponents.includes(value)) {
@@ -614,7 +626,7 @@ export default class Component<P = Record<string, any>> extends Store {
 
   __child<T extends AnyComponent>(Ctor: new (props: any) => T, props: any, key?: any): T {
     const child = new Ctor(props)
-    child.parentComponent = this as AnyComponent
+    child.parentComponent = ((this as any).__selfProxy ?? this) as AnyComponent
     child.__geaCompiledChild = true
     if (key !== undefined) {
       child.__geaItemKey = String(key)

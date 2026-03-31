@@ -6,11 +6,11 @@ import { runInSSRContext } from '../src/ssr-context.ts'
 
 describe('Store SSR overlay – delete tombstone', () => {
   beforeEach(() => {
-    Store._rootProxyHandlerFactory = createSSRRootProxyHandler
+    Store.rootProxyHandlerFactory = createSSRRootProxyHandler
   })
 
   afterEach(() => {
-    Store._rootProxyHandlerFactory = null
+    Store.rootProxyHandlerFactory = null
   })
 
   it('deleting a property in SSR overlay returns undefined on read, not the underlying value', () => {

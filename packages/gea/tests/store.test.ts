@@ -1,12 +1,47 @@
 import assert from 'node:assert/strict'
 import { describe, it, beforeEach } from 'node:test'
-import { Store } from '../src/lib/store'
+import { Store, isClassConstructorValue } from '../src/lib/store'
 import type { StoreChange } from '../src/lib/store'
 
 async function flush() {
   await new Promise((r) => setTimeout(r, 0))
   await new Promise((r) => setTimeout(r, 0))
 }
+
+describe('isClassConstructorValue', () => {
+  it('identifies class constructors (not via toString)', () => {
+    class RouteComponent {}
+    function plainFn() {}
+    assert.equal(isClassConstructorValue(RouteComponent), true)
+    assert.equal(isClassConstructorValue(plainFn), false)
+    assert.equal(
+      isClassConstructorValue(() => {}),
+      false,
+    )
+  })
+
+  it('treats HMR-style constructor proxy as a class (real prototype.constructor)', () => {
+    class Page {}
+    const target = function GeaHotStub() {}
+    const proxy = new Proxy(target, {
+      get(_t, prop) {
+        if (prop === 'prototype') return Page.prototype
+        return Reflect.get(Page as object as Function, prop)
+      },
+      getOwnPropertyDescriptor(_t, prop) {
+        return Object.getOwnPropertyDescriptor(Page, prop)
+      },
+    }) as unknown as Function
+    assert.throws(() => Object.getOwnPropertyDescriptor(proxy, 'prototype'))
+    assert.equal(isClassConstructorValue(proxy), true)
+  })
+
+  it('root proxy returns same class reference for route components (no spurious bind)', () => {
+    class HomePage {}
+    const router = new Store({ component: HomePage })
+    assert.strictEqual(router.component, HomePage)
+  })
+})
 
 describe('Store – construction', () => {
   it('creates with explicit initial state', () => {

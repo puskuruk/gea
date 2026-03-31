@@ -12,11 +12,11 @@ function getRaw(store: object): object {
 
 describe('serializeStores – SSR overlay awareness', () => {
   beforeEach(() => {
-    Store._rootProxyHandlerFactory = createSSRRootProxyHandler
+    Store.rootProxyHandlerFactory = createSSRRootProxyHandler
   })
 
   afterEach(() => {
-    Store._rootProxyHandlerFactory = null
+    Store.rootProxyHandlerFactory = null
   })
 
   it('serializes overlay values, not underlying store values', () => {

@@ -310,7 +310,7 @@ var Store = class Store {
 		this._noDirectTopLevelValue = Symbol("noDirectTopLevelValue");
 	}
 	static {
-		this._rootProxyHandlerFactory = null;
+		this.rootProxyHandlerFactory = null;
 	}
 	static {
 		this._pendingStores = /* @__PURE__ */ new Set();
@@ -461,7 +461,7 @@ var Store = class Store {
 			}
 			for (const [node, relevant] of deliveries) this._notifyHandlers(node, relevant);
 		};
-		const handler = Store._rootProxyHandlerFactory ? Store._rootProxyHandlerFactory() : Store._getBrowserRootProxyHandler();
+		const handler = Store.rootProxyHandlerFactory ? Store.rootProxyHandlerFactory() : Store._getBrowserRootProxyHandler();
 		const proxy = new Proxy(this, handler);
 		this._selfProxy = proxy;
 		if (initialData) for (const key of Object.keys(initialData)) Object.defineProperty(this, key, {

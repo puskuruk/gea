@@ -11,11 +11,11 @@ function getRaw(store: object): object {
 
 describe('Store SSR Proxy has trap', () => {
   beforeEach(() => {
-    Store._rootProxyHandlerFactory = createSSRRootProxyHandler
+    Store.rootProxyHandlerFactory = createSSRRootProxyHandler
   })
 
   afterEach(() => {
-    Store._rootProxyHandlerFactory = null
+    Store.rootProxyHandlerFactory = null
   })
 
   it('returns false for tombstoned properties via "in" operator', () => {
