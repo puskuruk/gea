@@ -1,15 +1,7 @@
-/**
- * Event method generation for the Gea compiler.
- *
- * Builds the `get events()` getter and individual event handler methods
- * on the component class, covering regular handlers, delegated prop callbacks,
- * and map-context handlers (item lookup via DOM walk).
- */
 import { t } from '../utils/babel-interop.ts'
 import { getTemplateParamBinding } from '../analyze/template-param-utils.ts'
-import { id, jsBlockBody, jsMethod } from 'eszter'
-import type { EventHandler } from '../ir/types.ts'
-import type { StateRefMeta } from '../ir/types.ts'
+import { id, jsBlockBody, jsExpr, jsMethod } from 'eszter'
+import type { EventHandler, StateRefMeta } from '../ir/types.ts'
 import {
   buildMemberChainFromParts,
   buildOptionalMemberChain,
@@ -19,6 +11,47 @@ import {
 } from './ast-helpers.ts'
 import { ITEM_IS_KEY } from '../analyze/helpers.ts'
 import { collectTemplateSetupStatements } from '../analyze/binding-resolver.ts'
+
+const SKIP_BINDING: Record<string, Set<string>> = {
+  VariableDeclarator: new Set(['id']),
+  MemberExpression: new Set(['property']),
+  OptionalMemberExpression: new Set(['property']),
+  ArrowFunctionExpression: new Set(['params']),
+  FunctionExpression: new Set(['params', 'id']),
+  FunctionDeclaration: new Set(['params', 'id']),
+}
+
+function deepMapNode(node: t.Node, visit: (n: t.Node) => t.Node | undefined): t.Node {
+  const hit = visit(node)
+  if (hit !== undefined) return hit
+  const keys = t.VISITOR_KEYS[node.type]
+  if (!keys?.length) return node
+  const skip = SKIP_BINDING[node.type]
+  let changed = false
+  const updates: Record<string, any> = {}
+  for (const key of keys) {
+    if (skip?.has(key)) continue
+    if (t.isObjectProperty(node) && key === 'key' && !node.computed) continue
+    const child = (node as any)[key]
+    if (Array.isArray(child)) {
+      let arrChanged = false
+      const mapped = child.map((c: any) => {
+        if (c && typeof c === 'object' && 'type' in c) {
+          const r = deepMapNode(c, visit)
+          if (r !== c) arrChanged = true
+          return r
+        }
+        return c
+      })
+      if (arrChanged) { changed = true; updates[key] = mapped }
+    } else if (child && typeof child === 'object' && 'type' in child) {
+      const r = deepMapNode(child, visit)
+      if (r !== child) { changed = true; updates[key] = r }
+    }
+  }
+  if (!changed) return node
+  return { ...node, ...updates } as t.Node
+}
 
 interface TemplateParamContext {
   propNames: Set<string>
@@ -48,12 +81,6 @@ function getTemplateParamContext(classBody: t.ClassBody): TemplateParamContext {
   return { propNames: new Set() }
 }
 
-function getMapContextKey(ctx: NonNullable<EventHandler['mapContext']>): string {
-  const store = ctx.storeVar || 'store'
-  const path = ctx.arrayPathParts.join('_')
-  return `${store}_${path}_${ctx.itemIdProperty}`
-}
-
 function ensureMapItemHelper(
   classBody: t.ClassBody,
   ctx: NonNullable<EventHandler['mapContext']>,
@@ -63,39 +90,14 @@ function ensureMapItemHelper(
 
   const itemsExpr = buildArrayItemsExpr(ctx)
 
-  const findPredicate =
-    ctx.itemIdProperty && ctx.itemIdProperty !== ITEM_IS_KEY
-      ? t.arrowFunctionExpression(
-          [t.identifier('__candidate')],
-          t.binaryExpression(
-            '===',
-            t.callExpression(t.identifier('String'), [
-              t.logicalExpression(
-                '??',
-                buildOptionalMemberChain(t.identifier('__candidate'), ctx.itemIdProperty),
-                t.identifier('__candidate'),
-              ),
-            ]),
-            t.identifier('__itemId'),
-          ),
-        )
-      : ctx.itemIdProperty === ITEM_IS_KEY
-        ? t.arrowFunctionExpression(
-            [t.identifier('__candidate')],
-            t.binaryExpression(
-              '===',
-              t.callExpression(t.identifier('String'), [t.identifier('__candidate')]),
-              t.identifier('__itemId'),
-            ),
-          )
-        : t.arrowFunctionExpression(
-            [t.identifier('_'), t.identifier('__i')],
-            t.binaryExpression(
-              '===',
-              t.callExpression(t.identifier('String'), [t.identifier('__i')]),
-              t.identifier('__itemId'),
-            ),
-          )
+  const optChain = ctx.itemIdProperty && ctx.itemIdProperty !== ITEM_IS_KEY
+    ? buildOptionalMemberChain(t.identifier('__candidate'), ctx.itemIdProperty)
+    : null
+  const findPredicate = optChain
+    ? jsExpr`(__candidate) => String(${optChain} ?? __candidate) === __itemId`
+    : ctx.itemIdProperty === ITEM_IS_KEY
+      ? jsExpr`(__candidate) => String(__candidate) === __itemId`
+      : jsExpr`(_, __i) => String(__i) === __itemId`
   const method = jsMethod`${id(helperName)}(e) {}`
   method.body.body.push(
     ...buildGeaItemDomWalk(),
@@ -143,11 +145,12 @@ export function appendCompiledEventMethods(
   )
   const seenContexts = new Set<string>()
   for (const h of mapHandlers) {
-    const key = getMapContextKey(h.mapContext)
+    const store = h.mapContext.storeVar || 'store'
+    const path = h.mapContext.arrayPathParts.join('_')
+    const key = `${store}_${path}_${h.mapContext.itemIdProperty}`
     if (seenContexts.has(key)) continue
     seenContexts.add(key)
-    const helperName = `__getMapItemFromEvent_${h.mapContext.storeVar || 'store'}_${h.mapContext.arrayPathParts.join('_')}`
-    ensureMapItemHelper(classBody, h.mapContext, helperName)
+    ensureMapItemHelper(classBody, h.mapContext, `__getMapItemFromEvent_${store}_${path}`)
   }
 
   appendEventsGetterHandlers(classBody, handlers, paramContext, templateParams)
@@ -173,7 +176,8 @@ function appendEventsGetterHandlers(
   setupStatements: t.Statement[],
 ): void {
   const getter = ensureEventsGetter(classBody)
-  const eventsObject = getEventsObject(getter)
+  const returnStmt = getter.body.body.find((s) => t.isReturnStatement(s)) as t.ReturnStatement | undefined
+  const eventsObject = returnStmt?.argument && t.isObjectExpression(returnStmt.argument) ? returnStmt.argument : null
   if (!eventsObject) return
 
   handlers.forEach((handler, index) => {
@@ -235,6 +239,9 @@ function buildSelectorHandlerMethod(
   const method = jsMethod`${id(methodName)}(e, targetComponent) {}`
 
   if (handler.delegatedPropName) {
+    const propLit = t.stringLiteral(handler.delegatedPropName)
+    const owner = handler.usesTargetComponent ? t.identifier('targetComponent') : t.thisExpression()
+    const callbackInit = t.memberExpression(t.memberExpression(owner, t.identifier('props')), propLit, true)
     if (handler.usesTargetComponent) {
       method.body.body.push(
         t.ifStatement(
@@ -245,39 +252,15 @@ function buildSelectorHandlerMethod(
           ),
           t.returnStatement(),
         ),
-        t.variableDeclaration('const', [
-          t.variableDeclarator(
-            t.identifier('callback'),
-            t.memberExpression(
-              t.memberExpression(t.identifier('targetComponent'), t.identifier('props')),
-              t.stringLiteral(handler.delegatedPropName),
-              true,
-            ),
-          ),
-        ]),
-        t.ifStatement(
-          t.binaryExpression('===', t.unaryExpression('typeof', t.identifier('callback')), t.stringLiteral('function')),
-          t.expressionStatement(t.callExpression(t.identifier('callback'), [t.identifier('e')])),
-        ),
-      )
-    } else {
-      method.body.body.push(
-        t.variableDeclaration('const', [
-          t.variableDeclarator(
-            t.identifier('callback'),
-            t.memberExpression(
-              t.memberExpression(t.thisExpression(), t.identifier('props')),
-              t.stringLiteral(handler.delegatedPropName),
-              true,
-            ),
-          ),
-        ]),
-        t.ifStatement(
-          t.binaryExpression('===', t.unaryExpression('typeof', t.identifier('callback')), t.stringLiteral('function')),
-          t.expressionStatement(t.callExpression(t.identifier('callback'), [t.identifier('e')])),
-        ),
       )
     }
+    method.body.body.push(
+      t.variableDeclaration('const', [t.variableDeclarator(t.identifier('callback'), callbackInit)]),
+      t.ifStatement(
+        t.binaryExpression('===', t.unaryExpression('typeof', t.identifier('callback')), t.stringLiteral('function')),
+        t.expressionStatement(t.callExpression(t.identifier('callback'), [t.identifier('e')])),
+      ),
+    )
     return method
   }
 
@@ -292,147 +275,21 @@ function buildSelectorHandlerMethod(
 
 function ensureEventsGetter(classBody: t.ClassBody): t.ClassMethod {
   const existing = classBody.body.find(
-    (member) =>
-      t.isClassMethod(member) && member.kind === 'get' && t.isIdentifier(member.key) && member.key.name === 'events',
+    (m) => t.isClassMethod(m) && m.kind === 'get' && t.isIdentifier(m.key) && m.key.name === 'events',
   ) as t.ClassMethod | undefined
   if (existing) return existing
-
-  const getter = t.classMethod(
-    'get',
-    t.identifier('events'),
-    [],
-    t.blockStatement([t.returnStatement(t.objectExpression([]))]),
-  )
+  const getter = t.classMethod('get', t.identifier('events'), [], t.blockStatement([t.returnStatement(t.objectExpression([]))]))
   classBody.body.push(getter)
   return getter
 }
 
-function getEventsObject(getter: t.ClassMethod): t.ObjectExpression | null {
-  const returnStmt = getter.body.body.find((statement) => t.isReturnStatement(statement)) as
-    | t.ReturnStatement
-    | undefined
-  if (!returnStmt || !returnStmt.argument || !t.isObjectExpression(returnStmt.argument)) return null
-  return returnStmt.argument
-}
-
 function replacePropsObjectRefsInNode(node: t.Node, propsObjectName: string): t.Node {
-  if (t.isIdentifier(node) && node.name === propsObjectName) {
-    return t.memberExpression(t.thisExpression(), t.identifier('props'))
-  }
-  if (t.isExpressionStatement(node)) {
-    return t.expressionStatement(replacePropsObjectRefsInNode(node.expression, propsObjectName) as t.Expression)
-  }
-  if (t.isBlockStatement(node)) {
-    return t.blockStatement(node.body.map((s) => replacePropsObjectRefsInNode(s, propsObjectName) as t.Statement))
-  }
-  if (t.isIfStatement(node)) {
-    return t.ifStatement(
-      replacePropsObjectRefsInNode(node.test, propsObjectName) as t.Expression,
-      replacePropsObjectRefsInNode(node.consequent, propsObjectName) as t.Statement,
-      node.alternate ? (replacePropsObjectRefsInNode(node.alternate, propsObjectName) as t.Statement) : null,
-    )
-  }
-  if (t.isReturnStatement(node)) {
-    return t.returnStatement(
-      node.argument ? (replacePropsObjectRefsInNode(node.argument, propsObjectName) as t.Expression) : null,
-    )
-  }
-  if (t.isCallExpression(node)) {
-    return t.callExpression(
-      replacePropsObjectRefsInNode(node.callee, propsObjectName) as t.Expression,
-      node.arguments.map(
-        (a) => (t.isExpression(a) ? replacePropsObjectRefsInNode(a, propsObjectName) : a) as t.Expression,
-      ),
-    )
-  }
-  if (t.isMemberExpression(node)) {
-    return t.memberExpression(
-      replacePropsObjectRefsInNode(node.object, propsObjectName) as t.Expression,
-      node.property,
-      node.computed,
-    )
-  }
-  if (t.isOptionalMemberExpression(node)) {
-    return t.optionalMemberExpression(
-      replacePropsObjectRefsInNode(node.object, propsObjectName) as t.Expression,
-      node.property as t.Expression,
-      node.computed,
-      node.optional,
-    )
-  }
-  if (t.isOptionalCallExpression(node)) {
-    return t.optionalCallExpression(
-      replacePropsObjectRefsInNode(node.callee, propsObjectName) as t.Expression,
-      node.arguments.map(
-        (a) => (t.isExpression(a) ? replacePropsObjectRefsInNode(a, propsObjectName) : a) as t.Expression,
-      ),
-      node.optional,
-    )
-  }
-  if (t.isConditionalExpression(node)) {
-    return t.conditionalExpression(
-      replacePropsObjectRefsInNode(node.test, propsObjectName) as t.Expression,
-      replacePropsObjectRefsInNode(node.consequent, propsObjectName) as t.Expression,
-      replacePropsObjectRefsInNode(node.alternate, propsObjectName) as t.Expression,
-    )
-  }
-  if (t.isLogicalExpression(node)) {
-    return t.logicalExpression(
-      node.operator,
-      replacePropsObjectRefsInNode(node.left, propsObjectName) as t.Expression,
-      replacePropsObjectRefsInNode(node.right, propsObjectName) as t.Expression,
-    )
-  }
-  if (t.isBinaryExpression(node)) {
-    return t.binaryExpression(
-      node.operator,
-      replacePropsObjectRefsInNode(node.left, propsObjectName) as t.Expression,
-      replacePropsObjectRefsInNode(node.right, propsObjectName) as t.Expression,
-    )
-  }
-  if (t.isUnaryExpression(node)) {
-    return t.unaryExpression(
-      node.operator,
-      replacePropsObjectRefsInNode(node.argument, propsObjectName) as t.Expression,
-      node.prefix,
-    )
-  }
-  if (t.isSequenceExpression(node)) {
-    return t.sequenceExpression(
-      node.expressions.map((e) => replacePropsObjectRefsInNode(e, propsObjectName) as t.Expression),
-    )
-  }
-  if (t.isAssignmentExpression(node)) {
-    return t.assignmentExpression(
-      node.operator,
-      replacePropsObjectRefsInNode(node.left, propsObjectName) as t.LVal,
-      replacePropsObjectRefsInNode(node.right, propsObjectName) as t.Expression,
-    )
-  }
-  if (t.isVariableDeclaration(node)) {
-    return t.variableDeclaration(
-      node.kind,
-      node.declarations.map((d) =>
-        t.variableDeclarator(
-          d.id,
-          d.init ? (replacePropsObjectRefsInNode(d.init, propsObjectName) as t.Expression) : null,
-        ),
-      ),
-    )
-  }
-  if (t.isArrowFunctionExpression(node)) {
-    const body = t.isBlockStatement(node.body)
-      ? t.blockStatement(node.body.body.map((s) => replacePropsObjectRefsInNode(s, propsObjectName) as t.Statement))
-      : (replacePropsObjectRefsInNode(node.body, propsObjectName) as t.Expression)
-    return t.arrowFunctionExpression(node.params, body, node.async)
-  }
-  if (t.isFunctionExpression(node)) {
-    const body = t.blockStatement(
-      node.body.body.map((s) => replacePropsObjectRefsInNode(s, propsObjectName) as t.Statement),
-    )
-    return t.functionExpression(node.id, node.params, body, node.generator, node.async)
-  }
-  return node
+  return deepMapNode(node, (n) => {
+    if (t.isIdentifier(n) && n.name === propsObjectName) {
+      return t.memberExpression(t.thisExpression(), t.identifier('props'))
+    }
+    return undefined
+  })
 }
 
 function applyTemplateParamContext(statements: t.Statement[], paramContext: TemplateParamContext): t.Statement[] {
@@ -464,18 +321,8 @@ function buildArrayItemsExpr(ctx: NonNullable<EventHandler['mapContext']>, opts:
   const [first] = ctx.arrayPathParts
   const unresolvedMatch = first?.match(/^__unresolved_(\d+)$/)
   if (unresolvedMatch) {
-    const mapIdx = Number(unresolvedMatch[1])
-    return t.callExpression(
-      t.memberExpression(
-        t.memberExpression(
-          t.memberExpression(t.thisExpression(), t.identifier('__geaMaps')),
-          t.numericLiteral(mapIdx),
-          true,
-        ),
-        t.identifier('getItems'),
-      ),
-      [],
-    )
+    const mapIdx = t.numericLiteral(Number(unresolvedMatch[1]))
+    return jsExpr`this.__geaMaps[${mapIdx}].getItems()`
   }
   const base = ctx.isImportedState
     ? opts.raw

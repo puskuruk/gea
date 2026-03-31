@@ -1,18 +1,8 @@
-/**
- * Event helper functions for the Gea compiler codegen.
- *
- * Provides event name mappings, prop context extraction,
- * root-class selectors, and hoistable event detection for
- * child component event delegation.
- */
-import { traverse, t } from '../utils/babel-interop.ts'
-import type { NodePath } from '@babel/traverse'
+import { t } from '../utils/babel-interop.ts'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { parseSource } from '../parse/parser.ts'
 import { getTemplateParamBinding } from '../analyze/template-param-utils.ts'
-
-// ─── Public types ───────────────────────────────────────────────────
 
 export interface PropContext {
   propsParamName?: string
@@ -25,9 +15,6 @@ export interface HoistableRootEventMeta {
   selector: string
 }
 
-// ─── Event name sets ────────────────────────────────────────────────
-
-/** All event attribute names the compiler recognises (on* form). */
 export const EVENT_NAMES = new Set([
   'click', 'dblclick',
   'mousedown', 'mouseup', 'mouseover', 'mouseout', 'mousemove',
@@ -39,12 +26,6 @@ export const EVENT_NAMES = new Set([
   'dragstart', 'dragend', 'dragover', 'dragleave', 'drop',
 ])
 
-// ─── Attribute-name to event-type conversion ────────────────────────
-
-/**
- * Convert a JSX event attribute name (e.g. `onClick`) to its DOM
- * event type (e.g. `click`).
- */
 export function toGeaEventType(attrName: string): string {
   if (attrName.startsWith('on') && attrName.length > 2) {
     const rest = attrName.slice(2)
@@ -53,12 +34,6 @@ export function toGeaEventType(attrName: string): string {
   return attrName
 }
 
-// ─── Template parameter context ─────────────────────────────────────
-
-/**
- * Extract destructured prop names (or the whole-object param name)
- * from a template method's parameter list.
- */
 export function getPropContext(
   params?: Array<t.Identifier | t.Pattern | t.RestElement>,
 ): PropContext {
@@ -74,7 +49,6 @@ export function getPropContext(
     return context
   }
 
-  // ObjectPattern destructuring
   context.propsParamName = 'props'
   binding.properties.forEach((prop) => {
     if (t.isObjectProperty(prop) && t.isIdentifier(prop.key)) {
@@ -84,12 +58,6 @@ export function getPropContext(
   return context
 }
 
-// ─── Root class selector ────────────────────────────────────────────
-
-/**
- * Extract the first CSS class from a root element's class/className
- * attribute for use as a delegation selector (e.g. `.my-class`).
- */
 export function getRootClassSelector(node: t.JSXElement): string | null {
   for (const attr of node.openingElement.attributes) {
     if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name)) continue
@@ -114,26 +82,17 @@ export function getRootClassSelector(node: t.JSXElement): string | null {
   return null
 }
 
-// ─── Prop callback resolution ───────────────────────────────────────
-
 function resolvePropCallbackName(
   expr: t.Expression,
   context: PropContext,
 ): string | null {
-  // Direct destructured prop: `onClick`
-  if (t.isIdentifier(expr) && context.destructuredPropNames.has(expr.name)) {
-    return expr.name
-  }
-  // `props.onClick`
+  if (t.isIdentifier(expr) && context.destructuredPropNames.has(expr.name)) return expr.name
   if (
     t.isMemberExpression(expr) &&
     t.isIdentifier(expr.property) &&
     t.isIdentifier(expr.object) &&
     expr.object.name === (context.propsParamName || 'props')
-  ) {
-    return expr.property.name
-  }
-  // `this.props.onClick` or `props.props.onClick`
+  ) return expr.property.name
   if (
     t.isMemberExpression(expr) &&
     t.isIdentifier(expr.property) &&
@@ -148,8 +107,6 @@ function resolvePropCallbackName(
   }
   return null
 }
-
-// ─── Hoistable root event detection ─────────────────────────────────
 
 function extractSingleCallExpression(
   expr: t.Expression,
@@ -171,10 +128,6 @@ function extractSingleCallExpression(
   return null
 }
 
-/**
- * Detect whether a root-element event handler can be hoisted to the
- * parent as a delegated prop callback.  Returns metadata on success.
- */
 export function getHoistableRootEvent(
   attrName: string,
   expr: t.Expression,
@@ -183,14 +136,8 @@ export function getHoistableRootEvent(
   selector: string | null,
 ): HoistableRootEventMeta | null {
   if (elementPath.length !== 0 || !selector) return null
-  if (
-    attrName.startsWith('data-') ||
-    attrName === 'class' ||
-    attrName === 'className' ||
-    attrName === 'style' ||
-    attrName === 'id'
-  )
-    return null
+  const skip = new Set(['class', 'className', 'style', 'id'])
+  if (attrName.startsWith('data-') || skip.has(attrName)) return null
 
   const eventType = toGeaEventType(attrName)
   const directProp = resolvePropCallbackName(expr, context)
@@ -206,169 +153,75 @@ export function getHoistableRootEvent(
   return { eventType, propName, selector }
 }
 
-// ─── Cross-file root event analysis ─────────────────────────────────
-
-function resolveImportPath(
-  importer: string,
-  source: string,
-): string | null {
+function resolveImportPath(importer: string, source: string): string | null {
   const base = resolve(dirname(importer), source)
-  const candidates = [
-    base,
-    `${base}.js`,
-    `${base}.jsx`,
-    `${base}.ts`,
-    `${base}.tsx`,
-    resolve(base, 'index.js'),
-    resolve(base, 'index.jsx'),
-    resolve(base, 'index.ts'),
-    resolve(base, 'index.tsx'),
-  ]
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate
+  const exts = ['', '.js', '.jsx', '.ts', '.tsx']
+  const candidates = [...exts.map((e) => base + e), ...exts.slice(1).map((e) => resolve(base, `index${e}`))]
+  return candidates.find((c) => existsSync(c)) ?? null
+}
+
+type RootJSXResult = { jsx: t.JSXElement; context: PropContext }
+
+function findJSXReturn(stmts: t.Statement[]): t.JSXElement | null {
+  for (const s of stmts) {
+    if (t.isReturnStatement(s) && s.argument && t.isJSXElement(s.argument)) return s.argument
   }
   return null
+}
+
+function jsxFromFunctionBody(
+  fn: t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration,
+): t.JSXElement | null {
+  if ('body' in fn && t.isJSXElement(fn.body)) return fn.body
+  if ('body' in fn && t.isBlockStatement(fn.body)) return findJSXReturn(fn.body.body)
+  return null
+}
+
+function jsxFromTemplateMethod(classBody: t.ClassBody): RootJSXResult | null {
+  const m = classBody.body.find(
+    (member) => t.isClassMethod(member) && t.isIdentifier(member.key) && member.key.name === 'template',
+  ) as t.ClassMethod | undefined
+  if (!m || !t.isBlockStatement(m.body)) return null
+  const jsx = findJSXReturn(m.body.body)
+  return jsx ? { jsx, context: getPropContext(m.params as (t.Identifier | t.Pattern | t.RestElement)[]) } : null
 }
 
 function getReturnedRootJSX(
   ast: t.File,
   componentClassName: string | null,
-): { jsx: t.JSXElement; context: PropContext } | null {
-  let found: { jsx: t.JSXElement; context: PropContext } | null = null
-
+): RootJSXResult | null {
   for (const stmt of ast.program.body) {
     if (t.isExportDefaultDeclaration(stmt)) {
       const decl = stmt.declaration
       if (t.isFunctionDeclaration(decl) && decl.body) {
-        const ret = decl.body.body.find(
-          (node) =>
-            t.isReturnStatement(node) &&
-            node.argument &&
-            t.isJSXElement(node.argument),
-        )
-        if (
-          ret &&
-          t.isReturnStatement(ret) &&
-          ret.argument &&
-          t.isJSXElement(ret.argument)
-        ) {
-          return { jsx: ret.argument, context: getPropContext(decl.params) }
-        }
+        const jsx = findJSXReturn(decl.body.body)
+        if (jsx) return { jsx, context: getPropContext(decl.params) }
       }
       if (t.isIdentifier(decl)) {
         for (const bodyStmt of ast.program.body) {
           if (!t.isVariableDeclaration(bodyStmt)) continue
           for (const dec of bodyStmt.declarations) {
-            if (!t.isIdentifier(dec.id, { name: decl.name })) continue
-            if (
-              !dec.init ||
-              (!t.isArrowFunctionExpression(dec.init) &&
-                !t.isFunctionExpression(dec.init))
-            )
-              continue
-            const fn = dec.init
-            if (t.isJSXElement(fn.body))
-              return { jsx: fn.body, context: getPropContext(fn.params) }
-            if (t.isBlockStatement(fn.body)) {
-              const ret = fn.body.body.find(
-                (node) =>
-                  t.isReturnStatement(node) &&
-                  node.argument &&
-                  t.isJSXElement(node.argument),
-              )
-              if (
-                ret &&
-                t.isReturnStatement(ret) &&
-                ret.argument &&
-                t.isJSXElement(ret.argument)
-              ) {
-                return { jsx: ret.argument, context: getPropContext(fn.params) }
-              }
-            }
+            if (!t.isIdentifier(dec.id, { name: decl.name }) || !dec.init) continue
+            if (!t.isArrowFunctionExpression(dec.init) && !t.isFunctionExpression(dec.init)) continue
+            const jsx = jsxFromFunctionBody(dec.init)
+            if (jsx) return { jsx, context: getPropContext(dec.init.params) }
           }
         }
       }
-      if (
-        componentClassName &&
-        t.isClassDeclaration(stmt.declaration) &&
-        t.isIdentifier(stmt.declaration.id, { name: componentClassName })
-      ) {
-        const templateMethod = stmt.declaration.body.body.find(
-          (member) =>
-            t.isClassMethod(member) &&
-            t.isIdentifier(member.key) &&
-            member.key.name === 'template',
-        ) as t.ClassMethod | undefined
-        if (!templateMethod || !t.isBlockStatement(templateMethod.body))
-          return null
-        const ret = templateMethod.body.body.find(
-          (node) =>
-            t.isReturnStatement(node) &&
-            node.argument &&
-            t.isJSXElement(node.argument),
-        )
-        if (
-          ret &&
-          t.isReturnStatement(ret) &&
-          ret.argument &&
-          t.isJSXElement(ret.argument)
-        ) {
-          return {
-            jsx: ret.argument,
-            context: getPropContext(
-              templateMethod.params as (
-                | t.Identifier
-                | t.Pattern
-                | t.RestElement
-              )[],
-            ),
-          }
-        }
+      if (componentClassName && t.isClassDeclaration(decl) && t.isIdentifier(decl.id, { name: componentClassName })) {
+        return jsxFromTemplateMethod(decl.body)
       }
     }
-    if (
-      !componentClassName ||
-      !t.isClassDeclaration(stmt) ||
-      !t.isIdentifier(stmt.id, { name: componentClassName })
-    )
+    if (!componentClassName || !t.isClassDeclaration(stmt) || !t.isIdentifier(stmt.id, { name: componentClassName }))
       continue
-    const templateMethod = stmt.body.body.find(
-      (member) =>
-        t.isClassMethod(member) &&
-        t.isIdentifier(member.key) &&
-        member.key.name === 'template',
-    ) as t.ClassMethod | undefined
-    if (!templateMethod || !t.isBlockStatement(templateMethod.body)) continue
-    const ret = templateMethod.body.body.find(
-      (node) =>
-        t.isReturnStatement(node) &&
-        node.argument &&
-        t.isJSXElement(node.argument),
-    )
-    if (
-      ret &&
-      t.isReturnStatement(ret) &&
-      ret.argument &&
-      t.isJSXElement(ret.argument)
-    ) {
-      found = {
-        jsx: ret.argument,
-        context: getPropContext(
-          templateMethod.params as (t.Identifier | t.Pattern | t.RestElement)[],
-        ),
-      }
-      break
-    }
+    const result = jsxFromTemplateMethod(stmt.body)
+    if (result) return result
   }
-  return found
+  return null
 }
 
 const hoistableRootEventCache = new Map<string, HoistableRootEventMeta[]>()
 
-/**
- * Analyse a child component file to discover root-element events
- * that can be delegated to the parent. Results are cached per file.
- */
 export function getHoistableRootEventsForImport(
   importer: string,
   source: string,
@@ -418,7 +271,6 @@ export function getHoistableRootEventsForImport(
   return result
 }
 
-/** Clear all internal caches. Useful between test runs. */
 export function clearCaches(): void {
   hoistableRootEventCache.clear()
 }

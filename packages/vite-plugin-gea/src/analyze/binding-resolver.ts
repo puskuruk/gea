@@ -17,6 +17,8 @@ export interface TemplateSetupContext {
   earlyReturnBarrierIndex?: number
 }
 
+const DOM_EVENT_RE = /^(click|input|change|submit|focus|blur|keydown|keyup|keypress|mousedown|mouseup|mouseover|mouseout|mouseenter|mouseleave|touchstart|touchend|touchmove|pointerdown|pointerup|pointermove|scroll|resize|drag|dragstart|dragend|dragover|drop|reset)$/
+
 export function buildComponentPropsExpression(
   jsxElement: t.JSXElement,
   imports: Map<string, string>,
@@ -40,14 +42,7 @@ export function buildComponentPropsExpression(
     else if (t.isJSXExpressionContainer(attr.value) && !t.isJSXEmptyExpression(attr.value.expression)) {
       const expr = attr.value.expression as t.Expression
       propValue = transformExpression(expr)
-      if (
-        propValue &&
-        (/^on[A-Z]/.test(propName) ||
-          /^(click|input|change|submit|focus|blur|keydown|keyup|keypress|mousedown|mouseup|mouseover|mouseout|mouseenter|mouseleave|touchstart|touchend|touchmove|pointerdown|pointerup|pointermove|scroll|resize|drag|dragstart|dragend|dragover|drop|reset)$/.test(
-            propName,
-          )) &&
-        t.isMemberExpression(propValue)
-      ) {
+      if (propValue && (/^on[A-Z]/.test(propName) || DOM_EVENT_RE.test(propName)) && t.isMemberExpression(propValue)) {
         const argsId = t.identifier('args')
         propValue = t.arrowFunctionExpression(
           [t.restElement(argsId)],
@@ -93,58 +88,47 @@ function collectExpressionDependenciesInto(
 ) {
   if (!stateRefs) return
 
-  const addDependency = (parts: string[], storeVar?: string) => {
-    const observeKey = buildObserveKey(parts, storeVar)
-    if (!dependencies.has(observeKey)) {
-      dependencies.set(observeKey, {
-        observeKey,
-        pathParts: parts,
-        storeVar,
-      })
-    }
+  const add = (parts: string[], storeVar?: string) => {
+    const key = buildObserveKey(parts, storeVar)
+    if (!dependencies.has(key)) dependencies.set(key, { observeKey: key, pathParts: parts, storeVar })
+  }
+
+  /** If the store ref has getter deps for `prop`, add them all and return true. */
+  const addGetterDeps = (ref: StateRefMeta | undefined, prop: string, storeVar: string): boolean => {
+    const paths = ref?.getterDeps?.get(prop)
+    if (!paths?.length) return false
+    for (const dep of paths) add(dep, storeVar)
+    return true
   }
 
   const referencedNames = collectReferencedIdentifiers(expr)
-  setupStatements.forEach((statement) => {
-    if (!t.isVariableDeclaration(statement)) return
-    statement.declarations.forEach((declaration) => {
-      if (!t.isObjectPattern(declaration.id) || !declaration.init) return
+  for (const statement of setupStatements) {
+    if (!t.isVariableDeclaration(statement)) continue
+    for (const declaration of statement.declarations) {
+      if (!t.isObjectPattern(declaration.id) || !declaration.init) continue
       const resolved = resolvePath(declaration.init as t.MemberExpression | t.Identifier | t.ThisExpression, stateRefs)
-      if (!resolved?.parts) return
-      declaration.id.properties.forEach((property) => {
-        if (!t.isObjectProperty(property)) return
-        const keyName = t.isIdentifier(property.key)
-          ? property.key.name
-          : t.isStringLiteral(property.key)
-            ? property.key.value
-            : null
-        if (!keyName) return
+      if (!resolved?.parts) continue
+      for (const property of declaration.id.properties) {
+        if (!t.isObjectProperty(property)) continue
+        const keyName = t.isIdentifier(property.key) ? property.key.name
+          : t.isStringLiteral(property.key) ? property.key.value : null
+        if (!keyName) continue
+        if (!collectPatternIdentifiers(property.value as t.LVal).some((n) => referencedNames.has(n))) continue
 
-        const valueNames = collectPatternIdentifiers(property.value as t.LVal)
-        if (!valueNames.some((name) => referencedNames.has(name))) return
-        const isStoreInstanceDestructure =
-          resolved.isImportedState && resolved.parts.length === 0 && t.isIdentifier(declaration.init)
-        if (isStoreInstanceDestructure) {
+        if (resolved.isImportedState && resolved.parts.length === 0 && t.isIdentifier(declaration.init)) {
           const storeRef = stateRefs.get((declaration.init as t.Identifier).name)
-          const getterStatePaths = storeRef?.getterDeps?.get(keyName)
-          if (getterStatePaths && getterStatePaths.length > 0) {
-            for (const dep of getterStatePaths) {
-              addDependency(dep, resolved.storeVar)
-            }
-          } else if (storeRef?.reactiveFields?.has(keyName)) {
-            addDependency([keyName], resolved.storeVar)
-          } else {
-            addDependency([], resolved.storeVar)
+          if (!addGetterDeps(storeRef, keyName, resolved.storeVar!)) {
+            add(storeRef?.reactiveFields?.has(keyName) ? [keyName] : [], resolved.storeVar!)
           }
         } else {
-          addDependency([...resolved.parts, keyName], resolved.isImportedState ? resolved.storeVar : undefined)
+          add([...resolved.parts, keyName], resolved.isImportedState ? resolved.storeVar : undefined)
         }
-      })
-    })
-  })
+      }
+    }
+  }
 
   const program = t.program([
-    ...setupStatements.map((statement) => t.cloneNode(statement, true) as t.Statement),
+    ...setupStatements.map((s) => t.cloneNode(s, true) as t.Statement),
     t.expressionStatement(t.cloneNode(expr, true)),
   ])
   traverse(program, {
@@ -158,41 +142,20 @@ function collectExpressionDependenciesInto(
       const isMethodCall = parent && t.isCallExpression(parent.node) && parent.node.callee === path.node
       if (isMethodCall && resolved.isImportedState && resolved.storeVar) {
         const ref = stateRefs?.get(resolved.storeVar)
-        if (ref && !ref.reactiveFields) {
-          addDependency([], resolved.storeVar)
-          return
-        }
-        // Store has reactiveFields -- strip the method name and observe the object
+        if (ref && !ref.reactiveFields) { add([], resolved.storeVar); return }
         const methodStripped = resolved.parts.slice(0, -1)
         const propName = methodStripped.length === 1 ? methodStripped[0] : undefined
-        if (propName && ref?.getterDeps?.has(propName)) {
-          const getterStatePaths = ref.getterDeps.get(propName)!
-          for (const dep of getterStatePaths) {
-            addDependency(dep, resolved.storeVar)
-          }
-          return
-        }
-        addDependency(methodStripped.length > 0 ? methodStripped : [], resolved.storeVar)
+        if (propName && addGetterDeps(ref, propName, resolved.storeVar)) return
+        add(methodStripped.length > 0 ? methodStripped : [], resolved.storeVar)
         return
       }
 
-      const parts =
-        resolved.parts.length >= 2 && resolved.parts[resolved.parts.length - 1] === 'length'
-          ? resolved.parts.slice(0, -1)
-          : resolved.parts
-      // Resolve getter dependencies for direct store member access (e.g. store.currentTrack)
+      const parts = resolved.parts.length >= 2 && resolved.parts[resolved.parts.length - 1] === 'length'
+        ? resolved.parts.slice(0, -1) : resolved.parts
       if (resolved.isImportedState && resolved.storeVar && parts.length >= 1) {
-        const ref = stateRefs?.get(resolved.storeVar)
-        const topProp = parts[0]
-        if (ref?.getterDeps?.has(topProp)) {
-          const getterStatePaths = ref.getterDeps.get(topProp)!
-          for (const dep of getterStatePaths) {
-            addDependency(dep, resolved.storeVar)
-          }
-          return
-        }
+        if (addGetterDeps(stateRefs?.get(resolved.storeVar), parts[0], resolved.storeVar)) return
       }
-      addDependency(parts, resolved.isImportedState ? resolved.storeVar : undefined)
+      add(parts, resolved.isImportedState ? resolved.storeVar : undefined)
     },
   })
 }
@@ -204,25 +167,16 @@ export function collectTemplateSetupStatements(
   if (!templateSetupContext) return []
 
   const bindingMap = new Map<string, { statement: t.Statement; index: number }>()
-
-  const firstParam = templateSetupContext.params[0]
-  const paramBinding = firstParam && !t.isRestElement(firstParam) ? getTemplateParamBinding(firstParam) : undefined
-  if (paramBinding) {
-    const paramStatement = t.variableDeclaration('const', [
-      t.variableDeclarator(
-        t.cloneNode(paramBinding, true),
-        t.memberExpression(t.thisExpression(), t.identifier('props')),
-      ),
+  const fp = templateSetupContext.params[0]
+  const pb = fp && !t.isRestElement(fp) ? getTemplateParamBinding(fp) : undefined
+  if (pb) {
+    const stmt = t.variableDeclaration('const', [
+      t.variableDeclarator(t.cloneNode(pb, true), t.memberExpression(t.thisExpression(), t.identifier('props'))),
     ])
-    collectPatternIdentifiers(paramBinding as t.LVal).forEach((name) => {
-      bindingMap.set(name, { statement: paramStatement, index: -1 })
-    })
+    for (const name of collectPatternIdentifiers(pb as t.LVal)) bindingMap.set(name, { statement: stmt, index: -1 })
   }
-
-  templateSetupContext.statements.forEach((statement, index) => {
-    collectStatementBindingNames(statement).forEach((name) => {
-      bindingMap.set(name, { statement, index })
-    })
+  templateSetupContext.statements.forEach((s, i) => {
+    for (const name of collectStatementBindingNames(s)) bindingMap.set(name, { statement: s, index: i })
   })
 
   const included = new Set<number>()
@@ -253,60 +207,37 @@ export function collectTemplateSetupStatements(
   const barrier = templateSetupContext.earlyReturnBarrierIndex
   if (barrier !== undefined && ordered.length > 0) {
     const stmtIndices = ordered.filter((e) => e.index >= 0).map((e) => e.index)
-    if (stmtIndices.length > 0) {
-      const maxIdx = Math.max(...stmtIndices)
-      const minIdx = Math.min(...stmtIndices)
-      // Main-branch setup after the barrier (e.g. const desc = item.x) needs the early if first.
-      // Setup taken only from before the barrier (e.g. const { item }) still needs that if before
-      // the main return template runs.
-      if (maxIdx > barrier || minIdx <= barrier) {
-        const have = new Set(ordered.map((e) => e.index))
-        const extra: Array<{ index: number; statement: t.Statement }> = []
-        for (let bi = 0; bi <= barrier; bi++) {
-          if (!have.has(bi)) {
-            extra.push({
-              index: bi,
-              statement: t.cloneNode(templateSetupContext.statements[bi], true) as t.Statement,
-            })
-          }
-        }
-        ordered.push(...extra)
-        ordered.sort((a, b) => a.index - b.index)
+    if (stmtIndices.length > 0 && (Math.max(...stmtIndices) > barrier || Math.min(...stmtIndices) <= barrier)) {
+      // Ensure all statements up to the barrier are included (early-return guard + preceding setup)
+      const have = new Set(ordered.map((e) => e.index))
+      for (let bi = 0; bi <= barrier; bi++) {
+        if (!have.has(bi))
+          ordered.push({ index: bi, statement: t.cloneNode(templateSetupContext.statements[bi], true) as t.Statement })
       }
+      ordered.sort((a, b) => a.index - b.index)
     }
   }
 
-  for (const entry of ordered) {
-    if (entry.index !== -1) continue
-    if (!t.isVariableDeclaration(entry.statement)) continue
-    const decl = entry.statement.declarations[0]
+  // Prune unused properties from param destructuring statements (index === -1)
+  for (const { index, statement } of ordered) {
+    if (index !== -1 || !t.isVariableDeclaration(statement)) continue
+    const decl = statement.declarations[0]
     if (!t.isObjectPattern(decl.id)) continue
-    decl.id.properties = decl.id.properties.filter((prop) => {
-      if (t.isRestElement(prop)) return true
-      if (t.isObjectProperty(prop)) {
-        const keyName = t.isIdentifier(prop.key) ? prop.key.name : t.isStringLiteral(prop.key) ? prop.key.value : null
-        return keyName ? includedParamNames.has(keyName) : true
-      }
-      return true
+    decl.id.properties = decl.id.properties.filter((p) => {
+      if (!t.isObjectProperty(p)) return true
+      const k = t.isIdentifier(p.key) ? p.key.name : t.isStringLiteral(p.key) ? p.key.value : null
+      return !k || includedParamNames.has(k)
     })
   }
 
-  return ordered.map((entry) => entry.statement)
+  return ordered.map((e) => e.statement)
 }
 
 function collectStatementBindingNames(statement: t.Statement): string[] {
-  if (t.isVariableDeclaration(statement)) {
-    return statement.declarations.flatMap((declaration) => collectPatternIdentifiers(declaration.id as t.LVal))
-  }
-
-  if (t.isFunctionDeclaration(statement) && statement.id) {
+  if (t.isVariableDeclaration(statement))
+    return statement.declarations.flatMap((d) => collectPatternIdentifiers(d.id as t.LVal))
+  if ((t.isFunctionDeclaration(statement) || t.isClassDeclaration(statement)) && statement.id)
     return [statement.id.name]
-  }
-
-  if (t.isClassDeclaration(statement) && statement.id) {
-    return [statement.id.name]
-  }
-
   return []
 }
 
@@ -314,31 +245,20 @@ function collectPatternIdentifiers(pattern: t.LVal): string[] {
   if (t.isIdentifier(pattern)) return [pattern.name]
   if (t.isRestElement(pattern)) return collectPatternIdentifiers(pattern.argument)
   if (t.isAssignmentPattern(pattern)) return collectPatternIdentifiers(pattern.left)
-  if (t.isObjectPattern(pattern)) {
-    return pattern.properties.flatMap((property) => {
-      if (t.isRestElement(property)) return collectPatternIdentifiers(property.argument)
-      return collectPatternIdentifiers(property.value as t.LVal)
-    })
-  }
-  if (t.isArrayPattern(pattern)) {
-    return pattern.elements.flatMap((element) => (element ? collectPatternIdentifiers(element as t.LVal) : []))
-  }
+  if (t.isObjectPattern(pattern))
+    return pattern.properties.flatMap((p) => collectPatternIdentifiers((t.isRestElement(p) ? p.argument : p.value) as t.LVal))
+  if (t.isArrayPattern(pattern))
+    return pattern.elements.flatMap((el) => el ? collectPatternIdentifiers(el as t.LVal) : [])
   return []
 }
 
 function collectReferencedIdentifiers(node: t.Node): Set<string> {
   const names = new Set<string>()
-  const program = t.program([
-    t.isStatement(node) ? t.cloneNode(node, true) : t.expressionStatement(t.cloneNode(node, true) as t.Expression),
-  ])
-
-  traverse(program, {
+  const cloned = t.cloneNode(node, true)
+  const prog = t.program([t.isStatement(cloned) ? cloned : t.expressionStatement(cloned as t.Expression)])
+  traverse(prog, {
     noScope: true,
-    Identifier(path: NodePath<t.Identifier>) {
-      if (!path.isReferencedIdentifier()) return
-      names.add(path.node.name)
-    },
+    Identifier(path: NodePath<t.Identifier>) { if (path.isReferencedIdentifier()) names.add(path.node.name) },
   })
-
   return names
 }

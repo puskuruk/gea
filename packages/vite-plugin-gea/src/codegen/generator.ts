@@ -8,7 +8,7 @@
 import { traverse, t } from '../utils/babel-interop.ts'
 import type { NodePath } from '../utils/babel-interop.ts'
 import type { ClassMethod, ReturnStatement } from '@babel/types'
-import { appendToBody, id, jsExpr, jsMethod } from 'eszter'
+import { appendToBody, id, jsExpr, jsImport, jsMethod } from 'eszter'
 import type { ChildComponent, EventHandler } from '../ir/types.ts'
 import type { AnalysisResult } from '../analyze/analyzer.ts'
 import { analyzeTemplate } from '../analyze/analyzer.ts'
@@ -36,11 +36,61 @@ import {
   wrapEventsGetterWithCache,
   wrapSubpathCacheGuards,
 } from './ast-helpers.ts'
-import { applyStaticReactivity } from './gen-reactivity.ts'
+import { applyStaticReactivity } from './reactivity.ts'
 import {
   analyzeStoreGetters,
   analyzeStoreReactiveFields,
 } from '../parse/store-analysis.ts'
+
+// ─── Shared helpers ──────────────────────────────────────────────────────
+
+/** Transform any JSX return statements nested in if/switch/block inside a template method body. */
+function transformNestedReturns(stmts: t.Statement[], mainReturn: t.Statement, ctx: Ctx): boolean {
+  let transformed = false
+  for (const stmt of stmts) {
+    if (t.isReturnStatement(stmt) && stmt !== mainReturn && stmt.argument) {
+      if (t.isJSXElement(stmt.argument)) {
+        stmt.argument = transformJSXToTemplate(stmt.argument, ctx)
+        transformed = true
+      } else if (t.isJSXFragment(stmt.argument)) {
+        stmt.argument = transformJSXFragmentToTemplate(stmt.argument, ctx)
+        transformed = true
+      } else if (t.isExpression(stmt.argument)) {
+        stmt.argument = transformJSXExpression(stmt.argument, ctx)
+        transformed = true
+      }
+    } else if (t.isIfStatement(stmt)) {
+      if (t.isBlockStatement(stmt.consequent)) transformed = transformNestedReturns(stmt.consequent.body, mainReturn, ctx) || transformed
+      else if (t.isReturnStatement(stmt.consequent)) transformed = transformNestedReturns([stmt.consequent], mainReturn, ctx) || transformed
+      if (stmt.alternate) {
+        if (t.isBlockStatement(stmt.alternate)) transformed = transformNestedReturns(stmt.alternate.body, mainReturn, ctx) || transformed
+        else if (t.isIfStatement(stmt.alternate)) transformed = transformNestedReturns([stmt.alternate], mainReturn, ctx) || transformed
+        else if (t.isReturnStatement(stmt.alternate)) transformed = transformNestedReturns([stmt.alternate], mainReturn, ctx) || transformed
+      }
+    } else if (t.isBlockStatement(stmt)) {
+      transformed = transformNestedReturns(stmt.body, mainReturn, ctx) || transformed
+    } else if (t.isSwitchStatement(stmt)) {
+      for (const c of stmt.cases) transformed = transformNestedReturns(c.consequent, mainReturn, ctx) || transformed
+    }
+  }
+  return transformed
+}
+
+/** Walk an AST node tree using t.VISITOR_KEYS. */
+function walkNode(node: t.Node | null | undefined, visit: (n: t.Node) => void): void {
+  if (!node || typeof node !== 'object') return
+  visit(node)
+  for (const key of t.VISITOR_KEYS[node.type] || []) {
+    const child = (node as any)[key]
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        if (item && typeof item === 'object' && typeof item.type === 'string') walkNode(item, visit)
+      }
+    } else if (child && typeof child === 'object' && typeof child.type === 'string') {
+      walkNode(child, visit)
+    }
+  }
+}
 
 export function transformComponentFile(
   ast: t.File,
@@ -57,20 +107,14 @@ export function transformComponentFile(
   const stateRefs = collectStateReferences(ast, storeImports)
 
   // Enrich imported store refs with getter dependency info
-  const allGetterMaps = analyzeStoreGetters(sourceFile, storeImports)
-  for (const [storeVar, getterMap] of allGetterMaps) {
+  for (const [storeVar, getterMap] of analyzeStoreGetters(sourceFile, storeImports)) {
     const ref = stateRefs.get(storeVar)
-    if (ref && ref.kind === 'imported') {
-      ref.getterDeps = getterMap
-    }
+    if (ref && ref.kind === 'imported') ref.getterDeps = getterMap
   }
 
-  const allReactiveFields = analyzeStoreReactiveFields(sourceFile, storeImports)
-  for (const [storeVar, fields] of allReactiveFields) {
+  for (const [storeVar, fields] of analyzeStoreReactiveFields(sourceFile, storeImports)) {
     const ref = stateRefs.get(storeVar)
-    if (ref && ref.kind === 'imported') {
-      ref.reactiveFields = fields
-    }
+    if (ref && ref.kind === 'imported') ref.reactiveFields = fields
   }
 
   const compiledChildren: ChildComponent[] = []
@@ -203,35 +247,7 @@ export function transformComponentFile(
         eventHandlers: [] as EventHandler[],
         eventIdCounter,
       }
-      const transformNestedReturns = (stmts: t.Statement[]) => {
-        for (const stmt of stmts) {
-          if (t.isReturnStatement(stmt) && stmt !== retStmt && stmt.argument) {
-            if (t.isJSXElement(stmt.argument)) {
-              stmt.argument = transformJSXToTemplate(stmt.argument, earlyReturnCtx)
-              transformed = true
-            } else if (t.isJSXFragment(stmt.argument)) {
-              stmt.argument = transformJSXFragmentToTemplate(stmt.argument, earlyReturnCtx)
-              transformed = true
-            } else if (t.isExpression(stmt.argument)) {
-              stmt.argument = transformJSXExpression(stmt.argument, earlyReturnCtx)
-              transformed = true
-            }
-          } else if (t.isIfStatement(stmt)) {
-            if (t.isBlockStatement(stmt.consequent)) transformNestedReturns(stmt.consequent.body)
-            else if (t.isReturnStatement(stmt.consequent)) transformNestedReturns([stmt.consequent])
-            if (stmt.alternate) {
-              if (t.isBlockStatement(stmt.alternate)) transformNestedReturns(stmt.alternate.body)
-              else if (t.isIfStatement(stmt.alternate)) transformNestedReturns([stmt.alternate])
-              else if (t.isReturnStatement(stmt.alternate)) transformNestedReturns([stmt.alternate])
-            }
-          } else if (t.isBlockStatement(stmt)) {
-            transformNestedReturns(stmt.body)
-          } else if (t.isSwitchStatement(stmt)) {
-            for (const c of stmt.cases) transformNestedReturns(c.consequent)
-          }
-        }
-      }
-      transformNestedReturns(body)
+      transformed = transformNestedReturns(body, retStmt, earlyReturnCtx) || transformed
 
       if (!ssr && earlyReturnCtx.eventHandlers!.length > 0) {
         const earlyClassPath = path.findParent((p) =>
@@ -310,7 +326,7 @@ export function transformComponentFile(
         if (classPath) {
           const refStatements: t.Statement[] = refBindings.flatMap((ref) => {
             const target = ref.targetExpr as t.LVal
-            const q = jsExpr`this.element_.querySelector(${t.stringLiteral(`[data-gea-ref="${ref.refId}"]`)})`
+            const q = jsExpr`this.element_.querySelector(${`[data-gea-ref="${ref.refId}"]`})`
             return [
               t.expressionStatement(t.assignmentExpression('=', target, t.nullLiteral())),
               t.expressionStatement(t.assignmentExpression('=', target, q)),
@@ -365,15 +381,7 @@ export function transformComponentFile(
         if (earlyReturnGuards.length > 0) {
           const guardIdents = new Set<string>()
           for (const guard of earlyReturnGuards) {
-            const walk = (node: t.Node) => {
-              if (t.isIdentifier(node)) guardIdents.add(node.name)
-              for (const key of t.VISITOR_KEYS[node.type] || []) {
-                const child = (node as any)[key]
-                if (Array.isArray(child)) child.forEach((c: any) => c?.type && walk(c))
-                else if (child?.type) walk(child)
-              }
-            }
-            walk(guard.test)
+            walkNode(guard.test, (node) => { if (t.isIdentifier(node)) guardIdents.add(node.name) })
           }
 
           const declBindsGuardIdent = (pattern: t.LVal): boolean => {
@@ -459,15 +467,9 @@ export function transformComponentFile(
           if (!name) continue
           const isCompilerGenerated =
             name === 'template' || (name === 'events' && member.kind === 'get') || name.startsWith('__')
-          if (isCompilerGenerated) {
-            cacheThisIdInMethod(member)
-          }
-          if (name === 'events' && member.kind === 'get') {
-            wrapEventsGetterWithCache(member)
-          }
-          if (name === '__onPropChange') {
-            wrapSubpathCacheGuards(member, subpathPcCounter, path.node.body)
-          }
+          if (isCompilerGenerated) cacheThisIdInMethod(member)
+          if (name === 'events' && member.kind === 'get') wrapEventsGetterWithCache(member)
+          if (name === '__onPropChange') wrapSubpathCacheGuards(member, subpathPcCounter, path.node.body)
         }
         path.stop()
       },
@@ -480,7 +482,6 @@ export function transformComponentFile(
 export function transformNonComponentJSX(ast: t.File, imports?: Map<string, string>): boolean {
   if (!imports) {
     imports = new Map<string, string>()
-    // Extract imports from the AST for JSX tag resolution
     for (const stmt of ast.program.body) {
       if (t.isImportDeclaration(stmt)) {
         for (const spec of stmt.specifiers) {
@@ -515,35 +516,7 @@ function transformNonComponentJSXWithImports(ast: t.File, imports: Map<string, s
         retStmt.argument = transformJSXExpression(retStmt.argument, ctx)
         transformed = true
       }
-      const transformNestedReturns = (stmts: t.Statement[]) => {
-        for (const stmt of stmts) {
-          if (t.isReturnStatement(stmt) && stmt !== retStmt && stmt.argument) {
-            if (t.isJSXElement(stmt.argument)) {
-              stmt.argument = transformJSXToTemplate(stmt.argument, ctx)
-              transformed = true
-            } else if (t.isJSXFragment(stmt.argument)) {
-              stmt.argument = transformJSXFragmentToTemplate(stmt.argument, ctx)
-              transformed = true
-            } else if (t.isExpression(stmt.argument)) {
-              stmt.argument = transformJSXExpression(stmt.argument, ctx)
-              transformed = true
-            }
-          } else if (t.isIfStatement(stmt)) {
-            if (t.isBlockStatement(stmt.consequent)) transformNestedReturns(stmt.consequent.body)
-            else if (t.isReturnStatement(stmt.consequent)) transformNestedReturns([stmt.consequent])
-            if (stmt.alternate) {
-              if (t.isBlockStatement(stmt.alternate)) transformNestedReturns(stmt.alternate.body)
-              else if (t.isIfStatement(stmt.alternate)) transformNestedReturns([stmt.alternate])
-              else if (t.isReturnStatement(stmt.alternate)) transformNestedReturns([stmt.alternate])
-            }
-          } else if (t.isBlockStatement(stmt)) {
-            transformNestedReturns(stmt.body)
-          } else if (t.isSwitchStatement(stmt)) {
-            for (const c of stmt.cases) transformNestedReturns(c.consequent)
-          }
-        }
-      }
-      transformNestedReturns(body)
+      transformed = transformNestedReturns(body, retStmt, ctx) || transformed
     },
   })
   transformRemainingJSX(ast, imports)
@@ -556,53 +529,29 @@ function transformNonComponentJSXWithImports(ast: t.File, imports: Map<string, s
 function addJoinToMapCallsInTemplates(ast: t.File): void {
   const processed = new WeakSet<t.Node>()
 
-  function wrapMapCall(node: t.CallExpression): t.CallExpression {
-    processed.add(node)
-    return t.callExpression(t.memberExpression(node, t.identifier('join')), [t.stringLiteral('')])
-  }
-
-  function isUnwrappedMapCall(node: t.Node): node is t.CallExpression {
-    if (!t.isCallExpression(node) || processed.has(node)) return false
-    if (!t.isMemberExpression(node.callee)) return false
-    const prop = node.callee.property
-    return (
-      t.isIdentifier(prop) &&
-      prop.name === 'map' &&
-      node.arguments.length >= 1 &&
-      t.isArrowFunctionExpression(node.arguments[0])
-    )
-  }
-
-  function visitTemplateLiteral(tl: t.TemplateLiteral): void {
-    for (let i = 0; i < tl.expressions.length; i++) {
-      const expr = tl.expressions[i]
-      if (isUnwrappedMapCall(expr)) {
-        tl.expressions[i] = wrapMapCall(expr)
-      }
-      walkNode(expr)
-    }
-  }
-
-  function walkNode(node: t.Node | null | undefined): void {
-    if (!node || typeof node !== 'object') return
-    if (t.isTemplateLiteral(node)) {
-      visitTemplateLiteral(node)
-      return
-    }
-    for (const key of t.VISITOR_KEYS[node.type] || []) {
-      const child = (node as any)[key]
-      if (Array.isArray(child)) {
-        for (const item of child) {
-          if (item && typeof item === 'object' && typeof item.type === 'string') walkNode(item)
-        }
-      } else if (child && typeof child === 'object' && typeof child.type === 'string') {
-        walkNode(child)
-      }
-    }
-  }
+  const isUnwrappedMapCall = (node: t.Node): node is t.CallExpression =>
+    t.isCallExpression(node) &&
+    !processed.has(node) &&
+    t.isMemberExpression(node.callee) &&
+    t.isIdentifier(node.callee.property) &&
+    node.callee.property.name === 'map' &&
+    node.arguments.length >= 1 &&
+    t.isArrowFunctionExpression(node.arguments[0])
 
   for (const stmt of ast.program.body) {
-    walkNode(stmt)
+    walkNode(stmt, (node) => {
+      if (!t.isTemplateLiteral(node)) return
+      for (let i = 0; i < node.expressions.length; i++) {
+        const expr = node.expressions[i]
+        if (isUnwrappedMapCall(expr)) {
+          processed.add(expr)
+          node.expressions[i] = t.callExpression(
+            t.memberExpression(expr, id('join')),
+            [t.stringLiteral('')],
+          )
+        }
+      }
+    })
   }
 }
 
@@ -621,15 +570,10 @@ function ensureComponentImport(ast: t.File, imports: Map<string, string>): void 
 
   if (geaImportPath) {
     ;(geaImportPath as NodePath<t.ImportDeclaration>).node.specifiers.push(
-      t.importSpecifier(t.identifier('Component'), t.identifier('Component')),
+      t.importSpecifier(id('Component'), id('Component')),
     )
   } else {
-    ast.program.body.unshift(
-      t.importDeclaration(
-        [t.importSpecifier(t.identifier('Component'), t.identifier('Component'))],
-        t.stringLiteral('@geajs/core'),
-      ),
-    )
+    ast.program.body.unshift(jsImport`import { Component } from '@geajs/core'`)
   }
   imports.set('Component', '@geajs/core')
 }
@@ -669,4 +613,3 @@ function transformRemainingJSX(ast: t.File, imports: Map<string, string>): void 
     },
   })
 }
-

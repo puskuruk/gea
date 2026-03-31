@@ -9,7 +9,7 @@
 
 import { traverse, t } from '../utils/babel-interop.ts'
 import type { NodePath } from '../utils/babel-interop.ts'
-import { appendToBody, id, js, jsBlockBody, jsExpr, jsMethod } from 'eszter'
+import { appendToBody, id, js, jsBlockBody, jsExpr, jsMethod, jsObjectExpr, tpl } from 'eszter'
 
 import type {
   PathParts,
@@ -90,15 +90,12 @@ export function generateCreatedHooks(
     body.push(js`this.__ensureArrayConfigs();`)
   }
 
-  // Collect all observe handlers and group by store+path, including
-  // those that should become onchange callbacks for __observeList
   const observeListPathKeys = new Set<string>()
   for (const config of observeListConfigs) {
     observeListPathKeys.add(`${config.storeVar}:${JSON.stringify(config.pathParts)}`)
   }
 
   for (const store of stores) {
-    // Group handlers by path to merge duplicate observers
     const byPath = new Map<
       string,
       Array<{
@@ -112,35 +109,26 @@ export function generateCreatedHooks(
     >()
     for (const handler of store.observeHandlers) {
       const pathKey = JSON.stringify(handler.pathParts)
-      // Skip handlers whose path is covered by __observeList
       const listKey = `${store.storeVar}:${pathKey}`
       if (observeListPathKeys.has(listKey)) continue
       if (!byPath.has(pathKey)) byPath.set(pathKey, [])
-      byPath.get(pathKey)!.push({
-        pathParts: handler.pathParts,
-        methodName: handler.methodName,
-        isVia: handler.isVia,
-        rereadExpr: handler.rereadExpr,
-        dynamicKeyExpr: handler.dynamicKeyExpr,
-        passValue: handler.passValue,
-      })
+      byPath.get(pathKey)!.push(handler)
     }
 
-    const storeVarExpr = t.identifier(store.storeVar)
+    const storeVarExpr = id(store.storeVar)
+    const pathArrayFor = (pp: PathParts) => jsExpr`[${pp.map((p) => t.stringLiteral(p)).join(', ')}]` as t.Expression
 
     for (const [pathKey, handlers] of byPath) {
       const pathParts: PathParts = JSON.parse(pathKey)
       const pathArray = t.arrayExpression(pathParts.map((part) => t.stringLiteral(part)))
 
       if (handlers.length === 1 && !handlers[0].isVia) {
-        // Single handler -- direct method reference
         body.push(
           js`this.__observe(${storeVarExpr}, ${pathArray}, this.${id(handlers[0].methodName)});`,
         )
       } else {
-        // Multiple handlers or via handlers -- merged arrow function
-        const vParam = t.identifier('__v')
-        const cParam = t.identifier('__c')
+        const vParam = id('__v')
+        const cParam = id('__c')
         const callStmts: t.Statement[] = []
         const seenCallKeys = new Set<string>()
         for (let hi = 0; hi < handlers.length; hi++) {
@@ -155,83 +143,31 @@ export function generateCreatedHooks(
           if (seenCallKeys.has(callKey)) continue
           seenCallKeys.add(callKey)
           if (h.isVia && h.rereadExpr) {
-            const argExpr = h.passValue === false ? t.identifier('undefined') : t.cloneNode(h.rereadExpr, true)
+            const argExpr = h.passValue === false ? id('undefined') : t.cloneNode(h.rereadExpr, true)
             const callStmt = js`this.${id(h.methodName)}(${argExpr}, null);`
             if (h.dynamicKeyExpr) {
-              const keyId = t.identifier(`__geaKey${hi}`)
-              const changeId = t.identifier(`__geaChange${hi}`)
-              const partsId = t.identifier(`__geaParts${hi}`)
-              const prevRootId = t.identifier(`__geaPrevRoot${hi}`)
+              const keyId = id(`__geaKey${hi}`)
+              const changeId = id(`__geaChange${hi}`)
+              const partsId = id(`__geaParts${hi}`)
+              const prevRootId = id(`__geaPrevRoot${hi}`)
               const prefixChecks = h.pathParts.map((part, idx) =>
-                t.binaryExpression(
-                  '===',
-                  t.memberExpression(partsId, t.numericLiteral(idx), true),
-                  t.stringLiteral(part),
-                ),
+                jsExpr`${partsId}[${idx}] === ${part}` as t.Expression,
               )
-              const prevEntryExpr = t.conditionalExpression(
-                t.binaryExpression('==', prevRootId, t.nullLiteral()),
-                t.identifier('undefined'),
-                t.memberExpression(prevRootId, keyId, true),
-              )
-              const nextEntryExpr = t.conditionalExpression(
-                t.binaryExpression('==', vParam, t.nullLiteral()),
-                t.identifier('undefined'),
-                t.memberExpression(vParam, keyId, true),
-              )
-              const sameRootAffectsKey = t.logicalExpression(
-                '&&',
-                t.binaryExpression(
-                  '===',
-                  t.memberExpression(partsId, t.identifier('length')),
-                  t.numericLiteral(h.pathParts.length),
-                ),
-                t.binaryExpression('!==', prevEntryExpr, nextEntryExpr),
-              )
-              const matchingNestedKey = t.binaryExpression(
-                '===',
-                t.memberExpression(partsId, t.numericLiteral(h.pathParts.length), true),
-                keyId,
-              )
-              const sameRootOrMatchingKey = t.logicalExpression('||', sameRootAffectsKey, matchingNestedKey)
+              const prevEntryExpr = jsExpr`${prevRootId} == null ? undefined : ${prevRootId}[${keyId}]`
+              const nextEntryExpr = jsExpr`${vParam} == null ? undefined : ${vParam}[${keyId}]`
+              const sameRootAffectsKey = jsExpr`${partsId}.length === ${h.pathParts.length} && ${prevEntryExpr} !== ${nextEntryExpr}`
+              const matchingNestedKey = jsExpr`${partsId}[${h.pathParts.length}] === ${keyId}`
+              const sameRootOrMatchingKey = jsExpr`(${sameRootAffectsKey}) || ${matchingNestedKey}`
               const relevantChangeExpr = prefixChecks
-                .concat([sameRootOrMatchingKey])
+                .concat([sameRootOrMatchingKey as t.Expression])
                 .reduce<t.Expression>((left, right) => t.logicalExpression('&&', left, right))
-              const someCall = t.callExpression(t.memberExpression(cParam, t.identifier('some')), [
-                t.arrowFunctionExpression(
-                  [changeId],
-                  t.blockStatement([
-                    t.variableDeclaration('const', [
-                      t.variableDeclarator(partsId, t.memberExpression(changeId, t.identifier('pathParts'))),
-                      t.variableDeclarator(
-                        prevRootId,
-                        t.memberExpression(changeId, t.identifier('previousValue')),
-                      ),
-                    ]),
-                    t.returnStatement(
-                      t.logicalExpression(
-                        '&&',
-                        jsExpr`Array.isArray(${partsId})` as t.Expression,
-                        relevantChangeExpr,
-                      ),
-                    ),
-                  ]),
-                ),
-              ])
+              const someCall = jsExpr`${cParam}.some((${changeId}) => {
+                const ${partsId} = ${changeId}.pathParts;
+                const ${prevRootId} = ${changeId}.previousValue;
+                return Array.isArray(${partsId}) && ${relevantChangeExpr};
+              })`
               callStmts.push(
-                t.blockStatement([
-                  t.variableDeclaration('const', [
-                    t.variableDeclarator(keyId, t.cloneNode(h.dynamicKeyExpr, true)),
-                  ]),
-                  t.ifStatement(
-                    t.logicalExpression(
-                      '&&',
-                      jsExpr`Array.isArray(${cParam})` as t.Expression,
-                      someCall,
-                    ),
-                    t.blockStatement([callStmt]),
-                  ),
-                ]),
+                js`{ const ${keyId} = ${t.cloneNode(h.dynamicKeyExpr, true)}; if (Array.isArray(${cParam}) && ${someCall}) { ${callStmt} } }`,
               )
             } else {
               callStmts.push(callStmt)
@@ -241,7 +177,7 @@ export function generateCreatedHooks(
           }
         }
         body.push(
-          js`this.__observe(${storeVarExpr}, ${pathArray}, ${t.arrowFunctionExpression([vParam, cParam], t.blockStatement(callStmts))});`,
+          js`this.__observe(${storeVarExpr}, ${pathArray}, ${jsExpr`(${vParam}, ${cParam}) => { ${t.blockStatement(callStmts)} }`});`,
         )
       }
     }
@@ -252,47 +188,36 @@ export function generateCreatedHooks(
       const itemsName = getComponentArrayItemsName(config.arrayPropName)
       const itemPropsMethodName = `__itemProps_${config.arrayPropName}`
 
-      const containerArrow = t.arrowFunctionExpression(
-        [],
-        config.containerUserIdExpr
-          ? (jsExpr`document.getElementById(${t.cloneNode(config.containerUserIdExpr, true) as t.Expression})` as t.Expression)
-          : config.containerBindingId
-            ? (jsExpr`this.__el(${t.stringLiteral(config.containerBindingId)})` as t.Expression)
-            : (jsExpr`this.$(":scope")` as t.Expression),
-      )
+      const containerExpr = config.containerUserIdExpr
+        ? jsExpr`document.getElementById(${t.cloneNode(config.containerUserIdExpr, true) as t.Expression})`
+        : config.containerBindingId
+          ? jsExpr`this.__el(${config.containerBindingId})`
+          : jsExpr`this.$(":scope")`
 
-      const propsArrow = t.arrowFunctionExpression(
-        [t.identifier('opt'), t.identifier('__k')],
-        jsExpr`this.${id(itemPropsMethodName)}(opt, __k)` as t.Expression,
-      )
+      const containerArrow = jsExpr`() => ${containerExpr}`
+      const propsArrow = jsExpr`(opt, __k) => this.${id(itemPropsMethodName)}(opt, __k)`
 
-      let keyArrow: t.ArrowFunctionExpression
+      let keyArrow: t.Expression
       if (config.itemIdProperty && config.itemIdProperty !== ITEM_IS_KEY) {
-        keyArrow = t.arrowFunctionExpression(
-          [t.identifier('opt')],
-          t.logicalExpression(
-            '??',
-            buildOptionalMemberChain(t.identifier('opt'), config.itemIdProperty),
-            t.identifier('opt'),
-          ),
-        )
+        keyArrow = jsExpr`(opt) => ${t.logicalExpression(
+          '??',
+          buildOptionalMemberChain(id('opt'), config.itemIdProperty),
+          id('opt'),
+        )}`
       } else if (config.itemIdProperty === ITEM_IS_KEY) {
-        keyArrow = t.arrowFunctionExpression([t.identifier('opt')], t.identifier('opt'))
+        keyArrow = jsExpr`(opt) => opt`
       } else {
-        keyArrow = t.arrowFunctionExpression(
-          [t.identifier('opt'), t.identifier('__k')],
-          jsExpr`'__idx_' + __k` as t.Expression,
-        )
+        keyArrow = jsExpr`(opt, __k) => '__idx_' + __k`
       }
 
-      const configProps: t.ObjectProperty[] = [
-        t.objectProperty(t.identifier('items'), jsExpr`this.${id(itemsName)}` as t.Expression),
-        t.objectProperty(t.identifier('itemsKey'), t.stringLiteral(itemsName)),
-        t.objectProperty(t.identifier('container'), containerArrow),
-        t.objectProperty(t.identifier('Ctor'), t.identifier(config.componentTag)),
-        t.objectProperty(t.identifier('props'), propsArrow),
-        t.objectProperty(t.identifier('key'), keyArrow),
-      ]
+      const configObj = jsObjectExpr`{
+        items: this.${id(itemsName)},
+        itemsKey: ${itemsName},
+        container: ${containerArrow},
+        Ctor: ${id(config.componentTag)},
+        props: ${propsArrow},
+        key: ${keyArrow}
+      }`
 
       // Merge any scalar observers on the same path into the onchange callback
       const samePathHandlers: Array<{ methodName: string; isVia?: boolean; rereadExpr?: t.Expression }> = []
@@ -307,15 +232,15 @@ export function generateCreatedHooks(
           if (h.isVia && h.rereadExpr) {
             return js`this.${id(h.methodName)}(${t.cloneNode(h.rereadExpr, true)}, null);`
           }
-          return js`this.${id(h.methodName)}(${t.memberExpression(t.identifier(config.storeVar), t.identifier(config.pathParts[0]))}, null);`
+          return js`this.${id(h.methodName)}(${jsExpr`${id(config.storeVar)}.${id(config.pathParts[0])}`}, null);`
         })
-        configProps.push(
-          t.objectProperty(t.identifier('onchange'), t.arrowFunctionExpression([], t.blockStatement(onchangeStmts))),
+        configObj.properties.push(
+          t.objectProperty(id('onchange'), jsExpr`() => { ${t.blockStatement(onchangeStmts)} }`),
         )
       }
 
       body.push(
-        js`this.__observeList(${storeVarExpr}, ${pathArray}, ${t.objectExpression(configProps)});`,
+        js`this.__observeList(${storeVarExpr}, ${pathArray}, ${configObj});`,
       )
     }
   }
@@ -333,12 +258,11 @@ export function generateLocalStateObserverSetup(
   observeHandlers: Array<{ pathParts: PathParts; methodName: string }>,
   hasArrayConfigs: boolean,
 ): t.ClassMethod {
-  const localStore = jsExpr`this.__store` as t.Expression
   const body: t.Statement[] = []
   if (hasArrayConfigs) {
     body.push(js`this.__ensureArrayConfigs();`)
   }
-  body.push(js`if (!${localStore}) { return; }`)
+  body.push(js`if (!this.__store) { return; }`)
 
   for (const observeHandler of observeHandlers) {
     const pathArray = t.arrayExpression(observeHandler.pathParts.map((part) => t.stringLiteral(part)))
@@ -410,14 +334,14 @@ export function generateConditionalSlotObserveMethod(
   if (slotIndices.length === 1) {
     patchStatements.push(t.ifStatement(anyPatchedExpr, t.returnStatement()))
   }
-  slotIndices.forEach((slotIndex) => {
+  for (const slotIndex of slotIndices) {
     patchStatements.push(
-      js`this.${id(`__geaCondPatched_${slotIndex}`)} = this.__geaPatchCond(${t.numericLiteral(slotIndex)});`,
+      js`this.${id(`__geaCondPatched_${slotIndex}`)} = this.__geaPatchCond(${slotIndex});`,
     )
     patchStatements.push(
       js`if (this.${id(`__geaCondPatched_${slotIndex}`)}) { queueMicrotask(() => this.${id(`__geaCondPatched_${slotIndex}`)} = false); }`,
     )
-  })
+  }
 
   if (emitEarlyReturn) {
     patchStatements.push(t.ifStatement(anyPatchedExpr, t.returnStatement()))
@@ -462,7 +386,7 @@ export function generateUnresolvedRelationalObserver(
   const containerLookup = arrayMap.containerUserIdExpr
     ? (jsExpr`document.getElementById(${t.cloneNode(arrayMap.containerUserIdExpr, true) as t.Expression})` as t.Expression)
     : arrayMap.containerBindingId !== undefined
-      ? (jsExpr`document.getElementById(this.id + ${t.stringLiteral('-' + arrayMap.containerBindingId)})` as t.Expression)
+      ? (jsExpr`document.getElementById(this.id + ${'-' + arrayMap.containerBindingId})` as t.Expression)
       : (jsExpr`this.$(":scope")` as t.Expression)
 
   const setupStatements: t.Statement[] = replacePropRefsInStatements(
@@ -476,41 +400,28 @@ export function generateUnresolvedRelationalObserver(
         templatePropNames,
         wholeParamName,
       )
-    : t.arrayExpression([])
+    : (jsExpr`[]` as t.Expression)
 
   const itemComparison: t.Expression = relBinding.itemProperty
     ? t.optionalMemberExpression(
         jsExpr`__arr[__i]` as t.Expression,
-        t.identifier(relBinding.itemProperty),
+        id(relBinding.itemProperty),
         false,
         true,
       )
     : (jsExpr`__arr[__i]` as t.Expression)
-
-  const classNameLiteral = t.stringLiteral(relBinding.classToggleName)
-
-  const arrDecl = t.variableDeclaration('var', [
-    t.variableDeclarator(
-      t.identifier('__arr'),
-      t.conditionalExpression(
-        jsExpr`Array.isArray(${arrExpr})` as t.Expression,
-        t.cloneNode(arrExpr, true),
-        t.arrayExpression([]),
-      ),
-    ),
-  ])
 
   const commonPreamble: t.Statement[] = [
     js`if (!this.rendered_) return;`,
     lazyInit(containerName, containerLookup),
     ...jsBlockBody`if (!${containerRef}) return;`,
     ...setupStatements,
-    arrDecl,
+    js`var __arr = Array.isArray(${arrExpr}) ? ${t.cloneNode(arrExpr, true)} : [];`,
   ]
 
   if (relBinding.matchWhenEqual) {
     const cacheFieldName = methodName.replace('__observe_', '__prel_')
-    const cacheRef = t.memberExpression(t.thisExpression(), t.privateName(t.identifier(cacheFieldName)))
+    const cacheRef = t.memberExpression(t.thisExpression(), t.privateName(id(cacheFieldName)))
 
     const method = jsMethod`${id(methodName)}(value, change) {}`
     return {
@@ -520,7 +431,7 @@ export function generateUnresolvedRelationalObserver(
         t.ifStatement(
           t.cloneNode(cacheRef, true),
           t.blockStatement([
-            js`${t.cloneNode(cacheRef, true)}.classList.remove(${t.cloneNode(classNameLiteral, true)});`,
+            js`${t.cloneNode(cacheRef, true)}.classList.remove(${relBinding.classToggleName});`,
             js`${t.cloneNode(cacheRef, true)} = null;`,
           ]),
         ),
@@ -528,7 +439,7 @@ export function generateUnresolvedRelationalObserver(
           var __items = ${containerRef}.querySelectorAll('[data-gea-item-id]');
           for (var __i = 0; __i < __items.length && __i < __arr.length; __i++) {
             if (${itemComparison} === value) {
-              __items[__i].classList.add(${classNameLiteral});
+              __items[__i].classList.add(${relBinding.classToggleName});
               ${cacheRef} = __items[__i];
               break;
             }
@@ -549,9 +460,9 @@ export function generateUnresolvedRelationalObserver(
         for (var __i = 0; __i < __items.length && __i < __arr.length; __i++) {
           var __child = __items[__i];
           if (${itemComparison} === value) {
-            __child.classList.${id('remove')}(${t.stringLiteral(relBinding.classToggleName)});
+            __child.classList.${id('remove')}(${relBinding.classToggleName});
           } else {
-            __child.classList.${id('add')}(${t.stringLiteral(relBinding.classToggleName)});
+            __child.classList.${id('add')}(${relBinding.classToggleName});
           }
         }
       `,
