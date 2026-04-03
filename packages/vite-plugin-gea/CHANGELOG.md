@@ -1,5 +1,27 @@
 # @geajs/vite-plugin
 
+## 1.1.0
+
+### Minor Changes
+
+- [`20fe43c`](https://github.com/dashersw/gea/commit/20fe43c8cf86af3b47b5fd0bea36b0fb22cc85c5) Thanks [@dashersw](https://github.com/dashersw)! - Migrate Component and UI internals from string keys to Symbol keys for cleaner separation of engine state and user data. Update docs, README package tables, and examples list. Remove unused imports in vite-plugin.
+
+### Patch Changes
+
+- [`9e4bf06`](https://github.com/dashersw/gea/commit/9e4bf060185a0e2b73b347da95139a4a961e9b19) Thanks [@dashersw](https://github.com/dashersw)! - Add event delegation support for CSS animation and transition events: `animationstart`, `animationend`, `animationiteration`, `transitionstart`, `transitionend`, `transitionrun`, and `transitioncancel`. These can now be used declaratively in JSX (e.g. `onAnimationEnd={() => ...}`) instead of requiring imperative `addEventListener` in lifecycle hooks.
+
+- [`0e478e5`](https://github.com/dashersw/gea/commit/0e478e5f897fb52008e02d8cd09565d7c83dc3fe) Thanks [@dashersw](https://github.com/dashersw)! - Fix event delegation for mouseover, mouseout, mouseenter, mouseleave, contextmenu, pointer events, touch events, scroll, resize, keypress, and reset. These were missing from EVENT_TYPES so the compiler rendered them as plain HTML attributes instead of wiring event delegation. Also fix `toGeaEventType` to fully lowercase the `on`-prefix form (e.g. `onMouseOver` → `mouseover`) so it matches native DOM event names.
+
+- [`13fe40f`](https://github.com/dashersw/gea/commit/13fe40f1b21542535db837e6f81126b9674eb155) Thanks [@dashersw](https://github.com/dashersw)! - Fix DOM ordering when `.map()` and conditional slots are siblings in JSX
+
+  Previously, list items rendered by `.map()` were always inserted before the first conditional comment marker in the container. This broke JSX source order when a conditional preceded the map (e.g. `{cond && <Header />}` followed by `{items.map(...)}`), causing list items to appear above the header.
+
+  The compiler now records `afterCondSlotIndex` — the index of the first conditional slot that follows the map in JSX source order — and passes it to the runtime. The runtime uses this to find the exact marker to insert before, preserving the intended order regardless of how many conditionals appear before or after the map.
+
+- [`482eb6b`](https://github.com/dashersw/gea/commit/482eb6b87483d44977e56a03cd5f0e8240355f4a) Thanks [@dashersw](https://github.com/dashersw)! - Fix list reconciliation when stripping duplicate map output: walk to a keyed list ancestor so Card roots under keyed ProductCard rows strip correctly, while static compiled siblings (for example CommentCreate) remain. Improve DOM recovery of keyed rows from element hosts. Align store getter analysis, events, and SSR proxy serialization with the store naming refactor.
+
+- [`227f7f9`](https://github.com/dashersw/gea/commit/227f7f925a6b275edd63901582aad0554079d828) Thanks [@dashersw](https://github.com/dashersw)! - Fix nested JSX ternaries in conditional slots (`a ? b : c ? d : e`): the outer falsy branch no longer collapses to only the inner consequent, so the DOM can show the correct branch when the outer test is false. Extract HTML templates from the raw conditional AST before the full-expression JSX transform (`extractHtmlTemplatesFromRawConditional`). Fix early-return template guard observers so the first store delivery is not skipped when the previous guard value was still `undefined`. Add regression tests (nested ternary codegen + auth-style repro with `pause()` after sign-in/out).
+
 ## 1.0.28
 
 ### Patch Changes

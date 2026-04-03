@@ -1,5 +1,21 @@
 # @geajs/core
 
+## 1.1.0
+
+### Minor Changes
+
+- [`20fe43c`](https://github.com/dashersw/gea/commit/20fe43c8cf86af3b47b5fd0bea36b0fb22cc85c5) Thanks [@dashersw](https://github.com/dashersw)! - Migrate Component and UI internals from string keys to Symbol keys for cleaner separation of engine state and user data. Update docs, README package tables, and examples list. Remove unused imports in vite-plugin.
+
+### Patch Changes
+
+- [`13fe40f`](https://github.com/dashersw/gea/commit/13fe40f1b21542535db837e6f81126b9674eb155) Thanks [@dashersw](https://github.com/dashersw)! - Fix DOM ordering when `.map()` and conditional slots are siblings in JSX
+
+  Previously, list items rendered by `.map()` were always inserted before the first conditional comment marker in the container. This broke JSX source order when a conditional preceded the map (e.g. `{cond && <Header />}` followed by `{items.map(...)}`), causing list items to appear above the header.
+
+  The compiler now records `afterCondSlotIndex` — the index of the first conditional slot that follows the map in JSX source order — and passes it to the runtime. The runtime uses this to find the exact marker to insert before, preserving the intended order regardless of how many conditionals appear before or after the map.
+
+- [`482eb6b`](https://github.com/dashersw/gea/commit/482eb6b87483d44977e56a03cd5f0e8240355f4a) Thanks [@dashersw](https://github.com/dashersw)! - Fix list reconciliation when stripping duplicate map output: walk to a keyed list ancestor so Card roots under keyed ProductCard rows strip correctly, while static compiled siblings (for example CommentCreate) remain. Improve DOM recovery of keyed rows from element hosts. Align store getter analysis, events, and SSR proxy serialization with the store naming refactor.
+
 ## 1.0.29
 
 ### Patch Changes
