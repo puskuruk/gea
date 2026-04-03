@@ -1,6 +1,6 @@
 ---
-"@geajs/core": patch
-"@geajs/vite-plugin": patch
+"@geajs/core": minor
+"@geajs/vite-plugin": minor
 "@geajs/ssr": patch
 "@geajs/ui": patch
 ---
