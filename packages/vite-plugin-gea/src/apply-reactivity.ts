@@ -120,6 +120,7 @@ function generateCreatedHooks(
     containerBindingId?: string
     containerUserIdExpr?: t.Expression
     itemIdProperty?: string
+    afterCondSlotIndex?: number
   }> = [],
 ): t.ClassMethod {
   const body: t.Statement[] = []
@@ -358,6 +359,12 @@ function generateCreatedHooks(
                 ),
         ),
       ]
+
+      if (config.afterCondSlotIndex != null) {
+        configProps.push(
+          t.objectProperty(t.identifier('afterCondSlotIndex'), t.numericLiteral(config.afterCondSlotIndex)),
+        )
+      }
 
       // Merge any scalar observers on the same path into the onchange callback
       const samePathHandlers: Array<{ methodName: string; isVia?: boolean; rereadExpr?: t.Expression }> = []
@@ -1424,6 +1431,7 @@ export function applyStaticReactivity(
             containerBindingId?: string
             containerUserIdExpr?: t.Expression
             itemIdProperty?: string
+            afterCondSlotIndex?: number
           }> = []
           // Static array maps whose .map() wasn't found in the template method
           // (e.g. inside a child component's children prop) need a __refresh call
@@ -1511,6 +1519,7 @@ export function applyStaticReactivity(
                     containerBindingId: arrayResult.containerBindingId,
                     containerUserIdExpr: arrayResult.containerUserIdExpr,
                     itemIdProperty: arrayResult.itemIdProperty,
+                    afterCondSlotIndex: um.afterCondSlotIndex,
                   })
                 } else {
                   const computedDeps = (
@@ -2756,6 +2765,7 @@ export function applyStaticReactivity(
                   containerBindingId: arrayResult.containerBindingId,
                   containerUserIdExpr: arrayResult.containerUserIdExpr,
                   itemIdProperty: arrayResult.itemIdProperty,
+                  afterCondSlotIndex: arrayMap.afterCondSlotIndex,
                 })
               }
               componentArrayDisposeTargets.push(getComponentArrayItemsName(arrayPropName))
@@ -3264,9 +3274,7 @@ export function applyStaticReactivity(
                     const guardBlock = t.ifStatement(
                       t.binaryExpression('==', t.cloneNode(storePropExpr), t.nullLiteral()),
                       t.blockStatement([
-                        t.expressionStatement(
-                          t.assignmentExpression('=', observePrevMem, t.cloneNode(storePropExpr)),
-                        ),
+                        t.expressionStatement(t.assignmentExpression('=', observePrevMem, t.cloneNode(storePropExpr))),
                         t.ifStatement(
                           thisGea('GEA_RENDERED'),
                           t.blockStatement([

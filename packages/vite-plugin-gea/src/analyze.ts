@@ -942,6 +942,7 @@ function analyzeChildren(
           onUnresolvedMap,
           classBody,
           templateSetupContext,
+          conditionalSlots?.length,
         )
       } else {
         // Collect nested maps first, then handle text binding (which may create a
@@ -1127,6 +1128,7 @@ function handleArrayMap(
   onUnresolvedMap: (info: UnresolvedMapInfo) => void,
   classBody?: t.ClassBody,
   templateSetupContext?: { params: Array<t.Identifier | t.Pattern | t.RestElement>; statements: t.Statement[] },
+  afterCondSlotIndex?: number,
 ) {
   const arrayExpr = (expr.callee as t.MemberExpression).object
   const normalizedArrayExpr = resolveHelperCallExpression(arrayExpr as t.Expression, classBody) || arrayExpr
@@ -1197,6 +1199,7 @@ function handleArrayMap(
         containerElementPath: [...elementPath],
         ...(cbBodyStmts.length > 0 ? { callbackBodyStatements: cbBodyStmts } : {}),
         ...(relationalClassBindings.length > 0 ? { relationalClassBindings } : {}),
+        ...(afterCondSlotIndex != null ? { afterCondSlotIndex } : {}),
       })
     }
     return
@@ -1312,6 +1315,7 @@ function handleArrayMap(
     classToggleName,
     conditionalBindings,
     ...(cbBodyStmts.length > 0 ? { callbackBodyStatements: cbBodyStmts } : {}),
+    ...(afterCondSlotIndex != null ? { afterCondSlotIndex } : {}),
   })
 }
 

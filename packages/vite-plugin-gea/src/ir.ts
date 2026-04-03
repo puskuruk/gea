@@ -104,6 +104,8 @@ export interface ArrayMapBinding {
   keyExpression?: t.Expression
   classToggleName?: string
   conditionalBindings?: ConditionalMapBinding[]
+  /** Index of the first conditional slot that follows this map in JSX source order. */
+  afterCondSlotIndex?: number
 }
 
 export interface ChildComponent {
@@ -184,4 +186,8 @@ export interface UnresolvedMapInfo {
   callbackBodyStatements?: t.Statement[]
   /** Per-item class toggles that can be patched surgically without full list rebuild */
   relationalClassBindings?: UnresolvedRelationalClassBinding[]
+  /** Index of the first conditional slot that follows this map in JSX source order.
+   *  The runtime uses this to insert list items before `<!--{id}-c{N}-->` instead of
+   *  blindly using the first conditional marker (which may precede the map). */
+  afterCondSlotIndex?: number
 }

@@ -104,6 +104,25 @@ const _transferByKey = new Map<string, AnyComponent>()
 const _inTransfer = new WeakSet<object>()
 
 /**
+ * Find the conditional-slot comment marker at a specific slot index.
+ * The compiler tells each list which slot index immediately follows it in JSX
+ * source order via `afterCondSlotIndex`.  We look for `<!--{id}-c{N}-->`.
+ * Returns null when no such marker exists (map is last, or no conditionals follow).
+ */
+function _findCondMarkerByIndex(
+  container: HTMLElement,
+  componentId: string,
+  slotIndex: number | undefined,
+): ChildNode | null {
+  if (slotIndex == null) return null
+  const target = `${componentId}-c${slotIndex}`
+  for (let node: ChildNode | null = container.firstChild; node; node = node.nextSibling) {
+    if (node.nodeType === 8 && (node as Comment).data === target) return node
+  }
+  return null
+}
+
+/**
  * Mark a keyed list-item component for cross-list transfer.
  * Call this *before* firing the store update that triggers reconciliation.
  * Unclaimed entries are auto-disposed after the current task (setTimeout 0),
@@ -380,9 +399,16 @@ export default class Component<P = Record<string, any>> extends Store {
       if (!c.items?.length) continue
       const container = c.container()
       if (!container) continue
+      const condRef = _findCondMarkerByIndex(container, engineThis(this)[GEA_ID], c.afterCondSlotIndex)
       for (const item of c.items) {
         if (!item) continue
-        if (!(item as any)[GEA_RENDERED]) item.render(container)
+        if (!(item as any)[GEA_RENDERED]) {
+          item.render(container)
+          if (condRef) {
+            const el = engineThis(item)[GEA_ELEMENT]
+            if (el && el.parentNode === container) container.insertBefore(el, condRef)
+          }
+        }
       }
     }
   }
@@ -609,8 +635,15 @@ export default class Component<P = Record<string, any>> extends Store {
         c.items.push(...next)
         const container = c.container()
         if (container) {
+          const condRef = _findCondMarkerByIndex(container, engineThis(this)[GEA_ID], c.afterCondSlotIndex)
           for (const item of next) {
-            if (!(item as any)[GEA_RENDERED]) item.render(container)
+            if (!(item as any)[GEA_RENDERED]) {
+              item.render(container)
+              if (condRef) {
+                const el = engineThis(item)[GEA_ELEMENT]
+                if (el && el.parentNode === container) container.insertBefore(el, condRef)
+              }
+            }
           }
         }
       }
@@ -830,7 +863,7 @@ export default class Component<P = Record<string, any>> extends Store {
     internals(this).observerRemovers.push(remover)
   }
 
-  [GEA_REORDER_CHILDREN](container: HTMLElement | null, items: AnyComponent[]): void {
+  [GEA_REORDER_CHILDREN](container: HTMLElement | null, items: AnyComponent[], afterCondSlotIndex?: number): void {
     if (!container || !(this as any)[GEA_RENDERED]) return
     for (const item of items) {
       if (!(item as any)[GEA_RENDERED]) {
@@ -850,16 +883,23 @@ export default class Component<P = Record<string, any>> extends Store {
     }
     if (ordered.length === 0) return
 
-    const itemSet = new Set(ordered)
-    let cursor: ChildNode | null = container.firstChild
-    while (cursor && !itemSet.has(cursor)) cursor = cursor.nextSibling
+    const condRef = _findCondMarkerByIndex(container, engineThis(this)[GEA_ID], afterCondSlotIndex)
+    if (condRef) {
+      for (const el of ordered) {
+        container.insertBefore(el, condRef)
+      }
+    } else {
+      const itemSet = new Set(ordered)
+      let cursor: ChildNode | null = container.firstChild
+      while (cursor && !itemSet.has(cursor)) cursor = cursor.nextSibling
 
-    for (const el of ordered) {
-      if (el !== cursor) {
-        container.insertBefore(el, cursor || null)
-      } else {
-        cursor = cursor!.nextSibling
-        while (cursor && !itemSet.has(cursor)) cursor = cursor.nextSibling
+      for (const el of ordered) {
+        if (el !== cursor) {
+          container.insertBefore(el, cursor || null)
+        } else {
+          cursor = cursor!.nextSibling
+          while (cursor && !itemSet.has(cursor)) cursor = cursor.nextSibling
+        }
       }
     }
   }
@@ -871,6 +911,7 @@ export default class Component<P = Record<string, any>> extends Store {
     Ctor: new (props: any) => AnyComponent,
     propsFactory: (item: any, index?: number) => any,
     keyExtractor: (item: any, index?: number) => any,
+    afterCondSlotIndex?: number,
   ): AnyComponent[] {
     const oldByKey = new Map<string, AnyComponent>()
     for (const item of oldItems) {
@@ -929,7 +970,7 @@ export default class Component<P = Record<string, any>> extends Store {
       removed.dispose?.()
     }
 
-    this[GEA_REORDER_CHILDREN](container, next)
+    this[GEA_REORDER_CHILDREN](container, next, afterCondSlotIndex)
 
     if (container && next.length > 0) {
       const rootSet = new Set<HTMLElement>()
@@ -1014,11 +1055,20 @@ export default class Component<P = Record<string, any>> extends Store {
           // Append (push)
           const { start, count } = changes[0]
           const container = config.container()
+          const condRef = container
+            ? _findCondMarkerByIndex(container, engineThis(this)[GEA_ID], config.afterCondSlotIndex)
+            : null
           for (let i = 0; i < count; i++) {
             const data = arr[start + i]
             const item = this[GEA_CHILD](config.Ctor, config.props(data, start + i), config.key(data, start + i))
             config.items.push(item)
-            if ((this as any)[GEA_RENDERED] && container) item.render(container)
+            if ((this as any)[GEA_RENDERED] && container) {
+              item.render(container)
+              if (condRef) {
+                const el = engineThis(item)[GEA_ELEMENT]
+                if (el && el.parentNode === container) container.insertBefore(el, condRef)
+              }
+            }
           }
         } else {
           // Full replace (filter, sort, reassign)
@@ -1029,6 +1079,7 @@ export default class Component<P = Record<string, any>> extends Store {
             config.Ctor,
             config.props,
             config.key,
+            config.afterCondSlotIndex,
           )
           config.items.length = 0
           config.items.push(...newItems)
@@ -1061,7 +1112,15 @@ export default class Component<P = Record<string, any>> extends Store {
       try {
         // Read through the proxy (not GEA_STORE_ROOT) so getters are evaluated
         const arr = p.reduce((obj: any, key: string) => obj?.[key], s) ?? []
-        const newItems = this[GEA_RECONCILE_LIST](c.items, arr, c.container(), c.Ctor, c.props, c.key)
+        const newItems = this[GEA_RECONCILE_LIST](
+          c.items,
+          arr,
+          c.container(),
+          c.Ctor,
+          c.props,
+          c.key,
+          c.afterCondSlotIndex,
+        )
         c.items.length = 0
         c.items.push(...newItems)
         c.onchange?.()
