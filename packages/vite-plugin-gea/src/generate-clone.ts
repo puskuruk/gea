@@ -23,24 +23,41 @@ const EVENT_TYPES = new Set([
   'dblclick',
   'change',
   'input',
+  'submit',
+  'reset',
+  'focus',
+  'blur',
   'keydown',
   'keyup',
-  'blur',
-  'focus',
+  'keypress',
   'mousedown',
   'mouseup',
-  'submit',
+  'mouseover',
+  'mouseout',
+  'mouseenter',
+  'mouseleave',
+  'mousemove',
+  'contextmenu',
+  'touchstart',
+  'touchend',
+  'touchmove',
+  'pointerdown',
+  'pointerup',
+  'pointermove',
+  'scroll',
+  'resize',
+  'drag',
+  'dragstart',
+  'dragend',
+  'dragover',
+  'dragleave',
+  'drop',
   'tap',
   'longTap',
   'swipeRight',
   'swipeUp',
   'swipeLeft',
   'swipeDown',
-  'dragstart',
-  'dragend',
-  'dragover',
-  'dragleave',
-  'drop',
 ])
 
 const VOID_ELEMENTS = new Set([
@@ -660,7 +677,13 @@ export function generateCloneMembers(
 
   const cloneMethodBody = buildCloneTemplateBody(identityPatches, contentPatches, cloneCtx)
 
-  const cloneMethod = t.classMethod('method', t.identifier('GEA_CLONE_TEMPLATE'), [], t.blockStatement(cloneMethodBody), true)
+  const cloneMethod = t.classMethod(
+    'method',
+    t.identifier('GEA_CLONE_TEMPLATE'),
+    [],
+    t.blockStatement(cloneMethodBody),
+    true,
+  )
 
   return [staticField, cloneMethod]
 }

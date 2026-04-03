@@ -47,7 +47,7 @@ export function buildComponentPropsExpression(
       if (
         propValue &&
         (/^on[A-Z]/.test(propName) ||
-          /^(click|input|change|submit|focus|blur|keydown|keyup|keypress|mousedown|mouseup|mouseover|mouseout|mouseenter|mouseleave|touchstart|touchend|touchmove|pointerdown|pointerup|pointermove|scroll|resize|drag|dragstart|dragend|dragover|drop|reset)$/.test(
+          /^(click|dblclick|input|change|submit|reset|focus|blur|keydown|keyup|keypress|mousedown|mouseup|mouseover|mouseout|mouseenter|mouseleave|mousemove|contextmenu|touchstart|touchend|touchmove|pointerdown|pointerup|pointermove|scroll|resize|drag|dragstart|dragend|dragover|dragleave|drop|tap|longTap|swipeRight|swipeUp|swipeLeft|swipeDown)$/.test(
             propName,
           )) &&
         t.isMemberExpression(propValue)
