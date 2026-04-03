@@ -1051,7 +1051,12 @@ export default class Component<P = Record<string, any>> extends Store {
               item[GEA_UPDATE_PROPS](config.props(arr[c.arrayIndex], c.arrayIndex))
             }
           }
-        } else if (changes.length === 1 && changes[0].type === 'append') {
+        } else if (
+          changes.length === 1 &&
+          changes[0].type === 'append' &&
+          changes[0].pathParts.length === path.length &&
+          changes[0].pathParts.every((p: string, i: number) => p === path[i])
+        ) {
           // Append (push)
           const { start, count } = changes[0]
           const container = config.container()
@@ -1305,6 +1310,10 @@ export default class Component<P = Record<string, any>> extends Store {
         } else if (!nested) {
           let insideCondSlot = false
           for (let s: ChildNode | null = container.firstChild; s; s = s.nextSibling) {
+            // An empty comment is the map's own end-of-list marker. If we hit
+            // it before any conditional-slot comment, the map lives at the
+            // container level (sibling of the cond slot), not inside one.
+            if (s.nodeType === 8 && !(s as Comment).data) break
             if (s.nodeType === 8 && (s as Comment).data && /-c\d+$/.test((s as Comment).data)) {
               insideCondSlot = true
               break

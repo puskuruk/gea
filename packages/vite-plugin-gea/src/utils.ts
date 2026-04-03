@@ -1795,7 +1795,9 @@ function stmtUsesPropRefreshCall(stmt: t.Statement): boolean {
 
 function containsPropRefreshCall(node: t.Node): boolean {
   if (t.isMemberExpression(node) && t.isIdentifier(node.property)) {
-    if (node.property.name === 'GEA_UPDATE_PROPS' || node.property.name.startsWith('__refresh')) return true
+    const n = node.property.name
+    if (n === 'GEA_UPDATE_PROPS' || n === 'GEA_SYNC_MAP' || n === 'GEA_PATCH_COND' || n.startsWith('__refresh'))
+      return true
   }
   const keys = t.VISITOR_KEYS[node.type]
   if (!keys) return false
