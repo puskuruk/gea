@@ -14,18 +14,8 @@ import { appendToBody, id, js, jsExpr, jsMethod, jsPrivateProp } from 'eszter'
 import type { ArrayMapBinding, PathParts } from '../ir/types.ts'
 import type { StateRefMeta } from '../parse/state-refs.ts'
 
-import {
-  generateCreatedHooks,
-  generateLocalStateObserverSetup,
-  classMethodUsesParam,
-} from './gen-observer-wiring.ts'
-import { generateMapRegistration } from './gen-map-helpers.ts'
-import {
-  buildObserveKey,
-  getObserveMethodName,
-  parseObserveKey,
-  pathPartsToString,
-} from './member-chain.ts'
+import { generateCreatedHooks, generateLocalStateObserverSetup, classMethodUsesParam } from './gen-observer-wiring.ts'
+import { buildObserveKey, getObserveMethodName, parseObserveKey } from './member-chain.ts'
 import { buildValueUnwrapHelper } from './array-compiler.ts'
 
 import type { ReactivityContext } from './reactivity-types.ts'
@@ -41,8 +31,7 @@ import type { ReactivityContext } from './reactivity-types.ts'
  */
 export function mergeObserveMethod(ctx: ReactivityContext, observeKey: string, method: t.ClassMethod): void {
   const methodName = getMethodName(method)
-  const existing =
-    ctx.addedMethods.get(observeKey) || (methodName ? ctx.addedMethodsByName.get(methodName) : undefined)
+  const existing = ctx.addedMethods.get(observeKey) || (methodName ? ctx.addedMethodsByName.get(methodName) : undefined)
   if (existing && t.isBlockStatement(existing.body) && t.isBlockStatement(method.body)) {
     if (method.params.length > existing.params.length) {
       existing.params = method.params.map((param) => t.cloneNode(param, true) as typeof param)
@@ -96,7 +85,7 @@ export function wireObservers(
   >,
   ownClassMethodNames: Set<string>,
   hasOnPropChange: boolean,
-  unresolvedBindings: Array<{ info: any; binding: any }>,
+  _unresolvedBindings: Array<{ info: any; binding: any }>,
 ): void {
   if (!ctx.applied) return
 
@@ -199,10 +188,10 @@ export function wireObservers(
     }
   }
   for (const obs of consolidatedMapSync.values()) {
-    ensureStoreGroup(obs.storeVar).observeHandlers.set(
-      `__mapSync_${obs.delegateName}_${obs.pathParts.join('_')}`,
-      { pathParts: obs.pathParts, methodName: obs.delegateName },
-    )
+    ensureStoreGroup(obs.storeVar).observeHandlers.set(`__mapSync_${obs.delegateName}_${obs.pathParts.join('_')}`, {
+      pathParts: obs.pathParts,
+      methodName: obs.delegateName,
+    })
   }
 
   for (const obs of storeComponentArrayObservers) {
@@ -258,9 +247,7 @@ export function wireObservers(
         // GEA_UPDATE_PROPS calls (child prop updates that read nested properties
         // of the observed value), inject a null guard before those calls.
         if (guardStateKeys.has(observeKey) && t.isBlockStatement(method.body)) {
-          const hasChildPropUpdate = method.body.body.some(
-            (stmt) => generate(stmt).code.includes('GEA_UPDATE_PROPS'),
-          )
+          const hasChildPropUpdate = method.body.body.some((stmt) => generate(stmt).code.includes('GEA_UPDATE_PROPS'))
           if (hasChildPropUpdate) {
             method.body.body.unshift(js`if (${id(sv)}.${id(parts[0])} == null) return;`)
           }
@@ -338,7 +325,12 @@ export function wireObservers(
     ensureStoreGroup(olc.storeVar)
   }
 
-  if (importedStores.size > 0 || localObserveHandlers.size > 0 || mapRegistrations.length > 0 || observeListConfigs.length > 0) {
+  if (
+    importedStores.size > 0 ||
+    localObserveHandlers.size > 0 ||
+    mapRegistrations.length > 0 ||
+    observeListConfigs.length > 0
+  ) {
     const storeConfigs = Array.from(importedStores.entries()).map(([storeVar, config]) => ({
       storeVar,
       captureExpression: config.captureExpression,
@@ -355,11 +347,7 @@ export function wireObservers(
     }))
 
     if (storeConfigs.length > 0 || mapRegistrations.length > 0 || observeListConfigs.length > 0) {
-      const createdHooksMethod = generateCreatedHooks(
-        storeConfigs,
-        htmlArrayMaps.length > 0,
-        observeListConfigs,
-      )
+      const createdHooksMethod = generateCreatedHooks(storeConfigs, htmlArrayMaps.length > 0, observeListConfigs)
       if (mapRegistrations.length > 0) {
         createdHooksMethod.body.body.push(...mapRegistrations)
       }
@@ -382,10 +370,7 @@ export function wireObservers(
         (m) => t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name === 'onAfterRenderHooks',
       ) as t.ClassMethod | undefined
       if (existingHook) existingHook.body.body.push(...refreshStmts)
-      else
-        ctx.classPath.node.body.body.push(
-          appendToBody(jsMethod`onAfterRenderHooks() {}`, ...refreshStmts),
-        )
+      else ctx.classPath.node.body.body.push(appendToBody(jsMethod`onAfterRenderHooks() {}`, ...refreshStmts))
     }
     if (localObserveHandlers.size > 0) {
       ctx.classPath.node.body.body.push(

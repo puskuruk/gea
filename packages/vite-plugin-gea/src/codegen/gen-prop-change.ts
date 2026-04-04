@@ -1,5 +1,5 @@
 import { t } from '../utils/babel-interop.ts'
-import { appendToBody, id, js, jsExpr, jsMethod } from 'eszter'
+import { appendToBody, id, js, jsMethod } from 'eszter'
 
 import type { ChildComponent, ConditionalSlot } from '../ir/types.ts'
 import { childHasNoProps } from './gen-children.ts'
@@ -125,7 +125,11 @@ export function ensureOnPropChangeMethod(
   unresolvedMapPropRefreshDeps: Array<{ mapIdx: number; propNames: string[] }> = [],
 ): void {
   const existing = classBody.body.find(
-    (member) => t.isClassMethod(member) && member.computed && t.isIdentifier(member.key) && member.key.name === 'GEA_ON_PROP_CHANGE',
+    (member) =>
+      t.isClassMethod(member) &&
+      member.computed &&
+      t.isIdentifier(member.key) &&
+      member.key.name === 'GEA_ON_PROP_CHANGE',
   ) as t.ClassMethod | undefined
   if (existing) return
 
@@ -184,7 +188,8 @@ export function ensureOnPropChangeMethod(
 
   const childRefreshCalls: t.Statement[] = childRefreshEntries.map(({ child, depProps }) => {
     const buildPropsName = `__buildProps_${child.instanceVar.replace(/^_/, '')}`
-    const call = js`this.${id(child.instanceVar)}[${id('GEA_UPDATE_PROPS')}](this.${id(buildPropsName)}());` as t.ExpressionStatement
+    const call =
+      js`this.${id(child.instanceVar)}[${id('GEA_UPDATE_PROPS')}](this.${id(buildPropsName)}());` as t.ExpressionStatement
     if (depProps.size > 0) {
       const guard = Array.from(depProps).reduce<t.Expression>((acc, prop) => {
         const test = t.binaryExpression('===', id('key'), t.stringLiteral(prop))

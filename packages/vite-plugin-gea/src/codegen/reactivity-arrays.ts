@@ -12,13 +12,7 @@ import { traverse, t } from '../utils/babel-interop.ts'
 import type { NodePath } from '../utils/babel-interop.ts'
 import { appendToBody, id, js, jsExpr, jsMethod } from 'eszter'
 
-import type {
-  ArrayMapBinding,
-  ChildComponent,
-  EventHandler,
-  PathParts,
-  UnresolvedMapInfo,
-} from '../ir/types.ts'
+import type { ArrayMapBinding, EventHandler, PathParts, UnresolvedMapInfo } from '../ir/types.ts'
 import type { AnalysisResult } from '../analyze/analyzer.ts'
 import type { StateRefMeta } from '../parse/state-refs.ts'
 import { ITEM_IS_KEY } from '../analyze/helpers.ts'
@@ -47,8 +41,6 @@ import {
   replaceMapWithComponentArrayItemsInConditionalSlots,
   inlineIntoConstructor,
   ensureDisposeCalls,
-  injectMapItemAttrsIntoTemplate,
-  addJoinToUnresolvedMapCalls,
   replaceInlineMapWithRenderCall,
   stripHtmlArrayMapJoinInTemplateMethod,
   replaceMapInConditionalSlots,
@@ -57,7 +49,6 @@ import {
 import {
   buildMemberChainFromParts,
   buildObserveKey,
-  buildListItemsSymbol,
   buildThisListItems,
   getObserveMethodName,
   pathPartsToString,
@@ -125,12 +116,10 @@ export function processUnresolvedMaps(
   sourceFile: string,
   stateProps: Map<string, PathParts>,
   templateMethod: t.ClassMethod | undefined,
-  tmplSetupCtx:
-    | { params: (t.Identifier | t.Pattern | t.RestElement)[]; statements: t.Statement[] }
-    | undefined,
+  tmplSetupCtx: { params: (t.Identifier | t.Pattern | t.RestElement)[]; statements: t.Statement[] } | undefined,
   eventIdCounter: { value: number },
-  templatePropNames: Set<string>,
-  templateWholeParam: string | undefined,
+  _templatePropNames: Set<string>,
+  _templateWholeParam: string | undefined,
 ): UnresolvedMapsResult {
   const unresolvedEventHandlers: EventHandler[] = []
   const unresolvedBindings: Array<{ info: UnresolvedMapInfo; binding: any }> = []
@@ -166,10 +155,10 @@ export function processUnresolvedMaps(
 
   const classPath = ctx.classPath
   const tmplBody = templateMethod?.body.body ?? []
-  let tmplReturnIdx = -1
+  let _tmplReturnIdx = -1
   for (let ri = tmplBody.length - 1; ri >= 0; ri--) {
     if (t.isReturnStatement(tmplBody[ri])) {
-      tmplReturnIdx = ri
+      _tmplReturnIdx = ri
       break
     }
   }
@@ -269,14 +258,18 @@ export function processUnresolvedMaps(
             ...arrayResult.arrSetupStatements.map((s) => t.cloneNode(s, true) as t.Statement),
             js`const __arr = ${t.cloneNode(arrayResult.arrAccessExpr, true)} ?? [];`,
             t.variableDeclaration('const', [t.variableDeclarator(id('__new'), reconcileCall)]),
-            t.expressionStatement(t.assignmentExpression('=',
-              t.memberExpression(t.cloneNode(thisItems, true) as t.Expression, id('length')),
-              t.numericLiteral(0),
-            )),
-            t.expressionStatement(t.callExpression(
-              t.memberExpression(t.cloneNode(thisItems, true) as t.Expression, id('push')),
-              [t.spreadElement(id('__new'))],
-            )),
+            t.expressionStatement(
+              t.assignmentExpression(
+                '=',
+                t.memberExpression(t.cloneNode(thisItems, true) as t.Expression, id('length')),
+                t.numericLiteral(0),
+              ),
+            ),
+            t.expressionStatement(
+              t.callExpression(t.memberExpression(t.cloneNode(thisItems, true) as t.Expression, id('push')), [
+                t.spreadElement(id('__new')),
+              ]),
+            ),
           )
           classPath.node.body.body.push(refreshMethod)
 
@@ -302,14 +295,10 @@ export function processUnresolvedMaps(
               | t.ReturnStatement
               | undefined
             if (returnStmt?.argument && t.isObjectExpression(returnStmt.argument)) {
-              const setupStmts = itemPropsMethod.body.body.filter(
-                (s) => !t.isReturnStatement(s),
-              ) as t.Statement[]
-              const itemPropsDeps = collectExpressionDependencies(
-                returnStmt.argument,
-                stateRefs,
-                setupStmts,
-              ).filter((dep) => dep.storeVar)
+              const setupStmts = itemPropsMethod.body.body.filter((s) => !t.isReturnStatement(s)) as t.Statement[]
+              const itemPropsDeps = collectExpressionDependencies(returnStmt.argument, stateRefs, setupStmts).filter(
+                (dep) => dep.storeVar,
+              )
               const computedDepKeys = new Set(
                 computedDeps.map((cd) => `${cd.storeVar}:${pathPartsToString(cd.pathParts)}`),
               )
@@ -421,10 +410,7 @@ export function processUnresolvedMaps(
                 '&&',
                 t.identifier(arrayVarName),
                 t.callExpression(
-                  t.memberExpression(
-                    t.thisExpression(),
-                    t.identifier(`__populateItemHandlersFor_${arrayPropName}`),
-                  ),
+                  t.memberExpression(t.thisExpression(), t.identifier(`__populateItemHandlersFor_${arrayPropName}`)),
                   [t.identifier(arrayVarName)],
                 ),
               ),
@@ -580,10 +566,7 @@ export function processMapRegistrations(
       } else if (dep.storeVar) {
         if (!delegateEmitted) {
           classPath.node.body.body.push(
-            appendToBody(
-              jsMethod`${id(delegateName)}() {}`,
-              js`this[${id('GEA_SYNC_MAP')}](${mapIdx});`,
-            ),
+            appendToBody(jsMethod`${id(delegateName)}() {}`, js`this[${id('GEA_SYNC_MAP')}](${mapIdx});`),
           )
           delegateEmitted = true
         }
@@ -626,9 +609,7 @@ export function processResolvedArrayMaps(
   sourceFile: string,
   stateProps: Map<string, PathParts>,
   templateMethod: t.ClassMethod | undefined,
-  tmplSetupCtx:
-    | { params: (t.Identifier | t.Pattern | t.RestElement)[]; statements: t.Statement[] }
-    | undefined,
+  tmplSetupCtx: { params: (t.Identifier | t.Pattern | t.RestElement)[]; statements: t.Statement[] } | undefined,
   eventIdCounter: { value: number },
   observeListConfigs: Array<{
     storeVar: string
@@ -643,7 +624,7 @@ export function processResolvedArrayMaps(
   staticArrayRefreshOnMount: string[],
   initialHtmlArrayRefreshOnMount: t.Statement[],
   childrenWithResolvedMap: Set<string>,
-  storeComponentArrayObservers: Array<{
+  _storeComponentArrayObservers: Array<{
     storeVar: string
     refreshMethodName: string
     pathParts: PathParts
@@ -793,7 +774,11 @@ export function processResolvedArrayMaps(
           existing.body.body.push(refreshStmt)
         }
       } else {
-        mergeObserveMethod(ctx, depObserveKey, jsMethod`${id(depMethodName)}(__v, __c) { this[${id('GEA_REFRESH_LIST')}](${pathKey}); }`)
+        mergeObserveMethod(
+          ctx,
+          depObserveKey,
+          jsMethod`${id(depMethodName)}(__v, __c) { this[${id('GEA_REFRESH_LIST')}](${pathKey}); }`,
+        )
       }
     }
   }
@@ -845,7 +830,11 @@ export function processResolvedArrayMaps(
     for (const [depKey, dep] of externalDeps) {
       const depMethodName = getObserveMethodName(dep.parts, dep.storeVar)
       if (!stateProps.has(depKey)) stateProps.set(depKey, dep.parts)
-      mergeObserveMethod(ctx, depKey, jsMethod`${id(depMethodName)}(__v, __c) { this[${id('GEA_REFRESH_LIST')}](${pathKey}); }`)
+      mergeObserveMethod(
+        ctx,
+        depKey,
+        jsMethod`${id(depMethodName)}(__v, __c) { this[${id('GEA_REFRESH_LIST')}](${pathKey}); }`,
+      )
     }
   }
 
@@ -933,10 +922,7 @@ export function processResolvedArrayMaps(
       afterRenderCalls.push(js`this.${id(methodName)}(${valueExpr}, []);`)
     })
     if (afterRenderCalls.length > 0) {
-      const afterRenderMethod = appendToBody(
-        jsMethod`onAfterRender() { super.onAfterRender(); }`,
-        ...afterRenderCalls,
-      )
+      const afterRenderMethod = appendToBody(jsMethod`onAfterRender() { super.onAfterRender(); }`, ...afterRenderCalls)
       classPath.node.body.body.push(afterRenderMethod)
     }
   }

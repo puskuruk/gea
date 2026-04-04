@@ -11,20 +11,10 @@ import type {
   TextExpression,
   UnresolvedMapInfo,
 } from '../ir/types.ts'
-import {
-  buildObserveKey,
-  pathPartsToString,
-  resolvePath,
-} from '../codegen/member-chain.ts'
+import { buildObserveKey, pathPartsToString, resolvePath } from '../codegen/member-chain.ts'
 import { generateSelector } from '../codegen/jsx-utils.ts'
 import { callsJSXReturningProperty } from '../codegen/gen-template.ts'
-import {
-  isEventAttribute,
-  isMapCall,
-  classifyAttribute,
-  getDirectChildElements,
-  getJSXTagName,
-} from './jsx-walker.ts'
+import { isEventAttribute, isMapCall, classifyAttribute, getDirectChildElements, getJSXTagName } from './jsx-walker.ts'
 import {
   resolveExpr,
   resolvePropRef,
@@ -143,11 +133,7 @@ export function analyzeAttributes(
 
     const kind = classifyAttribute(name)
     const attrType =
-      kind === 'class'
-        ? 'class'
-        : kind === 'value' || kind === 'checked'
-          ? (name as 'value' | 'checked')
-          : 'attribute'
+      kind === 'class' ? 'class' : kind === 'value' || kind === 'checked' ? (name as 'value' | 'checked') : 'attribute'
     const derived = buildDerivedPropBindings(
       expr,
       attrType,
@@ -892,7 +878,8 @@ function handleTextBinding(
       const stateDeps = dependencies.filter((d) => d.storeVar || (d.pathParts.length > 0 && d.pathParts[0] !== 'props'))
       if (stateDeps.length > 0) {
         const selector = generateSelector(elementPath)
-        const isChildrenPropBinding = !t.isJSXEmptyExpression(expr) && callsJSXReturningProperty(expr as t.Expression, classBody)
+        const isChildrenPropBinding =
+          !t.isJSXEmptyExpression(expr) && callsJSXReturningProperty(expr as t.Expression, classBody)
         propBindings.push({
           propName: '__state__',
           selector,
@@ -933,7 +920,9 @@ function handleTextBinding(
     selector: generateSelector(elementPath),
     elementPath: [...elementPath],
     ...(textNodeIndex !== undefined ? { textNodeIndex } : {}),
-    ...(!t.isJSXEmptyExpression(expr) && callsJSXReturningProperty(expr as t.Expression, classBody) ? { isChildrenProp: true } : {}),
+    ...(!t.isJSXEmptyExpression(expr) && callsJSXReturningProperty(expr as t.Expression, classBody)
+      ? { isChildrenProp: true }
+      : {}),
   }
   applyImportedState(binding, result, stateProps)
   if (shouldBuildTextTemplate && textTemplate && !jsxInTextSiblingGroup) {
@@ -1000,7 +989,7 @@ export function extractConditionalControlExpression(expr: t.Expression): t.Expre
   return null
 }
 
-function expressionContainsComponentJSX(node: t.Node): boolean {
+function _expressionContainsComponentJSX(node: t.Node): boolean {
   if (t.isJSXElement(node)) {
     const name = node.openingElement.name
     if (t.isJSXIdentifier(name) && /^[A-Z]/.test(name.name)) return true
@@ -1010,24 +999,24 @@ function expressionContainsComponentJSX(node: t.Node): boolean {
       if (t.isJSXIdentifier(cur) && /^[A-Z]/.test(cur.name)) return true
     }
     for (const c of node.children) {
-      if (expressionContainsComponentJSX(c)) return true
+      if (_expressionContainsComponentJSX(c)) return true
     }
     return false
   }
   if (t.isJSXExpressionContainer(node) && !t.isJSXEmptyExpression(node.expression)) {
-    return expressionContainsComponentJSX(node.expression)
+    return _expressionContainsComponentJSX(node.expression)
   }
   if (t.isLogicalExpression(node)) {
-    return expressionContainsComponentJSX(node.left) || expressionContainsComponentJSX(node.right)
+    return _expressionContainsComponentJSX(node.left) || _expressionContainsComponentJSX(node.right)
   }
   if (t.isConditionalExpression(node)) {
-    return expressionContainsComponentJSX(node.consequent) || expressionContainsComponentJSX(node.alternate)
+    return _expressionContainsComponentJSX(node.consequent) || _expressionContainsComponentJSX(node.alternate)
   }
   if (t.isParenthesizedExpression(node)) {
-    return expressionContainsComponentJSX(node.expression)
+    return _expressionContainsComponentJSX(node.expression)
   }
   if (t.isJSXFragment(node)) {
-    return node.children.some((c) => expressionContainsComponentJSX(c))
+    return node.children.some((c) => _expressionContainsComponentJSX(c))
   }
   return false
 }

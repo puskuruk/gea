@@ -1,5 +1,5 @@
 import { t } from '../utils/babel-interop.ts'
-import { id, js, jsExpr, jsMethod } from 'eszter'
+import { id, js, jsExpr } from 'eszter'
 
 import type { ArrayMapBinding, ConditionalSlot } from '../ir/types.ts'
 
@@ -107,7 +107,13 @@ export function generateConditionalPatchMethods(
     const condSymbol = t.callExpression(id('geaCondValueSymbol'), [t.numericLiteral(i)])
     const thisCondField = t.memberExpression(t.thisExpression(), condSymbol, true)
     condAssignments.push(
-      t.expressionStatement(t.assignmentExpression('=', thisCondField, t.unaryExpression('!', t.unaryExpression('!', t.cloneNode(rewrittenCondExprsSafe[i], true))))),
+      t.expressionStatement(
+        t.assignmentExpression(
+          '=',
+          thisCondField,
+          t.unaryExpression('!', t.unaryExpression('!', t.cloneNode(rewrittenCondExprsSafe[i], true))),
+        ),
+      ),
     )
   }
 
@@ -178,7 +184,11 @@ export function generateStateChildSwapMethod(
   }>,
 ): void {
   const existing = classBody.body.find(
-    (member) => t.isClassMethod(member) && member.computed && t.isIdentifier(member.key) && member.key.name === 'GEA_SWAP_STATE_CHILDREN',
+    (member) =>
+      t.isClassMethod(member) &&
+      member.computed &&
+      t.isIdentifier(member.key) &&
+      member.key.name === 'GEA_SWAP_STATE_CHILDREN',
   )
   if (existing) return
 

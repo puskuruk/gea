@@ -1,7 +1,7 @@
 import { js, jsExpr } from 'eszter'
 import { t } from '../utils/babel-interop.ts'
 import { setClassName, toggleClass } from '../codegen/dom-update.ts'
-import type { EmitContext, EmitterOpts, PatchEmitter } from './types.ts'
+import type { PatchEmitter } from './types.ts'
 
 export const classEmitter: PatchEmitter = {
   type: 'class',
@@ -15,9 +15,11 @@ export const classEmitter: PatchEmitter = {
         : jsExpr`(String(${value} ?? '')).trim().replace(/\\s+/g, ' ')`
 
     if (!ctx.guard) return [setClassName(el, classValue)]
-    return [js`{
+    return [
+      js`{
       const __newClass = ${classValue};
       if (${t.cloneNode(el, true)}.className !== __newClass) ${t.cloneNode(el, true)}.className = __newClass;
-    }`]
+    }`,
+    ]
   },
 }

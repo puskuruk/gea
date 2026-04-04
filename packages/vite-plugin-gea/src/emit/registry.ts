@@ -1,5 +1,5 @@
 import type { t } from '../utils/babel-interop.ts'
-import type { EmitContext, EmitterOpts, PatchEmitter } from './types.ts'
+import type { EmitterOpts, PatchEmitter } from './types.ts'
 import { PATCH_CTX, MOUNT_CTX } from './types.ts'
 import { textEmitter } from './text.ts'
 import { classEmitter } from './class.ts'
@@ -23,23 +23,13 @@ export function getEmitter(type: string): PatchEmitter | undefined {
   return emitters.get(type)
 }
 
-export function emitPatch(
-  type: string,
-  el: t.Expression,
-  value: t.Expression,
-  opts?: EmitterOpts,
-): t.Statement[] {
+export function emitPatch(type: string, el: t.Expression, value: t.Expression, opts?: EmitterOpts): t.Statement[] {
   const emitter = emitters.get(type)
   if (!emitter) return []
   return emitter.emit(el, value, PATCH_CTX, opts)
 }
 
-export function emitMount(
-  type: string,
-  el: t.Expression,
-  value: t.Expression,
-  opts?: EmitterOpts,
-): t.Statement[] {
+export function emitMount(type: string, el: t.Expression, value: t.Expression, opts?: EmitterOpts): t.Statement[] {
   const emitter = emitters.get(type)
   if (!emitter) return []
   return emitter.emit(el, value, MOUNT_CTX, opts)
@@ -65,7 +55,11 @@ export function applyEntries(
     const type = entry.type === 'className' ? 'class' : entry.type
     const emitter = emitters.get(type)
     if (!emitter) return []
-    const opts: EmitterOpts = { attributeName: entry.attributeName, classToggleName: entry.classToggleName, ...extraOpts?.(entry) }
+    const opts: EmitterOpts = {
+      attributeName: entry.attributeName,
+      classToggleName: entry.classToggleName,
+      ...extraOpts?.(entry),
+    }
     return emitter.emit(el, entry.expression, ctx, opts)
   })
 }

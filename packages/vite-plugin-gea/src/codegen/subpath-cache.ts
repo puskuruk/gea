@@ -16,16 +16,14 @@ function walk(node: t.Node | null | undefined, fn: (n: t.Node) => void): void {
   for (const key of keys) {
     const child = (node as any)[key]
     if (Array.isArray(child))
-      for (const c of child) if (c?.type) walk(c, fn)
-    else if (child?.type) walk(child, fn)
+      for (const c of child)
+        if (c?.type) walk(c, fn)
+        else if (child?.type) walk(child, fn)
   }
 }
 
 /** In-place child replacement: if `fn` returns a node, swap it in. */
-function replaceChildren(
-  node: t.Node,
-  fn: (n: t.Node) => t.Node | undefined,
-): void {
+function replaceChildren(node: t.Node, fn: (n: t.Node) => t.Node | undefined): void {
   const keys = t.VISITOR_KEYS[node.type]
   if (!keys) return
   for (const key of keys) {
@@ -47,10 +45,7 @@ function replaceChildren(
 }
 
 /** Matches `value.X` or `value?.X` (non-computed). */
-function isValueDot(
-  node: t.Node,
-  subProp?: string,
-): node is t.MemberExpression | t.OptionalMemberExpression {
+function isValueDot(node: t.Node, subProp?: string): node is t.MemberExpression | t.OptionalMemberExpression {
   if (
     (t.isMemberExpression(node) || t.isOptionalMemberExpression(node)) &&
     !node.computed &&
@@ -74,8 +69,7 @@ function serializeKeyGuardForSubpath(test: t.Expression): string | null {
   if (t.isLogicalExpression(test) && test.operator === '||') {
     const parts: string[] = []
     const collect = (node: t.Expression): boolean => {
-      if (t.isLogicalExpression(node) && node.operator === '||')
-        return collect(node.left) && collect(node.right)
+      if (t.isLogicalExpression(node) && node.operator === '||') return collect(node.left) && collect(node.right)
       if (
         t.isBinaryExpression(node) &&
         node.operator === '===' &&
@@ -117,9 +111,7 @@ export function collectValueSubpaths(node: t.Node): Set<string> {
   return set
 }
 
-function unwrapNullGuardBlock(
-  block: t.BlockStatement,
-): { inner: t.BlockStatement; hadNullGuard: boolean } {
+function unwrapNullGuardBlock(block: t.BlockStatement): { inner: t.BlockStatement; hadNullGuard: boolean } {
   if (
     block.body.length === 1 &&
     t.isIfStatement(block.body[0]) &&
@@ -143,9 +135,7 @@ function hoistDuplicateValueSubprops(block: t.BlockStatement): void {
       counts.set(name, (counts.get(name) || 0) + 1)
     }
   })
-  const dups = new Map(
-    [...counts].filter(([, c]) => c > 1).map(([name]) => [name, `__${name}`]),
-  )
+  const dups = new Map([...counts].filter(([, c]) => c > 1).map(([name]) => [name, `__${name}`]))
   if (dups.size === 0) return
   replaceChildren(block, (n) => {
     if (isValueDot(n)) {
@@ -154,16 +144,12 @@ function hoistDuplicateValueSubprops(block: t.BlockStatement): void {
     }
     return undefined
   })
-  block.body.unshift(
-    ...[...dups].map(([sub, local]) => js`const ${id(local)} = value?.${id(sub)};`),
-  )
+  block.body.unshift(...[...dups].map(([sub, local]) => js`const ${id(local)} = value?.${id(sub)};`))
 }
 
 // ─── Subpath chunk types ────────────────────────────────────────────
 
-type SubpathChunk =
-  | { kind: 'single'; subProp: string; stmts: t.Statement[] }
-  | { kind: 'always'; stmts: t.Statement[] }
+type SubpathChunk = { kind: 'single'; subProp: string; stmts: t.Statement[] } | { kind: 'always'; stmts: t.Statement[] }
 
 function containsPropRefreshCall(node: t.Node): boolean {
   let found = false
@@ -171,8 +157,7 @@ function containsPropRefreshCall(node: t.Node): boolean {
     if (
       t.isMemberExpression(n) &&
       t.isIdentifier(n.property) &&
-      (n.property.name === 'GEA_UPDATE_PROPS' ||
-        n.property.name.startsWith('__refresh'))
+      (n.property.name === 'GEA_UPDATE_PROPS' || n.property.name.startsWith('__refresh'))
     )
       found = true
   })
@@ -212,13 +197,14 @@ function chunkStatementsInOrder(stmts: t.Statement[]): SubpathChunk[] {
   return chunks
 }
 
-function stripPerStatementNullGuards(
-  stmts: t.Statement[],
-): { stmts: t.Statement[]; allHadGuards: boolean } {
+function stripPerStatementNullGuards(stmts: t.Statement[]): { stmts: t.Statement[]; allHadGuards: boolean } {
   let guardCount = 0
   const result = stmts.map((stmt) => {
     const stripped = stripNullGuard(stmt)
-    if (stripped) { guardCount++; return stripped }
+    if (stripped) {
+      guardCount++
+      return stripped
+    }
     return stmt
   })
   return { stmts: result, allHadGuards: stmts.length > 0 && guardCount === stmts.length }
@@ -233,15 +219,15 @@ function stripNullGuard(stmt: t.Statement): t.Statement | null {
         ? stmt
         : null
   if (!ifStmt || ifStmt.alternate || !isValueNullishGuard(ifStmt.test)) return null
-  const body = t.isBlockStatement(ifStmt.consequent)
-    ? ifStmt.consequent.body
-    : [ifStmt.consequent]
+  const body = t.isBlockStatement(ifStmt.consequent) ? ifStmt.consequent.body : [ifStmt.consequent]
   return t.blockStatement(body)
 }
 
 function countIdentifierRefs(node: t.Node, name: string): number {
   let count = 0
-  walk(node, (n) => { if (t.isIdentifier(n) && n.name === name) count++ })
+  walk(node, (n) => {
+    if (t.isIdentifier(n) && n.name === name) count++
+  })
   return count
 }
 
@@ -251,22 +237,25 @@ function isPure(e: t.Expression): boolean {
     return isPure(e.object as t.Expression) && (!e.computed || isPure(e.property as t.Expression))
   if (t.isConditionalExpression(e))
     return isPure(e.test) && isPure(e.consequent as t.Expression) && isPure(e.alternate as t.Expression)
-  if (t.isBinaryExpression(e) || t.isLogicalExpression(e))
-    return isPure(e.left) && isPure(e.right)
+  if (t.isBinaryExpression(e) || t.isLogicalExpression(e)) return isPure(e.left) && isPure(e.right)
   if (t.isUnaryExpression(e)) return isPure(e.argument)
-  if (t.isArrayExpression(e))
-    return e.elements.every((el) => el == null || (t.isExpression(el) && isPure(el)))
+  if (t.isArrayExpression(e)) return e.elements.every((el) => el == null || (t.isExpression(el) && isPure(el)))
   if (t.isObjectExpression(e))
     return e.properties.every((p) =>
-      t.isObjectProperty(p) && !p.computed ? t.isExpression(p.value) && isPure(p.value)
-      : t.isSpreadElement(p) ? isPure(p.argument) : false)
-  if (t.isTemplateLiteral(e) || t.isSequenceExpression(e))
-    return e.expressions.every((x) => isPure(x))
+      t.isObjectProperty(p) && !p.computed
+        ? t.isExpression(p.value) && isPure(p.value)
+        : t.isSpreadElement(p)
+          ? isPure(p.argument)
+          : false,
+    )
+  if (t.isTemplateLiteral(e) || t.isSequenceExpression(e)) return e.expressions.every((x) => isPure(x))
   return false
 }
 
 function renameIdentifier(node: t.Node, from: string, to: string): void {
-  walk(node, (n) => { if (t.isIdentifier(n) && n.name === from) n.name = to })
+  walk(node, (n) => {
+    if (t.isIdentifier(n) && n.name === from) n.name = to
+  })
 }
 
 const isBoundValueDecl = (s: t.Statement) =>
@@ -274,15 +263,12 @@ const isBoundValueDecl = (s: t.Statement) =>
   s.declarations.length === 1 &&
   t.isIdentifier(s.declarations[0].id, { name: '__boundValue' })
 
-const inlineBoundValue = (n: t.Node) =>
-  t.isIdentifier(n) && n.name === '__boundValue'
+const inlineBoundValue = (n: t.Node) => t.isIdentifier(n) && n.name === '__boundValue'
 
 /** Optimize `const __boundValue = <expr>` in a statement sequence. */
 function optimizeBoundValueAliases(stmts: t.Statement[]): t.Statement[] {
   const out = [...stmts]
-  let changed = true
-  while (changed) {
-    changed = false
+  for (;;) {
     const idx = out.findIndex(isBoundValueDecl)
     if (idx === -1) break
     const init = (out[idx] as t.VariableDeclaration).declarations[0].init
@@ -290,24 +276,27 @@ function optimizeBoundValueAliases(stmts: t.Statement[]): t.Statement[] {
     if (t.isIdentifier(init)) {
       out.splice(idx, 1)
       renameIdentifier(t.blockStatement(out), '__boundValue', init.name)
-      changed = true
       continue
     }
     if (!t.isExpression(init) || !isPure(init)) break
-    if (countIdentifierRefs(t.blockStatement([...out.slice(0, idx), ...out.slice(idx + 1)]), '__boundValue') !== 1) break
+    if (countIdentifierRefs(t.blockStatement([...out.slice(0, idx), ...out.slice(idx + 1)]), '__boundValue') !== 1)
+      break
     out.splice(idx, 1)
-    replaceChildren(t.blockStatement(out), (n) => inlineBoundValue(n) ? t.cloneNode(init, true) : undefined)
-    changed = true
+    replaceChildren(t.blockStatement(out), (n) => (inlineBoundValue(n) ? t.cloneNode(init, true) : undefined))
   }
   return out
 }
 
 function eliminateDeadBoundValueAlias(stmt: t.Statement): t.Statement {
-  const stmts = t.isBlockStatement(stmt) ? stmt.body
-    : t.isIfStatement(stmt) && t.isBlockStatement(stmt.consequent) ? stmt.consequent.body
-    : null
+  const stmts = t.isBlockStatement(stmt)
+    ? stmt.body
+    : t.isIfStatement(stmt) && t.isBlockStatement(stmt.consequent)
+      ? stmt.consequent.body
+      : null
   if (!stmts) return stmt
-  const declIdx = stmts.findIndex((s) => isBoundValueDecl(s) && (s as t.VariableDeclaration).declarations[0].init != null)
+  const declIdx = stmts.findIndex(
+    (s) => isBoundValueDecl(s) && (s as t.VariableDeclaration).declarations[0].init != null,
+  )
   if (declIdx === -1) return stmt
   const init = (stmts[declIdx] as t.VariableDeclaration).declarations[0].init as t.Expression
   if (t.isIdentifier(init)) {
@@ -316,9 +305,13 @@ function eliminateDeadBoundValueAlias(stmt: t.Statement): t.Statement {
     return stmt
   }
   if (!isPure(init)) return stmt
-  if (countIdentifierRefs(t.blockStatement([...stmts.slice(0, declIdx), ...stmts.slice(declIdx + 1)]), '__boundValue') !== 1) return stmt
+  if (
+    countIdentifierRefs(t.blockStatement([...stmts.slice(0, declIdx), ...stmts.slice(declIdx + 1)]), '__boundValue') !==
+    1
+  )
+    return stmt
   stmts.splice(declIdx, 1)
-  replaceChildren(stmt, (n) => inlineBoundValue(n) ? t.cloneNode(init, true) : undefined)
+  replaceChildren(stmt, (n) => (inlineBoundValue(n) ? t.cloneNode(init, true) : undefined))
   return stmt
 }
 
@@ -328,11 +321,7 @@ export function wrapSubpathCacheGuards(
   classBody?: t.ClassBody,
 ): void {
   for (const stmt of method.body.body) {
-    if (
-      !t.isIfStatement(stmt) ||
-      serializeKeyGuardForSubpath(stmt.test) === null
-    )
-      continue
+    if (!t.isIfStatement(stmt) || serializeKeyGuardForSubpath(stmt.test) === null) continue
     const block = t.isBlockStatement(stmt.consequent) ? stmt.consequent : null
     if (!block) continue
 
@@ -343,12 +332,12 @@ export function wrapSubpathCacheGuards(
       continue
     }
 
-    const { stmts: stripped, allHadGuards } = stripPerStatementNullGuards(
-      inner.body,
-    )
+    const { stmts: stripped, allHadGuards } = stripPerStatementNullGuards(inner.body)
     const chunks = chunkStatementsInOrder(stripped)
 
-    const singles = new Set(chunks.filter((c): c is SubpathChunk & { kind: 'single' } => c.kind === 'single').map((c) => c.subProp))
+    const singles = new Set(
+      chunks.filter((c): c is SubpathChunk & { kind: 'single' } => c.kind === 'single').map((c) => c.subProp),
+    )
     const hasAlways = chunks.some((c) => c.kind === 'always')
     if (!(singles.size > 0 && (singles.size >= 2 || hasAlways))) {
       hoistDuplicateValueSubprops(block)
@@ -370,14 +359,12 @@ export function wrapSubpathCacheGuards(
 
       if (classBody) pendingCacheFields.push(cacheId)
 
-      const localInit = allHadGuards
-        ? jsExpr`value.${id(subProp)}`
-        : jsExpr`value?.${id(subProp)}`
+      const localInit = allHadGuards ? jsExpr`value.${id(subProp)}` : jsExpr`value?.${id(subProp)}`
       newInnerBody.push(js`const ${id(local)} = ${localInit};`)
 
       let patched = stmts.map((s) => {
         const c = t.cloneNode(s, true)
-        replaceChildren(c, (n) => isValueDot(n, subProp) ? id(local) : undefined)
+        replaceChildren(c, (n) => (isValueDot(n, subProp) ? id(local) : undefined))
         return c as t.Statement
       })
       patched = optimizeBoundValueAliases(patched)
@@ -387,18 +374,11 @@ export function wrapSubpathCacheGuards(
         ? jsExpr`${cacheMember} !== ${id(local)}`
         : jsExpr`!Object.hasOwn(this, ${cacheId}) || !Object.is(${cacheMember}, ${id(local)})`
 
-      newInnerBody.push(
-        t.ifStatement(
-          cacheTest,
-          t.blockStatement([js`${cacheMember} = ${id(local)};`, ...patched]),
-        ),
-      )
+      newInnerBody.push(t.ifStatement(cacheTest, t.blockStatement([js`${cacheMember} = ${id(local)};`, ...patched])))
     }
 
     if (allHadGuards) {
-      block.body = [
-        t.ifStatement(jsExpr`value != null`, t.blockStatement(newInnerBody)),
-      ]
+      block.body = [t.ifStatement(jsExpr`value != null`, t.blockStatement(newInnerBody))]
     } else {
       inner.body = newInnerBody
     }

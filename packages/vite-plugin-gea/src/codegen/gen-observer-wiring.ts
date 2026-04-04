@@ -9,7 +9,7 @@
 
 import { traverse, t } from '../utils/babel-interop.ts'
 import type { NodePath } from '../utils/babel-interop.ts'
-import { appendToBody, id, js, jsBlockBody, jsExpr, jsMethod, jsObjectExpr, tpl } from 'eszter'
+import { appendToBody, id, js, jsBlockBody, jsExpr, jsMethod, jsObjectExpr } from 'eszter'
 
 import type { PathParts, UnresolvedMapInfo, UnresolvedRelationalClassBinding } from '../ir/types.ts'
 import { ITEM_IS_KEY } from '../analyze/helpers.ts'
@@ -108,7 +108,6 @@ export function generateCreatedHooks(
     }
 
     const storeVarExpr = id(store.storeVar)
-    const pathArrayFor = (pp: PathParts) => jsExpr`[${pp.map((p) => t.stringLiteral(p)).join(', ')}]` as t.Expression
 
     for (const [pathKey, handlers] of byPath) {
       const pathParts: PathParts = JSON.parse(pathKey)

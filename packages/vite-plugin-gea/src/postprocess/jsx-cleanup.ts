@@ -20,10 +20,7 @@ export function transformRemainingJSX(ast: t.File): void {
       try {
         path.replaceWith(jsxElementToTemplateLiteral(path.node))
       } catch (err) {
-        console.warn(
-          '[gea] Failed to transform remaining JSX element:',
-          err instanceof Error ? err.message : err,
-        )
+        console.warn('[gea] Failed to transform remaining JSX element:', err instanceof Error ? err.message : err)
       }
     },
 
@@ -32,10 +29,7 @@ export function transformRemainingJSX(ast: t.File): void {
       try {
         path.replaceWith(jsxChildrenToTemplateLiteral(path.node.children))
       } catch (err) {
-        console.warn(
-          '[gea] Failed to transform remaining JSX fragment:',
-          err instanceof Error ? err.message : err,
-        )
+        console.warn('[gea] Failed to transform remaining JSX fragment:', err instanceof Error ? err.message : err)
       }
     },
   })
@@ -105,7 +99,6 @@ function jsxElementToTemplateLiteral(node: t.JSXElement): t.TemplateLiteral {
 
   // Children
   appendChildren(node.children, quasis, expressions, raw)
-  raw = quasis.length > expressions.length ? '' : ''
   // After appendChildren the last piece of raw text is carried in the final quasi
   // We need to close the tag
   if (quasis.length > expressions.length) {
@@ -120,7 +113,9 @@ function jsxElementToTemplateLiteral(node: t.JSXElement): t.TemplateLiteral {
   return t.templateLiteral(quasis, expressions)
 }
 
-function jsxChildrenToTemplateLiteral(children: (t.JSXElement | t.JSXText | t.JSXExpressionContainer | t.JSXSpreadChild | t.JSXFragment)[]): t.TemplateLiteral {
+function jsxChildrenToTemplateLiteral(
+  children: (t.JSXElement | t.JSXText | t.JSXExpressionContainer | t.JSXSpreadChild | t.JSXFragment)[],
+): t.TemplateLiteral {
   const quasis: t.TemplateElement[] = []
   const expressions: t.Expression[] = []
   appendChildren(children, quasis, expressions, '')
@@ -222,21 +217,14 @@ function spreadToString(expr: t.Expression): t.Expression {
     t.memberExpression(
       t.callExpression(
         t.memberExpression(
-          t.callExpression(
-            t.memberExpression(t.identifier('Object'), t.identifier('entries')),
-            [expr],
-          ),
+          t.callExpression(t.memberExpression(t.identifier('Object'), t.identifier('entries')), [expr]),
           t.identifier('map'),
         ),
         [
           t.arrowFunctionExpression(
             [t.arrayPattern([t.identifier('__k'), t.identifier('__v')])],
             t.templateLiteral(
-              [
-                templateElement(''),
-                templateElement('="'),
-                templateElement('"'),
-              ],
+              [templateElement(''), templateElement('="'), templateElement('"')],
               [t.identifier('__k'), t.identifier('__v')],
             ),
           ),

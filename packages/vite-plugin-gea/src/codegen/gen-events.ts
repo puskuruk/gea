@@ -2,15 +2,8 @@ import { t, generate } from '../utils/babel-interop.ts'
 import { getTemplateParamBinding } from '../analyze/template-param-utils.ts'
 import { id, jsBlockBody, jsExpr, jsMethod } from 'eszter'
 import type { EventHandler, StateRefMeta } from '../ir/types.ts'
-import {
-  buildMemberChainFromParts,
-  buildOptionalMemberChain,
-} from './member-chain.ts'
-import {
-  extractHandlerBody,
-  replacePropRefsInExpression,
-  replacePropRefsInStatements,
-} from './prop-ref-utils.ts'
+import { buildMemberChainFromParts, buildOptionalMemberChain } from './member-chain.ts'
+import { extractHandlerBody, replacePropRefsInExpression, replacePropRefsInStatements } from './prop-ref-utils.ts'
 import { ITEM_IS_KEY } from '../analyze/helpers.ts'
 import { collectTemplateSetupStatements } from '../analyze/binding-resolver.ts'
 import { rewriteItemVarInExpression } from './array-compiler.ts'
@@ -46,10 +39,16 @@ function deepMapNode(node: t.Node, visit: (n: t.Node) => t.Node | undefined): t.
         }
         return c
       })
-      if (arrChanged) { changed = true; updates[key] = mapped }
+      if (arrChanged) {
+        changed = true
+        updates[key] = mapped
+      }
     } else if (child && typeof child === 'object' && 'type' in child) {
       const r = deepMapNode(child, visit)
-      if (r !== child) { changed = true; updates[key] = r }
+      if (r !== child) {
+        changed = true
+        updates[key] = r
+      }
     }
   }
   if (!changed) return node
@@ -167,9 +166,9 @@ export function appendCompiledEventMethods(
   storeImports: Map<string, string>,
   knownComponentImports: Set<string>,
   templateParams: t.Statement[],
-  sourceFile: string,
-  imports: Map<string, string>,
-  stateRefs: Map<string, StateRefMeta>,
+  _sourceFile: string,
+  _imports: Map<string, string>,
+  _stateRefs: Map<string, StateRefMeta>,
 ): boolean {
   if (handlers.length === 0) return false
 
@@ -181,7 +180,9 @@ export function appendCompiledEventMethods(
   for (const h of mapHandlers) {
     const store = h.mapContext.storeVar || 'store'
     const path = h.mapContext.arrayPathParts.join('_')
-    const keyPart = h.mapContext.keyExpression ? `expr:${generate(h.mapContext.keyExpression).code}` : h.mapContext.itemIdProperty
+    const keyPart = h.mapContext.keyExpression
+      ? `expr:${generate(h.mapContext.keyExpression).code}`
+      : h.mapContext.itemIdProperty
     const key = `${store}_${path}_${keyPart}`
     if (seenContexts.has(key)) continue
     seenContexts.add(key)
@@ -319,7 +320,12 @@ function ensureEventsGetter(classBody: t.ClassBody): t.ClassMethod {
     (m) => t.isClassMethod(m) && m.kind === 'get' && t.isIdentifier(m.key) && m.key.name === 'events',
   ) as t.ClassMethod | undefined
   if (existing) return existing
-  const getter = t.classMethod('get', t.identifier('events'), [], t.blockStatement([t.returnStatement(t.objectExpression([]))]))
+  const getter = t.classMethod(
+    'get',
+    t.identifier('events'),
+    [],
+    t.blockStatement([t.returnStatement(t.objectExpression([]))]),
+  )
   classBody.body.push(getter)
   return getter
 }

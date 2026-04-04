@@ -1,7 +1,7 @@
-import { id, js, jsExpr } from 'eszter'
+import { id, js } from 'eszter'
 import { t } from '../utils/babel-interop.ts'
-import { setTextContent, setFirstChildNodeValue } from '../codegen/dom-update.ts'
-import type { EmitContext, EmitterOpts, PatchEmitter } from './types.ts'
+import { setTextContent } from '../codegen/dom-update.ts'
+import type { EmitContext, PatchEmitter } from './types.ts'
 
 export const textEmitter: PatchEmitter = {
   type: 'text',
@@ -9,12 +9,15 @@ export const textEmitter: PatchEmitter = {
     if (opts?.textNodeIndex !== undefined) return emitTextNodeIndex(el, value, opts.textNodeIndex)
     if (opts?.isChildrenProp) return emitInnerHTML(el, value, ctx)
     if (!ctx.guard) return [setTextContent(el, value)]
-    return [js`if (${t.cloneNode(el, true)}.textContent !== ${value}) ${setTextContent(t.cloneNode(el, true), t.cloneNode(value, true))}`]
+    return [
+      js`if (${t.cloneNode(el, true)}.textContent !== ${value}) ${setTextContent(t.cloneNode(el, true), t.cloneNode(value, true))}`,
+    ]
   },
 }
 
 function emitTextNodeIndex(el: t.Expression, value: t.Expression, idx: number): t.Statement[] {
-  return [js`{
+  return [
+    js`{
     let __tn = ${el}.childNodes[${idx}];
     if (!__tn || __tn.nodeType !== 3) {
       __tn = document.createTextNode(${t.cloneNode(value, true)});
@@ -22,7 +25,8 @@ function emitTextNodeIndex(el: t.Expression, value: t.Expression, idx: number): 
     } else if (__tn.nodeValue !== ${t.cloneNode(value, true)}) {
       __tn.nodeValue = ${t.cloneNode(value, true)};
     }
-  }`]
+  }`,
+  ]
 }
 
 function emitInnerHTML(el: t.Expression, value: t.Expression, ctx: EmitContext): t.Statement[] {
@@ -32,7 +36,8 @@ function emitInnerHTML(el: t.Expression, value: t.Expression, ctx: EmitContext):
   // 1. Existing DOM node references stay valid (no stale refs after update)
   // 2. Runtime-added attributes (e.g. data-state) are preserved
   // Fall back to innerHTML when structure differs (multi-root or mismatched tag).
-  return [js`{
+  return [
+    js`{
     const __tw = document.createElement('template');
     __tw.innerHTML = ${t.cloneNode(value, true)};
     const __newEl = __tw.content.firstElementChild;
@@ -44,5 +49,6 @@ function emitInnerHTML(el: t.Expression, value: t.Expression, ctx: EmitContext):
       this[${id('GEA_INSTANTIATE_CHILD_COMPONENTS')}]();
       if (this.parentComponent) this.parentComponent[${id('GEA_MOUNT_COMPILED_CHILD_COMPONENTS')}]();
     }
-  }`]
+  }`,
+  ]
 }

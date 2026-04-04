@@ -16,13 +16,7 @@ import {
   buildTrimmedClassValueExpression,
 } from './jsx-utils.ts'
 import { buildOptionalMemberChain } from './member-chain.ts'
-import {
-  isEventAttribute,
-  isMapCall as isMapCallExpr,
-  classifyAttribute,
-  getDirectChildElements,
-  getJSXTagName,
-} from '../analyze/jsx-walker.ts'
+import { getDirectChildElements, getJSXTagName } from '../analyze/jsx-walker.ts'
 import {
   ITEM_IS_KEY,
   detectItemIdProperty,
@@ -163,19 +157,14 @@ function tryStaticStyleObjectToCSS(expr: t.ObjectExpression): string | null {
 }
 
 function buildStyleObjectExpression(expr: t.Expression): t.Expression {
-  return jsExpr`Object.entries(${expr}).map(([__k, __v]) => ${
-    t.templateLiteral(
-      [
-        t.templateElement({ raw: '', cooked: '' }, false),
-        t.templateElement({ raw: ': ', cooked: ': ' }, false),
-        t.templateElement({ raw: '', cooked: '' }, true),
-      ],
-      [
-        jsExpr`__k.replace(/[A-Z]/g, '-$&')`,
-        jsExpr`typeof __v === 'number' && __v !== 0 ? __v + 'px' : __v`,
-      ],
-    )
-  })`
+  return jsExpr`Object.entries(${expr}).map(([__k, __v]) => ${t.templateLiteral(
+    [
+      t.templateElement({ raw: '', cooked: '' }, false),
+      t.templateElement({ raw: ': ', cooked: ': ' }, false),
+      t.templateElement({ raw: '', cooked: '' }, true),
+    ],
+    [jsExpr`__k.replace(/[A-Z]/g, '-$&')`, jsExpr`typeof __v === 'number' && __v !== 0 ? __v + 'px' : __v`],
+  )})`
 }
 
 // ─── Conditional / expression analysis ─────────────────────────────
@@ -1060,11 +1049,7 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
             const itemVar = ctx.mapItemVariable || 'item'
             const propItemIdExpr: t.Expression =
               itemIdProp && itemIdProp !== ITEM_IS_KEY
-                ? t.logicalExpression(
-                    '??',
-                    buildOptionalMemberChain(id(itemVar), itemIdProp),
-                    id(itemVar),
-                  )
+                ? t.logicalExpression('??', buildOptionalMemberChain(id(itemVar), itemIdProp), id(itemVar))
                 : jsExpr`String(${id(itemVar)})`
             parts.push({ type: 'string', value: html })
             parts.push({
@@ -1299,10 +1284,12 @@ function processChildren(
         // - Map callback expressions: item properties may hold component instances
         //   whose toString() returns HTML (e.g. {item.content} in Tabs)
         const skipEscape =
-          childCallInfo || isChildrenPropAccess(rawExpr) || expressionContainsJSX(rawExpr) || ctx.inMapCallback || callsJSXReturningProperty(rawExpr, ctx.classBody)
-        const safeExpr = skipEscape
-          ? expr
-          : jsExpr`geaEscapeHtml(String(${expr}))`
+          childCallInfo ||
+          isChildrenPropAccess(rawExpr) ||
+          expressionContainsJSX(rawExpr) ||
+          ctx.inMapCallback ||
+          callsJSXReturningProperty(rawExpr, ctx.classBody)
+        const safeExpr = skipEscape ? expr : jsExpr`geaEscapeHtml(String(${expr}))`
         parts.push({ type: 'expression', value: safeExpr })
       }
     }

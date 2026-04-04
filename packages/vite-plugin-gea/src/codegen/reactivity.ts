@@ -11,21 +11,11 @@
 
 import { traverse, t } from '../utils/babel-interop.ts'
 import type { NodePath } from '../utils/babel-interop.ts'
-import { appendToBody, id, js, jsExpr, jsMethod } from 'eszter'
+import { appendToBody, id, js, jsMethod } from 'eszter'
 import type { ClassMethod } from '@babel/types'
 
 // ── IR types (old IR — still used by analysis result + codegen) ────────────
-import type {
-  ArrayMapBinding,
-  ChildComponent,
-  ConditionalSlot,
-  EventHandler,
-  PathParts,
-  PropBinding,
-  ReactiveBinding,
-  UnresolvedMapInfo,
-  UnresolvedRelationalClassBinding,
-} from '../ir/types.ts'
+import type { ChildComponent, PathParts } from '../ir/types.ts'
 
 // ── Analyze layer ──────────────────────────────────────────────────────────
 import { analyzeTemplate } from '../analyze/analyzer.ts'
@@ -37,7 +27,7 @@ import type { StateRefMeta } from '../parse/state-refs.ts'
 
 // ── Sibling codegen files ──────────────────────────────────────────────────
 import { mergeObserveHandlers } from './gen-observe-helpers.ts'
-import { getTemplatePropNames, getTemplateParamIdentifier, getTemplatePropVarName } from './template-params.ts'
+import { getTemplatePropNames, getTemplateParamIdentifier } from './template-params.ts'
 import {
   generateArrayConditionalPatchObserver,
   generateArrayConditionalRerenderObserver,
@@ -54,14 +44,8 @@ import {
   generateStateChildSwapObserver,
 } from './gen-observer-wiring.ts'
 import { ensureOnPropChangeMethod } from './gen-prop-change.ts'
-import {
-  generateConditionalPatchMethods,
-  generateStateChildSwapMethod,
-} from './gen-conditional-observers.ts'
-import {
-  injectMapItemAttrsIntoTemplate,
-  addJoinToUnresolvedMapCalls,
-} from './gen-map-helpers.ts'
+import { generateConditionalPatchMethods, generateStateChildSwapMethod } from './gen-conditional-observers.ts'
+import { injectMapItemAttrsIntoTemplate, addJoinToUnresolvedMapCalls } from './gen-map-helpers.ts'
 
 // ── AST helpers ────────────────────────────────────────────────────────────
 import {
@@ -76,7 +60,12 @@ import {
 
 // ── Extracted reactivity sub-modules ─────────────────────────────────────
 import type { ReactivityContext } from './reactivity-types.ts'
-import { mergeObserveMethod, wireObservers, injectPrivateFields, injectModuleLevelUnwrapHelper } from './reactivity-wiring.ts'
+import {
+  mergeObserveMethod,
+  wireObservers,
+  injectPrivateFields,
+  injectModuleLevelUnwrapHelper,
+} from './reactivity-wiring.ts'
 import {
   processUnresolvedMaps,
   processUnresolvedMapDeps,
@@ -395,10 +384,7 @@ export function applyStaticReactivity(
             )
             if (!hasReset) {
               classPath.node.body.body.push(
-                appendToBody(
-                  jsMethod`__resetEls() {}`,
-                  ...elRefFieldNames.map((name) => js`this.${id(name)} = null;`),
-                ),
+                appendToBody(jsMethod`__resetEls() {}`, ...elRefFieldNames.map((name) => js`this.${id(name)} = null;`)),
               )
               applied = true
             }
@@ -449,7 +435,11 @@ export function applyStaticReactivity(
           }
 
           const hasOnPropChange = classPath.node.body.body.some(
-            (member) => t.isClassMethod(member) && member.computed && t.isIdentifier(member.key) && member.key.name === 'GEA_ON_PROP_CHANGE',
+            (member) =>
+              t.isClassMethod(member) &&
+              member.computed &&
+              t.isIdentifier(member.key) &&
+              member.key.name === 'GEA_ON_PROP_CHANGE',
           )
 
           // ── Child observe groups ──────────────────────────────────────
@@ -653,10 +643,7 @@ export function applyStaticReactivity(
                   if (allDepsCovered) continue
                 }
               }
-              _merge(
-                observeKey,
-                generateRerenderObserver(propPath, storeVar, guardStateKeys.has(observeKey)),
-              )
+              _merge(observeKey, generateRerenderObserver(propPath, storeVar, guardStateKeys.has(observeKey)))
             } else if (guardStateKeys.has(observeKey)) {
               _merge(observeKey, generateRerenderObserver(propPath, storeVar, true))
             }

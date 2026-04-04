@@ -46,7 +46,7 @@ import { parseSource } from './parse/parser.ts'
 import { convertFunctionalToClass } from './preprocess/functional-to-class.ts'
 import { transformComponentFile, transformNonComponentJSX } from './codegen/generator.ts'
 import { injectHMR } from './postprocess/hmr.ts'
-import { ensureImport, ensureGeaCompilerSymbolImports } from './codegen/member-chain.ts'
+import { ensureGeaCompilerSymbolImports } from './codegen/member-chain.ts'
 import { isComponentTag } from './codegen/jsx-utils.ts'
 import { pascalToKebabCase } from './codegen/gen-template.ts'
 

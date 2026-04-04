@@ -17,12 +17,7 @@ import {
   toGeaEventType,
   EVENT_NAMES,
 } from './event-helpers.ts'
-import {
-  buildTrimmedClassValueExpression,
-  getDirectChildElements,
-  getJSXTagName,
-  isComponentTag,
-} from './jsx-utils.ts'
+import { buildTrimmedClassValueExpression, getDirectChildElements, getJSXTagName, isComponentTag } from './jsx-utils.ts'
 import { replacePropRefsInExpression } from './prop-ref-utils.ts'
 import { camelToKebab, escapeHtml, normalizeJSXText, toHtmlAttrName } from '../utils/html.ts'
 import { EVENT_TYPES, VOID_ELEMENTS } from '../ir/constants.ts'
@@ -60,7 +55,7 @@ export function jsxToStaticHtml(
   node: t.JSXElement,
   refCounter: { value: number },
   elementPath: string[] = [],
-  isRoot = true,
+  _isRoot = true,
 ): string | null {
   const tagName = getJSXTagName(node.openingElement.name)
   if (tagName && isComponentTag(tagName)) return null
@@ -252,10 +247,7 @@ export function collectClonePatchEntries(
 
 // ─── Rewrite props for clone ───────────────────────────────────────
 
-function rewritePropsForClone(
-  expr: t.Expression,
-  propContext: import('./event-helpers.ts').PropContext,
-): t.Expression {
+function rewritePropsForClone(expr: t.Expression, propContext: import('./event-helpers.ts').PropContext): t.Expression {
   const paramName = propContext.propsParamName
   if (!paramName) return expr
   if (t.isMemberExpression(expr) && t.isIdentifier(expr.object) && expr.object.name === paramName) {
@@ -309,7 +301,7 @@ function collectIdentityPatchesForElement(
     (attr) => t.isJSXAttribute(attr) && t.isJSXIdentifier(attr.name) && attr.name.name === 'id',
   )
 
-  const resolvePathKey = (): string => {
+  const _resolvePathKey = (): string => {
     const rawPathKey = elementPath.join(' > ')
     return ctx.elementPathPrefix ? ctx.elementPathPrefix + ' > ' + rawPathKey : rawPathKey
   }
@@ -506,7 +498,9 @@ export function generateCloneMembers(
   const identityPatches: CloneIdentityPatch[] = []
   const eventIdCounter = { value: 0 }
   collectIdentityPatchesForElement(
-    root, [], [],
+    root,
+    [],
+    [],
     {
       elementPathToBindingId: analysis.elementPathToBindingId,
       elementPathToUserIdExpr: analysis.elementPathToUserIdExpr,

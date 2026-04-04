@@ -12,13 +12,8 @@ import { buildObserveKey } from '../codegen/member-chain.ts'
 import { getDirectChildElements } from '../codegen/jsx-utils.ts'
 import { getTemplateParamBinding } from './template-param-utils.ts'
 import type { StateRefMeta } from '../parse/state-refs.ts'
+import { analyzeAttributes, collectTextChildren, analyzeChildren } from './template-walker.ts'
 import {
-  analyzeAttributes,
-  collectTextChildren,
-  analyzeChildren,
-} from './template-walker.ts'
-import {
-  resolveHelperCallExpression,
   collectUnresolvedComputationDependencies,
   buildDerivedUnresolvedMapDescriptor,
   getHelperMethodObserveKey,

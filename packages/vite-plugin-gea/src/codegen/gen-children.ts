@@ -61,11 +61,7 @@ export function injectChildComponents(
         existingCtor.body.body.push(...instanceStatements)
         injected = true
       } else if (!injected) {
-        const ctor = appendToBody(
-          jsMethod`constructor(...args) {}`,
-          js`super(...args);`,
-          ...instanceStatements,
-        )
+        const ctor = appendToBody(jsMethod`constructor(...args) {}`, js`super(...args);`, ...instanceStatements)
         path.node.body.body.unshift(ctor)
         injected = true
       }
@@ -82,10 +78,7 @@ export function injectChildComponents(
         } else if (child.directMappings && child.directMappings.length > 0) {
           propsArg = t.objectExpression(
             child.directMappings.map((m) =>
-              t.objectProperty(
-                id(m.childPropName),
-                jsExpr`this.props.${id(m.parentPropName)}`,
-              ),
+              t.objectProperty(id(m.childPropName), jsExpr`this.props.${id(m.parentPropName)}`),
             ),
           )
         } else {
@@ -120,7 +113,7 @@ export function injectComponentRegistrations(
   ast: t.File,
   className: string,
   children: Map<string, string>,
-  knownComponentImports: Set<string>,
+  _knownComponentImports: Set<string>,
 ): void {
   traverse(ast, {
     ClassMethod(path: NodePath<t.ClassMethod>) {
@@ -159,10 +152,7 @@ function buildInstanceStatements(
     } else if (child.directMappings && child.directMappings.length > 0) {
       propsArg = t.objectExpression(
         child.directMappings.map((m) =>
-          t.objectProperty(
-            id(m.childPropName),
-            jsExpr`this.props.${id(m.parentPropName)}`,
-          ),
+          t.objectProperty(id(m.childPropName), jsExpr`this.props.${id(m.parentPropName)}`),
         ),
       )
     } else {

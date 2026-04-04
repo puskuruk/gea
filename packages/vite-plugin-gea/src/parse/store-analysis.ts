@@ -193,15 +193,11 @@ function parseStoreFile(filePath: string): t.File | null {
 
 /** Check if a class declaration extends Store. */
 function isStoreClass(node: t.ClassDeclaration): boolean {
-  return (
-    !!node.superClass &&
-    t.isIdentifier(node.superClass) &&
-    node.superClass.name === 'Store'
-  )
+  return !!node.superClass && t.isIdentifier(node.superClass) && node.superClass.name === 'Store'
 }
 
 /** Check if a name follows the private convention (_prefix or suffix_). */
-function isPrivateName(name: string): boolean {
+function _isPrivateName(name: string): boolean {
   return name.charCodeAt(0) === 95 || name.charCodeAt(name.length - 1) === 95
 }
 
@@ -285,7 +281,5 @@ function resolveTransitiveGetterDeps(result: Map<string, string[][]>): void {
 
 /** Check if a path array list already contains an equivalent path. */
 function containsPath(list: string[][], path: string[]): boolean {
-  return list.some(
-    (existing) => existing.length === path.length && existing.every((v, i) => v === path[i]),
-  )
+  return list.some((existing) => existing.length === path.length && existing.every((v, i) => v === path[i]))
 }
