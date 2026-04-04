@@ -304,6 +304,14 @@ export function geaPlugin(): Plugin {
     }
   }
 
+  const looksLikeGeaFunctionalComponentSource = (source: string): boolean => {
+    if (!source.includes('<') || !source.includes('>')) return false
+    if (/export\s+default\s+async\s+function\b/.test(source)) return true
+    if (/export\s+default\s+function\b/.test(source)) return true
+    if (/export\s+default\s*\([^)]*\)\s*=>\s*/.test(source)) return true
+    return false
+  }
+
   const isComponentModule = (filePath: string): boolean => {
     if (componentModules.has(filePath)) return true
     if (!existsSync(filePath)) return false
