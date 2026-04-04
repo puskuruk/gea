@@ -308,9 +308,11 @@ export default class IssueDetails extends Component {
                 </div>
               )}
               {!this.isEditingDescription && issueDescription && (
-                <div class="text-edited-content description-clickable" click={() => this.startEditDescription()}>
-                  {issueDescription}
-                </div>
+                <div
+                  class="text-edited-content description-clickable"
+                  click={() => this.startEditDescription()}
+                  dangerouslySetInnerHTML={issueDescription}
+                />
               )}
               {!this.isEditingDescription && !issueDescription && (
                 <p class="issue-description-placeholder" click={() => this.startEditDescription()}>

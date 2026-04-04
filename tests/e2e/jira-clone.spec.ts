@@ -754,6 +754,55 @@ test.describe('jira-clone board and surgical DOM updates', () => {
     })
   })
 
+  test.describe('Drag and Drop', () => {
+    test('dragging a card to another column moves it without errors', async ({ page }) => {
+      const errors: string[] = []
+      page.on('pageerror', (err) => errors.push(err.message))
+
+      const backlogCards = page.locator('.board-list').nth(0).locator('.issue-card')
+      const selectedCards = page.locator('.board-list').nth(1).locator('.issue-card')
+
+      const backlogCountBefore = await backlogCards.count()
+      const selectedCountBefore = await selectedCards.count()
+      expect(backlogCountBefore).toBeGreaterThan(0)
+
+      const firstCard = backlogCards.first()
+      const cardTitle = await firstCard.locator('.issue-card-title').textContent()
+
+      const selectedDropZone = page.locator('.board-list').nth(1).locator('.board-list-issues')
+
+      // Drag from backlog to selected column
+      const cardBox = await firstCard.boundingBox()
+      const dropBox = await selectedDropZone.boundingBox()
+
+      await page.mouse.move(cardBox!.x + cardBox!.width / 2, cardBox!.y + cardBox!.height / 2)
+      await page.mouse.down()
+      // Move past drag threshold (5px)
+      await page.mouse.move(cardBox!.x + cardBox!.width / 2 + 10, cardBox!.y + cardBox!.height / 2 + 10, { steps: 3 })
+      // Move to the drop zone
+      await page.mouse.move(dropBox!.x + dropBox!.width / 2, dropBox!.y + 20, { steps: 10 })
+      await page.waitForTimeout(100)
+      await page.mouse.up()
+
+      // Wait for drop animation + reconciliation
+      await page.waitForTimeout(500)
+
+      // No ReferenceError should have occurred
+      const stashErrors = errors.filter((e) => e.includes('stashComponentForTransfer'))
+      expect(stashErrors).toEqual([])
+
+      // Card should have moved: backlog has one fewer, selected has one more
+      await expect(backlogCards).toHaveCount(backlogCountBefore - 1, { timeout: 1000 })
+      await expect(selectedCards).toHaveCount(selectedCountBefore + 1, { timeout: 1000 })
+
+      // The moved card should be in the selected column
+      await expect(selectedCards.locator('.issue-card-title', { hasText: cardTitle! })).toBeVisible()
+
+      // No placeholder should remain
+      await expect(page.locator('.gea-dnd-placeholder')).toHaveCount(0)
+    })
+  })
+
   test('assignee add and remove', async ({ page }) => {
     await boardIssueCards(page).first().click()
     await expect(page.locator('.issue-details')).toBeVisible({ timeout: 500 })
