@@ -99,8 +99,7 @@
     // ── Root proxy get/set traps ──
 
     const StoreClass = Object.getPrototypeOf(Object.getPrototypeOf(realStore)).constructor
-    const getBrowserRootHandler =
-      StoreClass[Symbol.for('gea.store.getBrowserRootProxyHandlerForTests')]
+    const getBrowserRootHandler = StoreClass[Symbol.for('gea.store.getBrowserRootProxyHandlerForTests')]
     const rootHandler =
       typeof getBrowserRootHandler === 'function' ? getBrowserRootHandler() : StoreClass._browserRootProxyHandler
 
