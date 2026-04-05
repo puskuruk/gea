@@ -465,7 +465,7 @@ test('unkeyed mapped tables do not emit key attributes', async () => {
 
     const row = view.el.querySelector('tbody > tr')
     assert.equal(row?.hasAttribute('key'), false)
-    assert.equal((row as any)?.[GEA_DOM_KEY] != null || row?.hasAttribute('data-gea-item-id'), true)
+    assert.equal((row as any)?.[GEA_DOM_KEY] != null || row?.hasAttribute('data-gid'), true)
 
     view.dispose()
     await flushMicrotasks()
@@ -691,7 +691,7 @@ for (const keyed of [true]) {
       const selectLink = view.el.querySelector('tbody > tr:nth-of-type(5) .select-link') as HTMLElement
       const selectedRowBefore = view.el.querySelector('tbody > tr:nth-of-type(5)')
       assert.equal(
-        (selectedRowBefore as any)?.[GEA_DOM_KEY] ?? selectedRowBefore?.getAttribute('data-gea-item-id'),
+        (selectedRowBefore as any)?.[GEA_DOM_KEY] ?? selectedRowBefore?.getAttribute('data-gid'),
         '5',
       )
       selectLink.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
@@ -699,7 +699,7 @@ for (const keyed of [true]) {
 
       assert.equal(view.el.querySelector('tbody > tr:nth-of-type(5)')?.className, 'danger')
       const row5 = view.el.querySelector('tbody > tr:nth-of-type(5)')
-      assert.equal((row5 as any)?.[GEA_DOM_KEY] ?? row5?.getAttribute('data-gea-item-id'), '5')
+      assert.equal((row5 as any)?.[GEA_DOM_KEY] ?? row5?.getAttribute('data-gid'), '5')
 
       const removeLink = view.el.querySelector('tbody > tr:nth-of-type(9) .remove-link') as HTMLElement
       removeLink.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
@@ -707,7 +707,7 @@ for (const keyed of [true]) {
 
       assert.equal(view.el.querySelector('tbody > tr:nth-of-type(9) > td:nth-of-type(1)')?.textContent?.trim(), '10')
       const row9 = view.el.querySelector('tbody > tr:nth-of-type(9)')
-      assert.equal((row9 as any)?.[GEA_DOM_KEY] ?? row9?.getAttribute('data-gea-item-id'), '10')
+      assert.equal((row9 as any)?.[GEA_DOM_KEY] ?? row9?.getAttribute('data-gid'), '10')
 
       view.dispose()
       await flushMicrotasks()
@@ -1048,8 +1048,8 @@ test('component array children reconcile by key, not by index', async () => {
     assert.strictEqual((childrenAfter[1] as { el: HTMLElement }).el, elA, 'component A must keep the same DOM node')
     assert.strictEqual((childrenAfter[2] as { el: HTMLElement }).el, elB, 'component B must keep the same DOM node')
 
-    const container = parent.el.querySelector('.list') || parent.el
-    const domChildren = Array.from(container.children)
+    const container = (parent.el as HTMLElement).querySelector('.list') || parent.el as HTMLElement
+    const domChildren = Array.from(container.children) as Element[]
     assert.equal(domChildren.length, 3, 'container must have 3 children')
     assert.equal(domChildren[0].textContent, 'Gamma')
     assert.equal(domChildren[1].textContent, 'Alpha')
@@ -1124,12 +1124,12 @@ test('nested member keys let delegated map events target the correct row', async
     view.render(root)
     await flushMicrotasks()
 
-    const rows = () => Array.from(view.el.querySelectorAll('tbody > tr'))
+    const rows = () => Array.from((view.el as HTMLElement).querySelectorAll('tbody > tr')) as HTMLElement[]
     const graceRowBefore = rows()[1] as HTMLElement | undefined
     const graceButton = graceRowBefore?.querySelector('.bump') as HTMLElement | null
 
-    assert.equal(rows()[0]?.getAttribute('data-gea-item-id'), 'Ada')
-    assert.equal(rows()[1]?.getAttribute('data-gea-item-id'), 'Grace')
+    assert.equal(rows()[0]?.getAttribute('data-gid'), 'Ada')
+    assert.equal(rows()[1]?.getAttribute('data-gid'), 'Grace')
     assert.equal(graceRowBefore?.querySelector('.dedication')?.textContent?.trim(), '2')
     assert.equal(graceRowBefore?.querySelector('.revenue')?.textContent?.trim(), '200')
     assert.equal(view.el.querySelector('.total')?.textContent?.trim(), '300')
@@ -1143,8 +1143,8 @@ test('nested member keys let delegated map events target the correct row', async
     assert.equal(store.memberships[0].revenue, 100)
     assert.equal(store.memberships[1].dedication, 3)
     assert.equal(store.memberships[1].revenue, 300)
-    assert.equal(rows()[0]?.getAttribute('data-gea-item-id'), 'Ada')
-    assert.equal(rows()[1]?.getAttribute('data-gea-item-id'), 'Grace')
+    assert.equal(rows()[0]?.getAttribute('data-gid'), 'Ada')
+    assert.equal(rows()[1]?.getAttribute('data-gid'), 'Grace')
 
     view.dispose()
     await flushMicrotasks()
@@ -1201,7 +1201,7 @@ test('.map((tab, index) => ...) renders correct active class and click handler p
     component.render(root)
     await flushMicrotasks()
 
-    const buttons = () => Array.from(component.el.querySelectorAll('button'))
+    const buttons = () => Array.from((component.el as HTMLElement).querySelectorAll('button')) as HTMLElement[]
 
     // Initial render: first button should have 'active' class, others should not
     assert.ok(buttons()[0]?.className.includes('active'), 'first button should be active initially')
@@ -1209,7 +1209,7 @@ test('.map((tab, index) => ...) renders correct active class and click handler p
     assert.ok(!buttons()[2]?.className.includes('active'), 'third button should not be active initially')
 
     // Change active tab to index 1
-    component[GEA_UPDATE_PROPS]({ tabs, activeTabIndex: 1, onTabChange })
+    ;(component as any)[GEA_UPDATE_PROPS]({ tabs, activeTabIndex: 1, onTabChange })
     await flushMicrotasks()
 
     assert.ok(!buttons()[0]?.className.includes('active'), 'first button should not be active after change')
@@ -1294,7 +1294,7 @@ test('store-only component array map observes store changes and re-renders', asy
     view.render(root)
     await flushMicrotasks()
 
-    const items = () => Array.from(view.el.querySelectorAll('.sidebar-item'))
+    const items = () => Array.from((view.el as HTMLElement).querySelectorAll('.sidebar-item')) as Element[]
     assert.equal(items().length, 2, 'should render 2 items initially')
     assert.equal(items()[0]?.textContent?.trim(), 'Recording 1')
     assert.equal(items()[1]?.textContent?.trim(), 'Recording 2')

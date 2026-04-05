@@ -8,7 +8,7 @@
 import { t } from '../utils/babel-interop.ts'
 import { jsExpr, id } from 'eszter'
 import { escapeHtml, normalizeJSXText, toHtmlAttrName, camelToKebab } from '../utils/html.ts'
-import { VOID_ELEMENTS, EVENT_TYPES, RESERVED_HTML_TAG_NAMES } from '../ir/constants.ts'
+import { VOID_ELEMENTS, EVENT_TYPES } from '../ir/constants.ts'
 import { toGeaEventType } from './event-helpers.ts'
 import {
   isComponentTag as isCompTag,
@@ -75,7 +75,7 @@ export interface Ctx {
   mapItemIdProperty?: string
   /** Map callback param name (e.g. 'opt', 'item') for itemId expression */
   mapItemVariable?: string
-  /** Container binding ID for map items (when set, use `id` instead of `data-gea-item-id`) */
+  /** Container binding ID for map items (when set, use `id` instead of `data-gid`) */
   mapContainerBindingId?: string
   sourceFile?: string
   lazyChildComponents?: boolean
@@ -113,7 +113,7 @@ export function pascalToKebabCase(tagName: string): string {
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .replace(/[\s_]+/g, '-')
     .toLowerCase()
-  return RESERVED_HTML_TAG_NAMES.has(normalized) ? `gea-${normalized}` : normalized
+  return normalized.includes('-') ? normalized : `gea-${normalized}`
 }
 
 // ─── Static attribute helpers ──────────────────────────────────────
@@ -843,7 +843,7 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
         html = '"'
         hasDynamicUserId = true
       }
-      parts.push({ type: 'string', value: html + ' data-gea-cid="' })
+      parts.push({ type: 'string', value: html + ' data-gcc="' })
       parts.push({ type: 'expression', value: jsExpr`this.id` })
       html = '"'
     } else {
@@ -891,7 +891,7 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
         : jsExpr`String(${id(itemVar)})`
 
     {
-      parts.push({ type: 'string', value: html + ' data-gea-item-id="' })
+      parts.push({ type: 'string', value: html + ' data-gid="' })
       parts.push({ type: 'expression', value: itemIdExpr })
       html = '"'
     }
@@ -1008,9 +1008,9 @@ function processElement(node: t.JSXElement, parts: TemplatePart[], ctx: Ctx, ele
             if (!generatedEventToken) {
               generatedEventToken = `ev${ctx.eventIdCounter?.value ?? 0}`
               if (ctx.eventIdCounter) ctx.eventIdCounter.value += 1
-              html += ` data-gea-event="${generatedEventToken}"`
+              html += ` data-ge="${generatedEventToken}"`
             }
-            selector = `[data-gea-event="${generatedEventToken}"]`
+            selector = `[data-ge="${generatedEventToken}"]`
           }
         }
 
@@ -1322,7 +1322,7 @@ function buildUserIdSelectorExpression(userIdExpr: t.Expression): t.Expression {
   )
 }
 
-/** User-authored `id={...}` / `id="..."` -- use #id delegation only; never emit data-gea-event for this element. */
+/** User-authored `id={...}` / `id="..."` -- use #id delegation only; never emit data-ge for this element. */
 function getExplicitIdValueExpression(attr: t.JSXAttribute | undefined): t.Expression | undefined {
   if (!attr || !t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name) || attr.name.name !== 'id') return undefined
   const v = attr.value

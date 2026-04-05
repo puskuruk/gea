@@ -67,9 +67,9 @@ export function earlyReturnFalsyBindingName(
   ) {
     const nullish = (e: t.Expression) =>
       t.isNullLiteral(e) || (t.isIdentifier(e) && e.name === 'undefined')
-    if (t.isIdentifier(guard.left) && nullish(guard.right))
+    if (t.isIdentifier(guard.left) && nullish(guard.right as t.Expression))
       return guard.left.name
-    if (t.isIdentifier(guard.right) && nullish(guard.left))
+    if (t.isIdentifier(guard.right) && nullish(guard.left as t.Expression))
       return guard.right.name
   }
   if (t.isLogicalExpression(guard) && guard.operator === '||') {

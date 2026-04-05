@@ -2,7 +2,7 @@ import * as t from '@babel/types'
 
 /** Left-hand binding of `template`'s first param after unwrap (`= default`, TS parameter props). */
 export function getTemplateParamBinding(
-  param: t.FunctionParameter | undefined | null,
+  param: t.FunctionParameter | t.TSParameterProperty | undefined | null,
 ): t.Identifier | t.ObjectPattern | undefined {
   if (param == null) return undefined
   let node: t.Node = param

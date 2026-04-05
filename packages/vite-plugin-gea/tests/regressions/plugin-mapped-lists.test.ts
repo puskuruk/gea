@@ -231,7 +231,7 @@ test('identity-based imported map conditionals patch rows without rerender metho
 
   assert.match(output, /store\.selectedId/)
   assert.match(output, /todo\.id/)
-  assert.match(output, /data-gea-item-id/)
+  assert.match(output, /data-gid/)
   assert.match(output, /\? 'danger' : ''/)
   assert.doesNotMatch(output, /render(?:__unresolved_0|Todos)Item[\s\S]*replaceWith/)
   assert.doesNotMatch(output, /__idMap/)
@@ -268,8 +268,8 @@ test('unresolved map container uses getElementById for tbody lookup', () => {
     'tbody must have id for getElementById',
   )
   assert.ok(
-    /____unresolved_0_container.*getElementById|getElementById.*____unresolved_0_container/.test(output),
-    'unresolved map container must use getElementById, not this.$(selector)',
+    /____unresolved_0_container.*__gid|__gid.*____unresolved_0_container/.test(output),
+    'unresolved map container must use __gid, not this.$(selector)',
   )
   assert.match(
     output,
@@ -723,7 +723,7 @@ test('generateCreateItemMethod uses data-prop-* for component-root map items', a
     arrayPathParts: ['conversations'],
     itemBindings: [],
     storeVar: 'store',
-    key: 'conversations',
+    containerSelector: '',
   }
 
   const { method } = generateCreateItemMethod(arrayMap)
@@ -756,7 +756,7 @@ test('generateCreateItemMethod sets [GEA_DOM_PROPS] with object props for compon
     arrayPathParts: ['messages'],
     itemBindings: [],
     storeVar: 'store',
-    key: 'messages',
+    containerSelector: '',
   }
 
   const { method } = generateCreateItemMethod(arrayMap)
@@ -780,7 +780,7 @@ test('generateCreateItemMethod does NOT set [GEA_DOM_PROPS] for non-component ma
     arrayPathParts: ['items'],
     itemBindings: [],
     storeVar: 'store',
-    key: 'items',
+    containerSelector: '',
   }
 
   const { method } = generateCreateItemMethod(arrayMap)
@@ -804,7 +804,7 @@ test('generateEnsureArrayConfigsMethod sets hasComponentItems for component-root
     arrayPathParts: ['todos'],
     itemBindings: [],
     storeVar: 'store',
-    key: 'todos',
+    containerSelector: '',
   }
 
   const method = generateEnsureArrayConfigsMethod([arrayMap])
@@ -826,7 +826,7 @@ test('generateEnsureArrayConfigsMethod does NOT set hasComponentItems for non-co
     arrayPathParts: ['items'],
     itemBindings: [],
     storeVar: 'store',
-    key: 'items',
+    containerSelector: '',
   }
 
   const method = generateEnsureArrayConfigsMethod([arrayMap])
@@ -871,7 +871,7 @@ export default class App {
   }
 })
 
-test('nested member keys become data-gea-item-id expressions', async () => {
+test('nested member keys become data-gid expressions', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'gea-nested-map-key-'))
   try {
     const componentPath = join(dir, 'App.jsx')
@@ -899,8 +899,8 @@ export default class App {
     )
 
     assert.ok(output, 'should produce compiled output')
-    assert.match(output, /data-gea-item-id="\$\{membership\?\.member\?\.name \?\? membership\}"/)
-    assert.doesNotMatch(output, /data-gea-item-id="\$\{membership\.id\}"/)
+    assert.match(output, /data-gid="\$\{membership\?\.member\?\.name \?\? membership\}"/)
+    assert.doesNotMatch(output, /data-gid="\$\{membership\.id\}"/)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -966,7 +966,7 @@ test('store-only component array map generates [GEA_OBSERVE_LIST] and createdHoo
   assert.match(output, /geaListItemsSymbol\("recordings"\)/, 'must generate recordings list-items symbol')
 })
 
-test('template literal key expression is preserved in data-gea-item-id', () => {
+test('template literal key expression is preserved in data-gid', () => {
   const output = transformComponentSource(`
     import { Component } from '@geajs/core'
 
@@ -991,14 +991,14 @@ test('template literal key expression is preserved in data-gea-item-id', () => {
   // The key expression should use tab.title (not String(tab) which gives [object Object])
   assert.doesNotMatch(
     output,
-    /data-gea-item-id="\$\{String\(tab\)\}"/,
+    /data-gid="\$\{String\(tab\)\}"/,
     'must not stringify the whole item object as key — causes [object Object]',
   )
   // The template literal key should evaluate to something that includes tab.title
   assert.match(
     output,
-    /data-gea-item-id="[^"]*tab\.title|data-gea-item-id="[^"]*tab\?\.title/,
-    'data-gea-item-id must reference tab.title from the template literal key',
+    /data-gid="[^"]*tab\.title|data-gid="[^"]*tab\?\.title/,
+    'data-gid must reference tab.title from the template literal key',
   )
 })
 

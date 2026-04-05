@@ -196,11 +196,6 @@ function isStoreClass(node: t.ClassDeclaration): boolean {
   return !!node.superClass && t.isIdentifier(node.superClass) && node.superClass.name === 'Store'
 }
 
-/** Check if a name follows the private convention (_prefix or suffix_). */
-function _isPrivateName(name: string): boolean {
-  return name.charCodeAt(0) === 95 || name.charCodeAt(name.length - 1) === 95
-}
-
 /**
  * Extract the `this.*` property paths a getter method reads.
  *

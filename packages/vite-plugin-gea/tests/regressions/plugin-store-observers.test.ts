@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { tmpdir } from 'node:os'
 import { GEA_STORE_ROOT } from '../../../gea/src/lib/symbols'
+import type { StateRefMeta } from '../../src/ir/types'
 import {
   transformComponentSource,
   transformWithPlugin,
@@ -132,7 +133,7 @@ test('imported store input value binding injects id for getElementById', () => {
     /input[^>]*id=.*__id.*-b\d|id=.*__id.*-b\d[^>]*input/.test(output),
     'input must have id for getElementById so value updates (e.g. clear after add) work',
   )
-  assert.ok(/getElementById\([^)]*__id[^)]*\+[^)]*"-b\d"\)/.test(output), 'input value binding must use getElementById')
+  assert.ok(/__gid\([^)]*__id[^)]*\+[^)]*"-b\d"\)/.test(output), 'input value binding must use __gid')
 })
 
 test('wildcard observers update index zero items', () => {
@@ -154,7 +155,7 @@ test('wildcard observers update index zero items', () => {
       `,
     )
     harness.root = document.createElement('div')
-    harness.root.innerHTML = '<div class="item" data-gea-item-id="0"><span class="label">before</span></div>'
+    harness.root.innerHTML = '<div class="item" data-gid="0"><span class="label">before</span></div>'
     harness.__todos_container = harness.root
 
     harness[getObserveMethodName(['todos', '*', 'label'])]('after', {
@@ -191,7 +192,7 @@ test('wildcard observers resolve imported array paths correctly', () => {
       storeState: { [GEA_STORE_ROOT]: { todos: [{ id: 1, label: 'before' }] } },
     })
     harness.root = document.createElement('div')
-    harness.root.innerHTML = '<div class="item" data-gea-item-id="0"><span class="label">before</span></div>'
+    harness.root.innerHTML = '<div class="item" data-gid="0"><span class="label">before</span></div>'
     harness.__todos_container = harness.root
 
     harness[getObserveMethodName(['todos', '*', 'label'], 'storeState')]('after', {

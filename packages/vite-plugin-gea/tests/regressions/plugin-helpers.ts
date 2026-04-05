@@ -228,8 +228,8 @@ export function createArrayObserverHarness(arrayMap: ArrayMapBinding) {
               t.templateLiteral(
                 [
                   t.templateElement({
-                    raw: '<li data-gea-item-id="',
-                    cooked: '<li data-gea-item-id="',
+                    raw: '<li data-gid="',
+                    cooked: '<li data-gid="',
                   }),
                   t.templateElement({ raw: '">', cooked: '">' }),
                   t.templateElement({ raw: '</li>', cooked: '</li>' }, true),

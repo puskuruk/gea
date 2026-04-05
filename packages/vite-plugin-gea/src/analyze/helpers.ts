@@ -131,8 +131,8 @@ function rewriteIdentifiers(
       const process = (c: any, idx?: number) => {
         if (!c || typeof c !== 'object' || !c.type) return
         if (t.isIdentifier(c) && lookup.has(c.name)) {
-          if (t.isMemberExpression(node) && key === 'property' && !(node as t.MemberExpression).computed) return
-          if (t.isObjectProperty(node) && key === 'key') return
+          if (t.isMemberExpression(node) && (key as string) === 'property' && !(node as t.MemberExpression).computed) return
+          if (t.isObjectProperty(node) && (key as string) === 'key') return
           const replacement = makeReplacement(c.name)
           if (idx !== undefined) (child as any[])[idx] = replacement
           else (node as any)[key] = replacement

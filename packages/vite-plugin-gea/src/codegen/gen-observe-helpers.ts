@@ -136,7 +136,7 @@ function buildElementLookup(binding: ReactiveBinding, stateRefs?: Map<string, St
     if (stateRefs && !t.isStringLiteral(idExpr)) {
       idExpr = rewriteStateRefs(idExpr, stateRefs)
     }
-    return t.callExpression(t.memberExpression(t.identifier('document'), t.identifier('getElementById')), [idExpr])
+    return t.callExpression(t.identifier('__gid'), [idExpr])
   }
   if (binding.bindingId === undefined) {
     return t.callExpression(t.memberExpression(t.thisExpression(), t.identifier('$')), [
@@ -151,7 +151,7 @@ function buildElementLookup(binding: ReactiveBinding, stateRefs?: Map<string, St
     t.memberExpression(t.thisExpression(), t.identifier('id')),
     t.stringLiteral('-' + binding.bindingId),
   )
-  return t.callExpression(t.memberExpression(t.identifier('document'), t.identifier('getElementById')), [idExpr])
+  return t.callExpression(t.identifier('__gid'), [idExpr])
 }
 
 // ─── Simple (direct) update ────────────────────────────────────────

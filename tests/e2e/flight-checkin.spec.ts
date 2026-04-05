@@ -203,36 +203,36 @@ test.describe('flight check-in multi-step flow and surgical DOM updates', () => 
   test('option selection is mutually exclusive within a step', async ({ page }) => {
     const luggage = stepSection(page, 'Select Luggage')
     // Click first option (use item id — duplicate DOM can make nth() ambiguous)
-    await luggage.locator('[data-gea-item-id="carry-on"]').click()
+    await luggage.locator('[data-gid="carry-on"]').click()
     await expect(luggage.locator('.option-item.selected')).toHaveCount(1)
 
     // Click second option — first should deselect
-    await luggage.locator('[data-gea-item-id="checked-1"]').click()
+    await luggage.locator('[data-gid="checked-1"]').click()
     await expect(luggage.locator('.option-item.selected')).toHaveCount(1)
-    await expect(luggage.locator('[data-gea-item-id="checked-1"]')).toHaveClass(/selected/)
-    await expect(luggage.locator('[data-gea-item-id="carry-on"]')).not.toHaveClass(/selected/)
+    await expect(luggage.locator('[data-gid="checked-1"]')).toHaveClass(/selected/)
+    await expect(luggage.locator('[data-gid="carry-on"]')).not.toHaveClass(/selected/)
 
     // Click third option
-    await luggage.locator('[data-gea-item-id="checked-2"]').click()
+    await luggage.locator('[data-gid="checked-2"]').click()
     await expect(luggage.locator('.option-item.selected')).toHaveCount(1)
-    await expect(luggage.locator('[data-gea-item-id="checked-2"]')).toHaveClass(/selected/)
+    await expect(luggage.locator('[data-gid="checked-2"]')).toHaveClass(/selected/)
   })
 
   test('selecting an option preserves correct option count and structure', async ({ page }) => {
     const luggage = stepSection(page, 'Select Luggage')
-    const countBefore = await luggage.locator('.option-item[data-gea-item-id]').count()
+    const countBefore = await luggage.locator('.option-item[data-gid]').count()
 
     // Click second option
-    await luggage.locator('[data-gea-item-id="checked-1"]').click()
-    await expect(luggage.locator('[data-gea-item-id="checked-1"]')).toHaveClass(/selected/)
+    await luggage.locator('[data-gid="checked-1"]').click()
+    await expect(luggage.locator('[data-gid="checked-1"]')).toHaveClass(/selected/)
 
     // Option count must remain the same (no duplication or loss)
-    await expect(luggage.locator('.option-item[data-gea-item-id]')).toHaveCount(countBefore)
+    await expect(luggage.locator('.option-item[data-gid]')).toHaveCount(countBefore)
 
     // Each option should still have a label
     const ids = ['carry-on', 'checked-1', 'checked-2', 'checked-3']
     for (const id of ids) {
-      await expect(luggage.locator(`[data-gea-item-id="${id}"] .label`)).not.toBeEmpty()
+      await expect(luggage.locator(`[data-gid="${id}"] .label`)).not.toBeEmpty()
     }
   })
 
@@ -284,8 +284,8 @@ test.describe('flight check-in multi-step flow and surgical DOM updates', () => 
 
       // Select a different option
       const luggage = stepSection(page, 'Select Luggage')
-      await luggage.locator('[data-gea-item-id="checked-2"]').click()
-      await expect(luggage.locator('[data-gea-item-id="checked-2"]')).toHaveClass(/selected/)
+      await luggage.locator('[data-gid="checked-2"]').click()
+      await expect(luggage.locator('[data-gid="checked-2"]')).toHaveClass(/selected/)
 
       // Verify the mount root survived
       const markerSurvived = await page.locator('[data-dom-stability-marker="original"]').count()

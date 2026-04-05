@@ -19,7 +19,7 @@ export type GeaHmrBindings = {
   handleComponentUpdate: (moduleId: string, newModule: unknown) => boolean
 }
 
-type GeaHot = { data: { componentInstances: Map<string, Set<unknown>> }; invalidate?: () => void }
+type GeaHot = { data: { componentInstances: Map<string, Set<unknown>> }; invalidate?: () => void; accept?: () => void }
 
 function getHot(): GeaHot {
   return (globalThis as { __geaHmrTestHot?: GeaHot }).__geaHmrTestHot!
@@ -75,9 +75,9 @@ function reRenderComponent(instance: Record<string, unknown>) {
       /* ignore */
     }
   }
-  i[GEA_RENDERED] = false
-  if (typeof instance[GEA_CLEANUP_BINDINGS] === 'function') instance[GEA_CLEANUP_BINDINGS]()
-  if (typeof instance[GEA_TEARDOWN_SELF_LISTENERS] === 'function') instance[GEA_TEARDOWN_SELF_LISTENERS]()
+  ;(i as any)[GEA_RENDERED] = false
+  if (typeof (instance as any)[GEA_CLEANUP_BINDINGS] === 'function') (instance as any)[GEA_CLEANUP_BINDINGS]()
+  if (typeof (instance as any)[GEA_TEARDOWN_SELF_LISTENERS] === 'function') (instance as any)[GEA_TEARDOWN_SELF_LISTENERS]()
   if (typeof instance.__cleanupCompiledDirectEvents === 'function') instance.__cleanupCompiledDirectEvents()
   const childComponents = i[GEA_CHILD_COMPONENTS] as unknown[] | undefined
   if (childComponents && childComponents.length) {

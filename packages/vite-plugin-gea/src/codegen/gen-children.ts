@@ -179,7 +179,7 @@ function collectBindingNames(stmt: t.Statement): string[] {
         node.properties.forEach((p) =>
           collect(t.isRestElement(p) ? p.argument : ((p as t.ObjectProperty).value as t.LVal)),
         )
-      else if (t.isArrayPattern(node)) node.elements.forEach((e) => e && collect(e))
+      else if (t.isArrayPattern(node)) node.elements.forEach((e) => e && collect(e as t.LVal))
     }
     stmt.declarations.forEach((d) => collect(d.id as t.LVal))
     return names

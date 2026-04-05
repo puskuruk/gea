@@ -1,6 +1,7 @@
 import { traverse, t } from '../utils/babel-interop.ts'
 import type { NodePath } from '../utils/babel-interop.ts'
 import type { StateRefMeta } from '../ir/types.ts'
+export type { StateRefMeta }
 
 /**
  * Collect all state references reachable from the AST.

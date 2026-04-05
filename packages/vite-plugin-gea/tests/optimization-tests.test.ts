@@ -30,6 +30,7 @@ function transformComponentSource(source: string): string {
     '/virtual/test-component.jsx',
     original.ast,
     new Set(),
+    new Set(),
   )
 
   assert.equal(transformed, true)
@@ -95,11 +96,12 @@ async function flushMicrotasks() {
 async function loadRuntimeModules(seed: string) {
   const { default: ComponentManager } = await import('../../gea/src/lib/base/component-manager.ts')
   ComponentManager.instance = undefined
-  return Promise.all([
+  const [compMod, storeMod, symMod] = await Promise.all([
     import(`../../gea/src/lib/base/component.tsx?${seed}`),
     import(`../../gea/src/lib/store.ts?${seed}`),
     import(`../../gea/src/lib/symbols.ts?${seed}`),
   ])
+  return [compMod, storeMod, symMod] as const
 }
 
 // --- Optimization #3: Prop patch methods (inlined into GEA_ON_PROP_CHANGE) ---

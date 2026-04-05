@@ -175,9 +175,9 @@ export function generateMapRegistration(
   const mapIdx = getMapIndex(arrayMap.arrayPathParts)
 
   const containerLookup = arrayMap.containerUserIdExpr
-    ? (jsExpr`document.getElementById(${t.cloneNode(arrayMap.containerUserIdExpr, true) as t.Expression})` as t.Expression)
+    ? (jsExpr`__gid(${t.cloneNode(arrayMap.containerUserIdExpr, true) as t.Expression})` as t.Expression)
     : arrayMap.containerBindingId !== undefined
-      ? (jsExpr`document.getElementById(${jsExpr`this.id`} + ${'-' + arrayMap.containerBindingId})` as t.Expression)
+      ? (jsExpr`__gid(${jsExpr`this.id`} + ${'-' + arrayMap.containerBindingId})` as t.Expression)
       : (jsExpr`this.$(":scope")` as t.Expression)
 
   let arrExpr = t.cloneNode(unresolvedMap.computationExpr || t.arrayExpression([]), true) as t.Expression
@@ -391,10 +391,10 @@ export function injectMapItemAttrsIntoTemplate(
       const rootTL = findRootTemplateLiteral(t.isBlockStatement(fn.body) ? fn.body : fn.body)
       if (!rootTL) return
 
-      // Strip any leftover data-gea-item-id
+      // Strip any leftover data-gid
       for (let qi = 0; qi < rootTL.quasis.length; qi++) {
         const raw = rootTL.quasis[qi].value.raw
-        const attrIdx = raw.indexOf(' data-gea-item-id="')
+        const attrIdx = raw.indexOf(' data-gid="')
         if (attrIdx === -1) continue
         const before = raw.substring(0, attrIdx)
         const nextRaw = rootTL.quasis[qi + 1]?.value.raw
@@ -412,7 +412,7 @@ export function injectMapItemAttrsIntoTemplate(
       if (!tagMatch) return
       const tagPart = tagMatch[1], remainder = first.substring(tagPart.length)
       const tagName = tagPart.slice(1).toLowerCase()
-      const eventAttr = info.eventToken && !tagName.includes('-') ? ` data-gea-event="${info.eventToken}"` : ''
+      const eventAttr = info.eventToken && !tagName.includes('-') ? ` data-ge="${info.eventToken}"` : ''
       const itemIdExpr = info.keyExpression
         ? t.callExpression(id('String'), [t.cloneNode(info.keyExpression, true)])
         : info.itemIdProperty && info.itemIdProperty !== ITEM_IS_KEY
@@ -420,7 +420,7 @@ export function injectMapItemAttrsIntoTemplate(
           : jsExpr`String(${id(info.itemVariable)})`
 
       rootTL.quasis = [
-        t.templateElement({ raw: `${tagPart} data-gea-item-id="`, cooked: `${tagPart} data-gea-item-id="` }),
+        t.templateElement({ raw: `${tagPart} data-gid="`, cooked: `${tagPart} data-gid="` }),
         t.templateElement({ raw: `"${eventAttr}${remainder}`, cooked: `"${eventAttr}${remainder}` }, rootTL.quasis[0].tail),
         ...rootTL.quasis.slice(1),
       ]

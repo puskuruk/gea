@@ -6,36 +6,7 @@ import { dirname, join } from 'node:path'
 import { JSDOM } from 'jsdom'
 
 import { createBenchmarkHistoryEntry } from '../../../scripts/benchmark-history.mjs'
-import {
-  GEA_STORE_ADD_DESCENDANTS_FOR_OBJECT_REPLACEMENT,
-  GEA_STORE_ADD_OBSERVER,
-  GEA_STORE_CLEAR_ARRAY_INDEX_CACHE,
-  GEA_STORE_COLLECT_DESCENDANT_OBSERVER_NODES,
-  GEA_STORE_COLLECT_MATCHING_OBSERVER_NODES,
-  GEA_STORE_COLLECT_MATCHING_OBSERVER_NODES_FROM_NODE,
-  GEA_STORE_CREATE_PROXY,
-  GEA_STORE_DELIVER_ARRAY_ITEM_PROP_BATCH,
-  GEA_STORE_DELIVER_KNOWN_ARRAY_ITEM_PROP_BATCH,
-  GEA_STORE_DELIVER_TOP_LEVEL_BATCH,
-  GEA_STORE_EMIT_CHANGES,
-  GEA_STORE_FLUSH_CHANGES,
-  GEA_STORE_GET_CACHED_ARRAY_META,
-  GEA_STORE_GET_BROWSER_ROOT_PROXY_HANDLER_FOR_TESTS,
-  GEA_STORE_GET_DIRECT_TOP_LEVEL_OBSERVED_VALUE,
-  GEA_STORE_GET_OBSERVER_NODE,
-  GEA_STORE_GET_TOP_LEVEL_OBSERVED_VALUE,
-  GEA_STORE_INTERCEPT_ARRAY_ITERATOR,
-  GEA_STORE_INTERCEPT_ARRAY_METHOD,
-  GEA_STORE_NORMALIZE_BATCH,
-  GEA_STORE_NOTIFY_HANDLERS,
-  GEA_STORE_NOTIFY_HANDLERS_WITH_VALUE,
-  GEA_STORE_QUEUE_CHANGE,
-  GEA_STORE_QUEUE_DIRECT_ARRAY_ITEM_PRIMITIVE_CHANGE,
-  GEA_STORE_SCHEDULE_FLUSH,
-  GEA_STORE_TRACK_PENDING_CHANGE,
-  GEA_PROXY_GET_TARGET,
-  GEA_PROXY_RAW,
-} from '../../gea/src/lib/symbols'
+import { GEA_PROXY_GET_TARGET } from '../../gea/src/lib/symbols'
 import { compileJsxComponent, loadRuntimeModules } from './helpers/compile'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -673,7 +644,8 @@ describe('benchmark simulation: gea vs vanilla slowdown', () => {
     const restoreDom = installDom()
     try {
       const seed = `sim-callcount-all-${Date.now()}`
-      const [{ default: Component }, { Store }] = await loadRuntimeModules(seed)
+      const [{ default: Component }, storeModule] = await loadRuntimeModules(seed)
+      const { Store, _getBrowserRootProxyHandler } = storeModule as any
       const store = new Store({ data: [] as Array<{ id: number; label: string }>, selected: 0 })
       const fixturePath = join(__dirname, 'fixtures/benchmark-select-row.jsx')
 
@@ -707,55 +679,9 @@ describe('benchmark simulation: gea vs vanilla slowdown', () => {
       store.selected = 1
       await flush()
 
-      const rawStore = (store as any)[GEA_PROXY_RAW]
-      const storeProto = Object.getPrototypeOf(rawStore)
-
-      const ALL_STORE_METHODS = [
-        GEA_STORE_FLUSH_CHANGES,
-        GEA_STORE_EMIT_CHANGES,
-        GEA_STORE_QUEUE_CHANGE,
-        GEA_STORE_SCHEDULE_FLUSH,
-        GEA_STORE_TRACK_PENDING_CHANGE,
-        GEA_STORE_DELIVER_TOP_LEVEL_BATCH,
-        GEA_STORE_DELIVER_KNOWN_ARRAY_ITEM_PROP_BATCH,
-        GEA_STORE_DELIVER_ARRAY_ITEM_PROP_BATCH,
-        GEA_STORE_NORMALIZE_BATCH,
-        GEA_STORE_COLLECT_MATCHING_OBSERVER_NODES,
-        GEA_STORE_COLLECT_MATCHING_OBSERVER_NODES_FROM_NODE,
-        GEA_STORE_ADD_DESCENDANTS_FOR_OBJECT_REPLACEMENT,
-        GEA_STORE_NOTIFY_HANDLERS,
-        GEA_STORE_NOTIFY_HANDLERS_WITH_VALUE,
-        GEA_STORE_GET_DIRECT_TOP_LEVEL_OBSERVED_VALUE,
-        GEA_STORE_GET_TOP_LEVEL_OBSERVED_VALUE,
-        GEA_STORE_GET_OBSERVER_NODE,
-        GEA_STORE_COLLECT_DESCENDANT_OBSERVER_NODES,
-        GEA_STORE_CLEAR_ARRAY_INDEX_CACHE,
-        GEA_STORE_CREATE_PROXY,
-        GEA_STORE_QUEUE_DIRECT_ARRAY_ITEM_PRIMITIVE_CHANGE,
-        GEA_STORE_INTERCEPT_ARRAY_METHOD,
-        GEA_STORE_INTERCEPT_ARRAY_ITERATOR,
-        GEA_STORE_GET_CACHED_ARRAY_META,
-        GEA_STORE_ADD_OBSERVER,
-      ]
-
-      const calls: Record<string, number> = {}
-      const originals: Record<symbol, Function> = {}
-
-      for (const sym of ALL_STORE_METHODS) {
-        const label = sym.description ?? String(sym)
-        const orig = (rawStore as any)[sym] ?? (storeProto as any)[sym]
-        if (typeof orig === 'function') {
-          originals[sym] = orig
-          ;(rawStore as any)[sym] = function (this: any, ...args: any[]) {
-            calls[`store.${label}`] = (calls[`store.${label}`] || 0) + 1
-            return orig.apply(this, args)
-          }
-        }
-      }
-
       let proxyGetCalls = 0,
         proxySetCalls = 0
-      const handler = Store[GEA_STORE_GET_BROWSER_ROOT_PROXY_HANDLER_FOR_TESTS]()
+      const handler = _getBrowserRootProxyHandler()
       const origHandlerGet = handler.get
       const origHandlerSet = handler.set
       handler.get = function (...args: any[]) {
@@ -901,8 +827,6 @@ describe('benchmark simulation: gea vs vanilla slowdown', () => {
       interface ProfileResult {
         proxyGet: number
         proxySet: number
-        storeMethods: number
-        storeDetail: [string, number][]
         dom: number
         domDetail: Record<string, number>
         total: number
@@ -911,7 +835,6 @@ describe('benchmark simulation: gea vs vanilla slowdown', () => {
       const results: Record<string, ProfileResult> = {}
 
       function reset() {
-        for (const k of Object.keys(calls)) delete calls[k]
         proxyGetCalls = proxySetCalls = 0
         getByIdCalls = cnGet = cnSet = tcSet = 0
         insertBeforeCalls = childrenGet = 0
@@ -920,10 +843,6 @@ describe('benchmark simulation: gea vs vanilla slowdown', () => {
       }
 
       function capture(label: string): ProfileResult {
-        const storeDetail = Object.entries(calls)
-          .filter(([, v]) => v > 0)
-          .sort((a, b) => b[1] - a[1])
-        const storeTotal = storeDetail.reduce((s, [, v]) => s + v, 0)
         const domDetail: Record<string, number> = {}
         if (getByIdCalls) domDetail.getElementById = getByIdCalls
         if (cnGet) domDetail['className.get'] = cnGet
@@ -938,12 +857,10 @@ describe('benchmark simulation: gea vs vanilla slowdown', () => {
         if (idSet) domDetail['id.set'] = idSet
         if (innerHTMLSet) domDetail['innerHTML.set'] = innerHTMLSet
         const domTotal = Object.values(domDetail).reduce((s, v) => s + v, 0)
-        const total = proxyGetCalls + proxySetCalls + storeTotal + domTotal
+        const total = proxyGetCalls + proxySetCalls + domTotal
         const r: ProfileResult = {
           proxyGet: proxyGetCalls,
           proxySet: proxySetCalls,
-          storeMethods: storeTotal,
-          storeDetail,
           dom: domTotal,
           domDetail,
           total,
@@ -953,29 +870,25 @@ describe('benchmark simulation: gea vs vanilla slowdown', () => {
       }
 
       function reportAll() {
-        console.log('\n╔═══════════════════════╤════════╤════════╤═════════╤════════╤════════╗')
-        console.log('║ Operation             │ proxy  │ proxy  │ store   │  DOM   │ TOTAL  ║')
-        console.log('║                       │  .get  │  .set  │ methods │        │        ║')
-        console.log('╠═══════════════════════╪════════╪════════╪═════════╪════════╪════════╣')
+        console.log('\n╔═══════════════════════╤════════╤════════╤════════╤════════╗')
+        console.log('║ Operation             │ proxy  │ proxy  │  DOM   │ TOTAL  ║')
+        console.log('║                       │  .get  │  .set  │        │        ║')
+        console.log('╠═══════════════════════╪════════╪════════╪════════╪════════╣')
         for (const [label, r] of Object.entries(results)) {
           console.log(
-            `║ ${label.padEnd(21)} │ ${String(r.proxyGet).padStart(6)} │ ${String(r.proxySet).padStart(6)} │ ${String(r.storeMethods).padStart(7)} │ ${String(r.dom).padStart(6)} │ ${String(r.total).padStart(6)} ║`,
+            `║ ${label.padEnd(21)} │ ${String(r.proxyGet).padStart(6)} │ ${String(r.proxySet).padStart(6)} │ ${String(r.dom).padStart(6)} │ ${String(r.total).padStart(6)} ║`,
           )
         }
-        console.log('╚═══════════════════════╧════════╧════════╧═════════╧════════╧════════╝')
+        console.log('╚═══════════════════════╧════════╧════════╧════════╧════════╝')
         for (const [label, r] of Object.entries(results)) {
+          if (!Object.keys(r.domDetail).length) continue
           console.log(`\n--- ${label} ---`)
-          if (r.storeDetail.length) {
-            console.log('  Store:', r.storeDetail.map(([n, c]) => `${n.replace('store.', '')}:${c}`).join(', '))
-          }
-          if (Object.keys(r.domDetail).length) {
-            console.log(
-              '  DOM:',
-              Object.entries(r.domDetail)
-                .map(([n, c]) => `${n}:${c}`)
-                .join(', '),
-            )
-          }
+          console.log(
+            '  DOM:',
+            Object.entries(r.domDetail)
+              .map(([n, c]) => `${n}:${c}`)
+              .join(', '),
+          )
         }
       }
 
@@ -1041,9 +954,6 @@ describe('benchmark simulation: gea vs vanilla slowdown', () => {
       reportAll()
 
       // Restore all interceptors
-      for (const sym of Object.getOwnPropertySymbols(originals)) {
-        ;(rawStore as any)[sym] = (originals as any)[sym]
-      }
       handler.get = origHandlerGet
       handler.set = origHandlerSet
       document.getElementById = origGetById

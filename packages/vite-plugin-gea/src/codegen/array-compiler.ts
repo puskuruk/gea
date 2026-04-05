@@ -36,7 +36,13 @@ import { ITEM_IS_KEY } from '../analyze/helpers.ts'
 import { buildComponentPropsExpression, collectTemplateSetupStatements } from '../analyze/binding-resolver.ts'
 import type { TemplateSetupContext } from '../analyze/binding-resolver.ts'
 import { getTemplateParamBinding } from '../analyze/template-param-utils.ts'
-import { buildTrimmedClassValueExpression, getJSXTagName, isComponentTag } from './jsx-utils.ts'
+import {
+  buildTrimmedClassValueExpression,
+  getJSXTagName,
+  isAlwaysStringExpression,
+  isComponentTag,
+  isWhitespaceFree,
+} from './jsx-utils.ts'
 import { camelToKebab } from '../utils/html.ts'
 import {
   buildOptionalMemberChain,
@@ -312,6 +318,27 @@ function buildRefCacheAndApply(entries: PatchEntry[], elVar: t.Identifier, lazyC
       entry.childPath.length > 0
         ? refMap.get(entry.childPath.join('_')) || buildElementNavExpr(elVar, entry.childPath)
         : elVar
+    if (
+      !lazyCache &&
+      entry.type === 'className' &&
+      t.isConditionalExpression(entry.expression) &&
+      t.isStringLiteral(entry.expression.alternate) &&
+      entry.expression.alternate.value === ''
+    ) {
+      stmts.push(
+        t.ifStatement(
+          t.cloneNode(entry.expression.test, true),
+          t.expressionStatement(
+            t.assignmentExpression(
+              '=',
+              t.memberExpression(navExpr, t.identifier('className')),
+              buildTrimmedClassValueExpression(t.cloneNode(entry.expression.consequent, true) as t.Expression),
+            ),
+          ),
+        ),
+      )
+      continue
+    }
     const emitType = entry.type === 'className' ? 'class' : entry.type
     stmts.push(...emitPatch(emitType, navExpr, entry.expression, { attributeName: entry.attributeName }))
   }
@@ -668,7 +695,7 @@ function buildPatchEntryPropPatcher(entry: {
         t.parenthesizedExpression(
           t.assignmentExpression(
             '=',
-            jsExpr`${t.cloneNode(row, true)}.${id(refName)}`,
+            jsExpr`${t.cloneNode(row, true)}.${id(refName)}` as t.LVal,
             buildElementNavExpr(t.cloneNode(row, true), entry.childPath),
           ),
         ),
@@ -676,9 +703,12 @@ function buildPatchEntryPropPatcher(entry: {
 
   const stmts: t.Statement[] = isRoot ? [] : jsAll`const __target = ${targetExpr}; if (!__target) return;`
   const emitType = entry.type === 'className' ? 'class' : entry.type
+  const classExpr = t.cloneNode(entry.expression, true) as t.Expression
+  const skipCoerce = entry.type === 'className' && isAlwaysStringExpression(classExpr) && isWhitespaceFree(classExpr)
   stmts.push(
-    ...emitPatch(emitType, isRoot ? row : id('__target'), t.cloneNode(entry.expression, true) as t.Expression, {
+    ...emitPatch(emitType, isRoot ? row : id('__target'), classExpr, {
       attributeName: entry.attributeName,
+      canSkipClassCoercion: skipCoerce,
     }),
   )
   return t.arrowFunctionExpression([id('row'), id('value'), id('item')], t.blockStatement(stmts))
@@ -825,14 +855,14 @@ function lazyInit(name: string, selector: string, bindingId?: string, userIdExpr
     const idArg = t.isStringLiteral(userIdExpr) ? userIdExpr : t.cloneNode(userIdExpr, true)
     return js`
       if (!this.${id(name)}) {
-        this.${id(name)} = document.getElementById(${idArg});
+        this.${id(name)} = __gid(${idArg});
       }
     `
   }
   if (bindingId) {
     return js`
       if (!this.${id(name)}) {
-        this.${id(name)} = document.getElementById(this.id + '-' + ${bindingId});
+        this.${id(name)} = __gid(this.id + '-' + ${bindingId});
       }
     `
   }
@@ -853,7 +883,7 @@ function buildQueryByItemId(
   containerBindingId: string | undefined,
 ): t.Expression {
   const bind = containerBindingId ?? 'list'
-  return jsExpr`document.getElementById(this.id + ${'-' + bind + '-gk-'} + ${t.cloneNode(idExpr, true)})`
+  return jsExpr`__gid(this.id + ${'-' + bind + '-gk-'} + ${t.cloneNode(idExpr, true)})`
 }
 
 function buildPathPartsEquals(expr: t.Expression, parts: string[]): t.Expression {
@@ -986,7 +1016,7 @@ function buildElsLookup(
                     '==',
                     t.optionalCallExpression(
                       t.optionalMemberExpression(t.cloneNode(ch, true), id('getAttribute'), false, true),
-                      [t.stringLiteral('data-gea-item-id')],
+                      [t.stringLiteral('data-gid')],
                       false,
                     ),
                     t.cloneNode(idExpr, true),
@@ -1223,7 +1253,7 @@ export function generateArrayConditionalRerenderObserver(arrayMap: ArrayMapBindi
             buildPathPartsEquals(jsExpr`__c0.pathParts`, arrayPathParts),
           ),
         ]
-        const orChain = skipTypes.reduce<t.Expression>((a, b) => t.logicalExpression('||', a, b))
+        const orChain = skipTypes.reduce((a, b) => t.logicalExpression('||', a, b) as t.Expression)
         return t.variableDeclaration('const', [
           t.variableDeclarator(id('__skipArrayConditionalRerender'), t.logicalExpression('&&', id('__c0'), orChain)),
         ])
@@ -1453,7 +1483,7 @@ export function generateCreateItemMethod(
     t.expressionStatement(
       t.optionalCallExpression(
         t.optionalMemberExpression(jsExpr`${cVar}.__geaTpl`, id('removeAttribute'), false, true),
-        [t.stringLiteral('data-gea-item-id')],
+        [t.stringLiteral('data-gid')],
         false,
       ),
     ),

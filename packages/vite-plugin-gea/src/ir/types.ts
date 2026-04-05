@@ -23,6 +23,10 @@ export interface ReactiveBinding {
   expression?: t.Expression
   /** When true, the binding value contains HTML and must update via innerHTML (not textContent). */
   isChildrenProp?: boolean
+  textNodeIndex?: number
+  isObjectClass?: boolean
+  isBooleanAttr?: boolean
+  isUrlAttr?: boolean
 }
 
 export interface TextExpression {
@@ -57,6 +61,7 @@ export interface EventHandler {
     isImportedState: boolean
     storeVar?: string
     itemRefProperty?: string
+    containerBindingId?: string
   }
 }
 
@@ -74,6 +79,7 @@ export interface RelationalMapBinding {
   itemIdProperty: string
   classToggleName: string
   classWhenMatch: boolean
+  scopeClassIsPure?: boolean
 }
 
 export interface ConditionalMapBinding {
@@ -108,6 +114,7 @@ export interface ArrayMapBinding {
   /** Index of the first conditional slot that follows this map in JSX source order. */
   afterCondSlotIndex?: number
   conditionalBindings?: ConditionalMapBinding[]
+  callbackBodyStatements?: t.Statement[]
 }
 
 export interface ChildComponent {
@@ -141,6 +148,7 @@ export interface PropBinding {
   stateOnly?: boolean
   /** When true, the binding value contains HTML and must update via innerHTML (not textContent). */
   isChildrenProp?: boolean
+  textNodeIndex?: number
 }
 
 export interface ConditionalSlot {
@@ -176,6 +184,7 @@ export interface UnresolvedMapInfo {
   /** Full key expression AST when key is not a simple item.prop (e.g. template literals, concatenation) */
   keyExpression?: t.Expression
   computationExpr?: t.Expression
+  rootHasUserId?: boolean
   /** Expression that appears as the map's object in the template (for replacement matching). When computationExpr is inlined from const x = y, this stays as identifier x. */
   mapObjectExpr?: t.Expression
   computationSetupStatements?: t.Statement[]

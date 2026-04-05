@@ -122,7 +122,7 @@ function ensureMapItemHelper(
       ...jsBlockBody`
         if (!__el) return null;
         if (__el[GEA_DOM_ITEM]) return __el[GEA_DOM_ITEM];
-        const __itemId = __el[GEA_DOM_KEY] ?? (__el.getAttribute && __el.getAttribute('data-gea-item-id'));
+        const __itemId = __el[GEA_DOM_KEY] ?? (__el.getAttribute && __el.getAttribute('data-gid'));
         if (__itemId == null) return null;
         const __items = ${itemsExpr};
         const __arr = Array.isArray(__items) ? __items : Array.isArray(__items?.__getTarget) ? __items.__getTarget : [];
@@ -136,7 +136,7 @@ function ensureMapItemHelper(
       ...jsBlockBody`
         if (!__el) return null;
         if (__el[GEA_DOM_ITEM]) return __el[GEA_DOM_ITEM];
-        const __itemId = __el[GEA_DOM_KEY] ?? (__el.getAttribute && __el.getAttribute('data-gea-item-id'));
+        const __itemId = __el[GEA_DOM_KEY] ?? (__el.getAttribute && __el.getAttribute('data-gid'));
         if (__itemId == null) return null;
         const __items = ${itemsExpr};
         const __arr = Array.isArray(__items) ? __items : Array.isArray(__items?.__getTarget) ? __items.__getTarget : [];
@@ -388,7 +388,7 @@ function buildArrayItemsExpr(ctx: NonNullable<EventHandler['mapContext']>, opts:
 function buildGeaItemDomWalk(): t.Statement[] {
   return jsBlockBody`
     var __el = e.target;
-    while (__el && __el[GEA_DOM_KEY] == null && (!__el.getAttribute || !__el.getAttribute('data-gea-item-id'))) __el = __el.parentElement;
+    while (__el && __el[GEA_DOM_KEY] == null && (!__el.getAttribute || !__el.getAttribute('data-gid'))) __el = __el.parentElement;
   `
 }
 

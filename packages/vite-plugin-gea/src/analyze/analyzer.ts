@@ -31,7 +31,7 @@ export interface AnalysisResult {
   /** Condition expressions (with setup statements) that control conditional JSX rendering */
   rerenderConditions: Array<{ expression: t.Expression; setupStatements: t.Statement[] }>
   conditionalSlots: import('../ir').ConditionalSlot[]
-  stateChildSlots: import('../transform-jsx').StateChildSlot[]
+  stateChildSlots: import('../codegen/gen-template').StateChildSlot[]
   /** elementPath.join(' > ') -> bindingId for template transform to inject id attributes */
   elementPathToBindingId: Map<string, string>
   /** elementPath.join(' > ') -> user-provided id expression (static string or dynamic expr) */

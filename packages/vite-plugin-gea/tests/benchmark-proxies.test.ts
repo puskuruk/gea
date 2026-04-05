@@ -78,10 +78,11 @@ return ${className};`
 async function loadRuntimeModules(seed: string) {
   const { default: ComponentManager } = await import('../../gea/src/lib/base/component-manager')
   ComponentManager.instance = undefined
-  return Promise.all([
+  const [compMod, storeMod] = await Promise.all([
     import(`../../gea/src/lib/base/component.tsx?${seed}`),
     import(`../../gea/src/lib/store.ts?${seed}`),
   ])
+  return [compMod, storeMod] as const
 }
 
 function buildRows(count: number, startId = 1) {

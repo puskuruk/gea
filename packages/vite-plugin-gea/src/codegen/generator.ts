@@ -393,7 +393,7 @@ export function transformComponentFile(
                   ? declBindsGuardIdent(p.argument)
                   : declBindsGuardIdent((p as t.ObjectProperty).value as t.LVal),
               )
-            if (t.isArrayPattern(pattern)) return pattern.elements.some((e) => e && declBindsGuardIdent(e))
+            if (t.isArrayPattern(pattern)) return pattern.elements.some((e) => e && declBindsGuardIdent(e as t.LVal))
             return false
           }
 

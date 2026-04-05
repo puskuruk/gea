@@ -149,7 +149,7 @@ export function generateCreatedHooks(
               const sameRootOrMatchingKey = jsExpr`(${sameRootAffectsKey}) || ${matchingNestedKey}`
               const relevantChangeExpr = prefixChecks
                 .concat([sameRootOrMatchingKey as t.Expression])
-                .reduce<t.Expression>((left, right) => t.logicalExpression('&&', left, right))
+                .reduce((left, right) => t.logicalExpression('&&', left, right) as t.Expression)
               const someCall = jsExpr`${cParam}.some((${changeId}) => {
                 const ${partsId} = ${changeId}.pathParts;
                 const ${prevRootId} = ${changeId}.previousValue;
@@ -177,7 +177,7 @@ export function generateCreatedHooks(
       const itemPropsMethodName = `__itemProps_${config.arrayPropName}`
 
       const containerExpr = config.containerUserIdExpr
-        ? jsExpr`document.getElementById(${t.cloneNode(config.containerUserIdExpr, true) as t.Expression})`
+        ? jsExpr`__gid(${t.cloneNode(config.containerUserIdExpr, true) as t.Expression})`
         : config.containerBindingId
           ? jsExpr`this[${id('GEA_EL')}](${config.containerBindingId})`
           : jsExpr`this.$(":scope")`
@@ -431,9 +431,9 @@ export function generateUnresolvedRelationalObserver(
   const containerRef = jsExpr`this.${id(containerName)}` as t.Expression
 
   const containerLookup = arrayMap.containerUserIdExpr
-    ? (jsExpr`document.getElementById(${t.cloneNode(arrayMap.containerUserIdExpr, true) as t.Expression})` as t.Expression)
+    ? (jsExpr`__gid(${t.cloneNode(arrayMap.containerUserIdExpr, true) as t.Expression})` as t.Expression)
     : arrayMap.containerBindingId !== undefined
-      ? (jsExpr`document.getElementById(this.id + ${'-' + arrayMap.containerBindingId})` as t.Expression)
+      ? (jsExpr`__gid(this.id + ${'-' + arrayMap.containerBindingId})` as t.Expression)
       : (jsExpr`this.$(":scope")` as t.Expression)
 
   const setupStatements: t.Statement[] = replacePropRefsInStatements(
@@ -478,7 +478,7 @@ export function generateUnresolvedRelationalObserver(
           ]),
         ),
         ...jsBlockBody`
-          var __items = ${containerRef}.querySelectorAll('[data-gea-item-id]');
+          var __items = ${containerRef}.querySelectorAll('[data-gid]');
           for (var __i = 0; __i < __items.length && __i < __arr.length; __i++) {
             if (${itemComparison} === value) {
               __items[__i].classList.add(${relBinding.classToggleName});
@@ -498,7 +498,7 @@ export function generateUnresolvedRelationalObserver(
       method,
       ...commonPreamble,
       ...jsBlockBody`
-        var __items = ${containerRef}.querySelectorAll('[data-gea-item-id]');
+        var __items = ${containerRef}.querySelectorAll('[data-gid]');
         for (var __i = 0; __i < __items.length && __i < __arr.length; __i++) {
           var __child = __items[__i];
           if (${itemComparison} === value) {

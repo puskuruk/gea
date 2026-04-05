@@ -227,6 +227,7 @@ test('fragment root in generateRenderItemMethod throws fragment-specific error',
           itemTemplate: fragmentTemplate,
         } as any,
         new Map(),
+        undefined,
         { value: 0 },
       ),
     (err: Error) => {

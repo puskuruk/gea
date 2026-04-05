@@ -98,8 +98,8 @@ test('prop patch methods use getElementById for element lookup', () => {
 
   assert.match(output, /counter-value.*id=.*__id.*-b\d|id=.*__id.*-b\d.*counter-value/)
   assert.ok(
-    /getElementById\([^)]*__id[^)]*\+[^)]*"-b\d"\)/.test(output),
-    'prop patch must use getElementById, not this.$(selector)',
+    /__gid\([^)]*__id[^)]*\+[^)]*"-b\d"\)/.test(output),
+    'prop patch must use __gid, not this.$(selector)',
   )
 })
 
@@ -126,7 +126,7 @@ test('generated selectors distinguish repeated sibling bindings', () => {
   `)
 
   const selectors = Array.from(output.matchAll(/this\.\$\("([^"]+)"\)/g)).map((match) => match[1])
-  const bindingIds = Array.from(output.matchAll(/getElementById\([^+]*\+\s*["']-([^"']+)["']\)/g)).map(
+  const bindingIds = Array.from(output.matchAll(/__gid\([^+]*\+\s*["']-([^"']+)["']\)/g)).map(
     (match) => match[1],
   )
   const updateTextIds = Array.from(output.matchAll(/this\[GEA_UPDATE_TEXT\]\(['"]([^'"]+)['"]/g)).map(
@@ -289,6 +289,7 @@ test('two components in a single file are both transformed', () => {
       className,
       '/virtual/multi-component.jsx',
       original.ast,
+      new Set(),
       new Set(),
     )
   }

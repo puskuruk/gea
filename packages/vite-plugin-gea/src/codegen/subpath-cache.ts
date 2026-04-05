@@ -15,10 +15,9 @@ function walk(node: t.Node | null | undefined, fn: (n: t.Node) => void): void {
   if (!keys) return
   for (const key of keys) {
     const child = (node as any)[key]
-    if (Array.isArray(child))
-      for (const c of child)
-        if (c?.type) walk(c, fn)
-        else if (child?.type) walk(child, fn)
+    if (Array.isArray(child)) {
+      for (const c of child) if (c?.type) walk(c, fn)
+    } else if (child?.type) walk(child, fn)
   }
 }
 
@@ -154,12 +153,16 @@ type SubpathChunk = { kind: 'single'; subProp: string; stmts: t.Statement[] } | 
 function containsPropRefreshCall(node: t.Node): boolean {
   let found = false
   walk(node, (n) => {
-    if (
-      t.isMemberExpression(n) &&
-      t.isIdentifier(n.property) &&
-      (n.property.name === 'GEA_UPDATE_PROPS' || n.property.name.startsWith('__refresh'))
-    )
-      found = true
+    if (t.isMemberExpression(n) && t.isIdentifier(n.property)) {
+      const name = n.property.name
+      if (
+        name === 'GEA_UPDATE_PROPS' ||
+        name === 'GEA_SYNC_MAP' ||
+        name === 'GEA_PATCH_COND' ||
+        name.startsWith('__refresh')
+      )
+        found = true
+    }
   })
   return found
 }
@@ -237,7 +240,8 @@ function isPure(e: t.Expression): boolean {
     return isPure(e.object as t.Expression) && (!e.computed || isPure(e.property as t.Expression))
   if (t.isConditionalExpression(e))
     return isPure(e.test) && isPure(e.consequent as t.Expression) && isPure(e.alternate as t.Expression)
-  if (t.isBinaryExpression(e) || t.isLogicalExpression(e)) return isPure(e.left) && isPure(e.right)
+  if (t.isBinaryExpression(e) || t.isLogicalExpression(e))
+    return isPure(e.left as t.Expression) && isPure(e.right as t.Expression)
   if (t.isUnaryExpression(e)) return isPure(e.argument)
   if (t.isArrayExpression(e)) return e.elements.every((el) => el == null || (t.isExpression(el) && isPure(el)))
   if (t.isObjectExpression(e))

@@ -84,7 +84,7 @@ test('generated selectors distinguish repeated typed inputs', () => {
   `)
 
   const selectors = Array.from(output.matchAll(/this\.\$\("([^"]+)"\)/g)).map((match) => match[1])
-  const bindingIds = Array.from(output.matchAll(/getElementById\([^+]*\+\s*["']-([^"']+)["']\)/g)).map(
+  const bindingIds = Array.from(output.matchAll(/__gid\([^+]*\+\s*["']-([^"']+)["']\)/g)).map(
     (match) => match[1],
   )
   assert.equal(new Set(selectors).size >= 2 || new Set(bindingIds).size >= 2, true)
@@ -120,7 +120,7 @@ test('multiple handlers on one element reuse a single generated selector id', ()
   assert.ok(selectorIds, 'expected both event handlers to be emitted')
   assert.equal(selectorIds[1], selectorIds[2], 'same element should reuse one generated selector across handlers')
   assert.doesNotMatch(output, /id="\$\{this\.id \+ "-ev\d+"\}"\s+id="\$\{this\.id \+ "-ev\d+"\}"/)
-  assert.doesNotMatch(output, /data-gea-event="ev\d+"\s+data-gea-event="ev\d+"/)
+  assert.doesNotMatch(output, /data-ge="ev\d+"\s+data-ge="ev\d+"/)
 })
 
 test('conditional root html event handlers are preserved inside logical branches', () => {

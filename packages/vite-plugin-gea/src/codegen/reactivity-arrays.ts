@@ -202,7 +202,7 @@ export function processUnresolvedMaps(
             usesTargetComponent: true,
           })) as EventHandler[]
           if (delegatedEvents.length > 0) {
-            appendCompiledEventMethods(classPath.node.body, delegatedEvents)
+            appendCompiledEventMethods(classPath.node.body, delegatedEvents, new Map(), new Set(), [], '', new Map(), new Map())
           }
         }
         inlineIntoConstructor(classPath.node.body, [
@@ -228,7 +228,7 @@ export function processUnresolvedMaps(
           const itemPropsMethodNameRef = `__itemProps_${arrayPropName}`
           const containerSuffix = arrayResult.containerBindingId
           const containerExpr = arrayResult.containerUserIdExpr
-            ? (jsExpr`document.getElementById(${t.cloneNode(arrayResult.containerUserIdExpr, true) as t.Expression})` as t.Expression)
+            ? (jsExpr`__gid(${t.cloneNode(arrayResult.containerUserIdExpr, true) as t.Expression})` as t.Expression)
             : containerSuffix
               ? (jsExpr`this[${id('GEA_EL')}](${containerSuffix})` as t.Expression)
               : (jsExpr`this.$(":scope")` as t.Expression)
@@ -362,7 +362,7 @@ export function processUnresolvedMaps(
     if (needsUnwrapHelper) needsModuleLevelUnwrapHelper = true
     if (needsRawStoreCache) needsClassLevelRawStoreField = true
     const newHandlers = unresolvedEventHandlers.slice(prevEventLen)
-    const tokenMatch = newHandlers[0]?.selector?.match(/data-gea-event="([^"]+)"/)
+    const tokenMatch = newHandlers[0]?.selector?.match(/data-ge="([^"]+)"/)
     mapItemAttrInfos.push({
       itemVariable: um.itemVariable,
       itemIdProperty: um.itemIdProperty,
@@ -619,6 +619,7 @@ export function processResolvedArrayMaps(
     containerBindingId?: string
     containerUserIdExpr?: t.Expression
     itemIdProperty?: string
+    afterCondSlotIndex?: number
   }>,
   componentArrayDisposeTargets: string[],
   staticArrayRefreshOnMount: string[],
@@ -711,7 +712,7 @@ export function processResolvedArrayMaps(
           usesTargetComponent: true,
         })) as EventHandler[]
         if (delegatedEvents.length > 0) {
-          appendCompiledEventMethods(classPath.node.body, delegatedEvents)
+          appendCompiledEventMethods(classPath.node.body, delegatedEvents, new Map(), new Set(), [], '', new Map(), new Map())
         }
       }
       inlineIntoConstructor(classPath.node.body, [

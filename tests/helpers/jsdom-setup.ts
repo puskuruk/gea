@@ -73,7 +73,7 @@ export function installDom(url = 'http://localhost/'): () => void {
     supports: () => false,
     escape: cssEscape,
   }
-  ;(globalThis as typeof globalThis & { CSS: unknown }).CSS = cssShim as unknown
+  ;(globalThis as typeof globalThis & { CSS: unknown }).CSS = cssShim as any
   ;(dom.window as unknown as { CSS: unknown }).CSS = cssShim as unknown
 
   Object.assign(globalThis, {

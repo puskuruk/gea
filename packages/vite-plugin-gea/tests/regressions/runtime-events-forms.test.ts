@@ -291,7 +291,7 @@ test('rerender preserves focused input and selection', async () => {
       }
 
       [GEA_ON_PROP_CHANGE]() {
-        if (this[GEA_RENDERED]) this[GEA_REQUEST_RENDER]()
+        if ((this as any)[GEA_RENDERED]) (this as any)[GEA_REQUEST_RENDER]()
       }
     }
 
@@ -306,8 +306,7 @@ test('rerender preserves focused input and selection', async () => {
     assert.ok(input)
     input!.focus()
     input!.setSelectionRange(1, 2)
-
-    view[GEA_UPDATE_PROPS]({ value: 'abcd' })
+    ;(view as any)[GEA_UPDATE_PROPS]({ value: 'abcd' })
     await flushMicrotasks()
 
     const rerendered = view.el.querySelector('input') as HTMLInputElement | null
@@ -340,7 +339,7 @@ test('rerender adjusts caret when formatted value grows before cursor', async ()
       }
 
       [GEA_ON_PROP_CHANGE]() {
-        if (this[GEA_RENDERED]) this[GEA_REQUEST_RENDER]()
+        if ((this as any)[GEA_RENDERED]) (this as any)[GEA_REQUEST_RENDER]()
       }
     }
 
@@ -355,8 +354,7 @@ test('rerender adjusts caret when formatted value grows before cursor', async ()
     assert.ok(input)
     input!.focus()
     input!.setSelectionRange(5, 5)
-
-    view[GEA_UPDATE_PROPS]({ value: '4242 4' })
+    ;(view as any)[GEA_UPDATE_PROPS]({ value: '4242 4' })
     await flushMicrotasks()
 
     const rerendered = view.el.querySelector('input') as HTMLInputElement | null
@@ -605,9 +603,9 @@ test('click handler on inline child inside compiled child component fires on par
 
     const btn = view.el.querySelector('.action-btn') as HTMLElement
     assert.ok(btn, 'inline button should exist inside the wrapper')
-    assert.ok(btn.getAttribute('data-gea-event'), 'button should have data-gea-event for event delegation')
+    assert.ok(btn.getAttribute('data-ge'), 'button should have data-ge for event delegation')
 
-    // Simulate Zag's spreadProps overwriting the id — data-gea-event should survive.
+    // Simulate Zag's spreadProps overwriting the id — data-ge should survive.
     // In real usage, our Dialog override replaces Zag's onclick (which calls stopPropagation)
     // with a version that doesn't — so the spread here omits stopPropagation.
     const { spreadProps } = await import('@zag-js/vanilla')
@@ -619,7 +617,7 @@ test('click handler on inline child inside compiled child component fires on par
       onclick() {},
     })
     assert.equal(btn.id, 'dialog:overwrite:close-trigger', 'spreadProps overwrites the id')
-    assert.ok(btn.getAttribute('data-gea-event'), 'data-gea-event survives spreadProps')
+    assert.ok(btn.getAttribute('data-ge'), 'data-ge survives spreadProps')
 
     btn.dispatchEvent(new window.Event('click', { bubbles: true }))
     await flushMicrotasks()
@@ -627,7 +625,7 @@ test('click handler on inline child inside compiled child component fires on par
     assert.equal(
       view.el.querySelector('.result')?.textContent,
       'clicked',
-      'click handler fires even after spreadProps overwrites id (uses data-gea-event)',
+      'click handler fires even after spreadProps overwrites id (uses data-ge)',
     )
 
     view.dispose()

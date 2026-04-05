@@ -48,7 +48,7 @@ function buildEventIdExpr(suffix?: string): t.Expression {
 // ─── JSX to static HTML ───────────────────────────────────────────
 
 /**
- * Emit static HTML skeleton (no compiler ids, no data-gea-event, no dynamic attrs).
+ * Emit static HTML skeleton (no compiler ids, no data-ge, no dynamic attrs).
  * Returns null if the tree contains unsupported patterns for clone optimization.
  */
 export function jsxToStaticHtml(
@@ -334,7 +334,7 @@ function collectIdentityPatchesForElement(
           expr: rewritePropsForClone(t.cloneNode(userIdExpr, true), propContext),
         })
       }
-      patches.push({ kind: 'attr', childPath: [...childPath], expr: jsExpr`this.id`, attrName: 'data-gea-cid' })
+      patches.push({ kind: 'attr', childPath: [...childPath], expr: jsExpr`this.id`, attrName: 'data-gcc' })
     } else {
       patches.push({ kind: 'id', childPath: [...childPath], expr: buildEventIdExpr() })
     }
@@ -450,7 +450,7 @@ function collectIdentityPatchesForElement(
             token: generatedEventToken,
           })
         }
-        selector = `[data-gea-event="${generatedEventToken}"]`
+        selector = `[data-ge="${generatedEventToken}"]`
       }
     }
 
@@ -477,7 +477,7 @@ export function generateCloneMembers(
   sourceFile: string,
   imports: Map<string, string>,
   cloneCtx: Ctx,
-): t.ClassMember[] | null {
+): t.ClassBody['body'][number][] | null {
   const tagName = getJSXTagName(root.openingElement.name)
   if (tagName && isComponentTag(tagName)) return null
 
@@ -564,7 +564,7 @@ function buildCloneTemplateBody(
     } else if (patch.kind === 'attr') {
       stmts.push(js`${nav}.setAttribute(${patch.attrName}, ${patch.expr});`)
     } else {
-      stmts.push(js`${nav}.setAttribute('data-gea-event', ${patch.token});`)
+      stmts.push(js`${nav}.setAttribute('data-ge', ${patch.token});`)
     }
   }
 

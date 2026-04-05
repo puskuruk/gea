@@ -117,7 +117,7 @@ function testBranchesOnValueNullish(test: t.Expression): boolean {
   if (t.isBinaryExpression(test) && ['==', '===', '!=', '!=='].includes(test.operator)) {
     const isValue = (e: t.Expression) => t.isIdentifier(e, { name: 'value' })
     const isNullish = (e: t.Expression) => t.isNullLiteral(e) || (t.isIdentifier(e) && e.name === 'undefined')
-    return (isValue(test.left) && isNullish(test.right)) || (isValue(test.right) && isNullish(test.left))
+    return (isValue(test.left as t.Expression) && isNullish(test.right as t.Expression)) || (isValue(test.right as t.Expression) && isNullish(test.left as t.Expression))
   }
   if (t.isUnaryExpression(test) && test.operator === '!' && t.isIdentifier(test.argument, { name: 'value' })) return true
   if (t.isLogicalExpression(test)) return testBranchesOnValueNullish(test.left) || testBranchesOnValueNullish(test.right)

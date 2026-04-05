@@ -215,10 +215,7 @@ export function applyStaticReactivity(
           const buildCachedGetElementById = (idArg: t.Expression): t.Expression => {
             const field = allocElRefField()
             const read = t.memberExpression(t.thisExpression(), t.identifier(field))
-            const inner = t.callExpression(
-              t.memberExpression(t.identifier('document'), t.identifier('getElementById')),
-              [idArg],
-            )
+            const inner = t.callExpression(t.identifier('__gid'), [idArg])
             return t.logicalExpression(
               '||',
               read,
@@ -473,7 +470,7 @@ export function applyStaticReactivity(
             }
           })
 
-          const ownClassMethodNames = new Set(
+          const ownClassMethodNames = new Set<string>(
             classPath.node.body.body
               .filter((m): m is t.ClassMethod => t.isClassMethod(m) && t.isIdentifier(m.key))
               .map((m) => (m.key as t.Identifier).name),
@@ -893,10 +890,10 @@ export function applyStaticReactivity(
           }
 
           if (renderEventHandlers.length > 0) {
-            applied = appendCompiledEventMethods(classPath.node.body, renderEventHandlers) || applied
+            applied = appendCompiledEventMethods(classPath.node.body, renderEventHandlers, storeImports, new Set(), [], sourceFile, imports, stateRefs) || applied
           }
           if (unresolvedEventHandlers.length > 0) {
-            applied = appendCompiledEventMethods(classPath.node.body, unresolvedEventHandlers) || applied
+            applied = appendCompiledEventMethods(classPath.node.body, unresolvedEventHandlers, storeImports, new Set(), [], sourceFile, imports, stateRefs) || applied
           }
 
           // ── Final wiring: observer registration ───────────────────────
