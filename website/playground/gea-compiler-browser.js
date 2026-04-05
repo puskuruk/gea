@@ -45101,7 +45101,8 @@ function collectReferencedSymbols(node, symbols, out) {
     out.add(node.name);
   }
   for (const key of Object.keys(node)) {
-    if (key === "type" || key === "start" || key === "end" || key === "loc" || key === "leadingComments" || key === "trailingComments" || key === "innerComments") continue;
+    if (key === "type" || key === "start" || key === "end" || key === "loc" || key === "leadingComments" || key === "trailingComments" || key === "innerComments")
+      continue;
     collectReferencedSymbols(node[key], symbols, out);
   }
 }
@@ -45470,121 +45471,6 @@ const BOOLEAN_HTML_ATTRS = /* @__PURE__ */ new Set([
   "formnovalidate",
   "defer",
   "async"
-]);
-const RESERVED_HTML_TAG_NAMES = /* @__PURE__ */ new Set([
-  "a",
-  "abbr",
-  "address",
-  "area",
-  "article",
-  "aside",
-  "audio",
-  "b",
-  "base",
-  "bdi",
-  "bdo",
-  "blockquote",
-  "body",
-  "br",
-  "button",
-  "canvas",
-  "caption",
-  "cite",
-  "code",
-  "col",
-  "colgroup",
-  "data",
-  "datalist",
-  "dd",
-  "del",
-  "details",
-  "dfn",
-  "dialog",
-  "div",
-  "dl",
-  "dt",
-  "em",
-  "embed",
-  "fieldset",
-  "figcaption",
-  "figure",
-  "footer",
-  "form",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "head",
-  "header",
-  "hgroup",
-  "hr",
-  "html",
-  "i",
-  "iframe",
-  "img",
-  "input",
-  "ins",
-  "kbd",
-  "label",
-  "legend",
-  "li",
-  "link",
-  "main",
-  "map",
-  "mark",
-  "menu",
-  "meta",
-  "meter",
-  "nav",
-  "noscript",
-  "object",
-  "ol",
-  "optgroup",
-  "option",
-  "output",
-  "p",
-  "param",
-  "picture",
-  "pre",
-  "progress",
-  "q",
-  "rp",
-  "rt",
-  "ruby",
-  "s",
-  "samp",
-  "script",
-  "section",
-  "select",
-  "slot",
-  "small",
-  "source",
-  "span",
-  "strong",
-  "style",
-  "sub",
-  "summary",
-  "sup",
-  "table",
-  "tbody",
-  "td",
-  "template",
-  "textarea",
-  "tfoot",
-  "th",
-  "thead",
-  "time",
-  "title",
-  "tr",
-  "track",
-  "u",
-  "ul",
-  "var",
-  "video",
-  "view",
-  "wbr"
 ]);
 
 function existsSync(filePath) {
@@ -46288,7 +46174,7 @@ function collectReferencedIdentifiers(node) {
 
 function pascalToKebabCase(tagName) {
   const normalized = tagName.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s_]+/g, "-").toLowerCase();
-  return RESERVED_HTML_TAG_NAMES.has(normalized) ? `gea-${normalized}` : normalized;
+  return normalized.includes("-") ? normalized : `gea-${normalized}`;
 }
 function tryStaticClassObjectToString(expr) {
   const parts = [];
@@ -46837,7 +46723,7 @@ function processElement(node, parts, ctx, elementPath = []) {
         html = '"';
         hasDynamicUserId = true;
       }
-      parts.push({ type: "string", value: html + ' data-gea-cid="' });
+      parts.push({ type: "string", value: html + ' data-gcc="' });
       parts.push({ type: "expression", value: jsExpr`this.id` });
       html = '"';
     } else {
@@ -46877,7 +46763,7 @@ function processElement(node, parts, ctx, elementPath = []) {
     const itemIdProp = ctx.mapItemIdProperty;
     const itemIdExpr = itemIdProp && itemIdProp !== ITEM_IS_KEY ? libExports.logicalExpression("??", buildOptionalMemberChain(id(itemVar), itemIdProp), id(itemVar)) : jsExpr`String(${id(itemVar)})`;
     {
-      parts.push({ type: "string", value: html + ' data-gea-item-id="' });
+      parts.push({ type: "string", value: html + ' data-gid="' });
       parts.push({ type: "expression", value: itemIdExpr });
       html = '"';
     }
@@ -46981,9 +46867,9 @@ function processElement(node, parts, ctx, elementPath = []) {
             if (!generatedEventToken) {
               generatedEventToken = `ev${ctx.eventIdCounter?.value ?? 0}`;
               if (ctx.eventIdCounter) ctx.eventIdCounter.value += 1;
-              html += ` data-gea-event="${generatedEventToken}"`;
+              html += ` data-ge="${generatedEventToken}"`;
             }
-            selector = `[data-gea-event="${generatedEventToken}"]`;
+            selector = `[data-ge="${generatedEventToken}"]`;
           }
         }
         if (selectorExpression || selector) {
@@ -49508,8 +49394,7 @@ function walk(node, fn) {
     if (Array.isArray(child)) {
       for (const c of child)
         if (c?.type) walk(c, fn);
-        else if (child?.type) walk(child, fn);
-    }
+    } else if (child?.type) walk(child, fn);
   }
 }
 function replaceChildren(node, fn) {
@@ -50534,9 +50419,12 @@ function buildPatchEntryPropPatcher(entry) {
   );
   const stmts = isRoot ? [] : jsAll`const __target = ${targetExpr}; if (!__target) return;`;
   const emitType = entry.type === "className" ? "class" : entry.type;
+  const classExpr = libExports.cloneNode(entry.expression, true);
+  const skipCoerce = entry.type === "className" && isAlwaysStringExpression(classExpr) && isWhitespaceFree(classExpr);
   stmts.push(
-    ...emitPatch(emitType, isRoot ? row : id("__target"), libExports.cloneNode(entry.expression, true), {
-      attributeName: entry.attributeName
+    ...emitPatch(emitType, isRoot ? row : id("__target"), classExpr, {
+      attributeName: entry.attributeName,
+      canSkipClassCoercion: skipCoerce
     })
   );
   return libExports.arrowFunctionExpression([id("row"), id("value"), id("item")], libExports.blockStatement(stmts));
@@ -50634,14 +50522,14 @@ function lazyInit$1(name, selector, bindingId, userIdExpr) {
     const idArg = libExports.isStringLiteral(userIdExpr) ? userIdExpr : libExports.cloneNode(userIdExpr, true);
     return js`
       if (!this.${id(name)}) {
-        this.${id(name)} = document.getElementById(${idArg});
+        this.${id(name)} = __gid(${idArg});
       }
     `;
   }
   if (bindingId) {
     return js`
       if (!this.${id(name)}) {
-        this.${id(name)} = document.getElementById(this.id + '-' + ${bindingId});
+        this.${id(name)} = __gid(this.id + '-' + ${bindingId});
       }
     `;
   }
@@ -50653,7 +50541,7 @@ function lazyInit$1(name, selector, bindingId, userIdExpr) {
 }
 function buildQueryByItemId(_containerExpr, idExpr, containerBindingId) {
   const bind = containerBindingId ?? "list";
-  return jsExpr`document.getElementById(this.id + ${"-" + bind + "-gk-"} + ${libExports.cloneNode(idExpr, true)})`;
+  return jsExpr`__gid(this.id + ${"-" + bind + "-gk-"} + ${libExports.cloneNode(idExpr, true)})`;
 }
 function buildPathPartsEquals$1(expr, parts) {
   let result = jsExpr`${libExports.cloneNode(expr)} && ${libExports.cloneNode(expr)}.length === ${parts.length}`;
@@ -50766,7 +50654,7 @@ function buildElsLookup(elsRef, containerRef, idExpr, rowVar, containerBindingId
                     "==",
                     libExports.optionalCallExpression(
                       libExports.optionalMemberExpression(libExports.cloneNode(ch, true), id("getAttribute"), false, true),
-                      [libExports.stringLiteral("data-gea-item-id")],
+                      [libExports.stringLiteral("data-gid")],
                       false
                     ),
                     libExports.cloneNode(idExpr, true)
@@ -51121,7 +51009,7 @@ function generateCreateItemMethod(arrayMap, templatePropNames, wholeParamName, t
     libExports.expressionStatement(
       libExports.optionalCallExpression(
         libExports.optionalMemberExpression(jsExpr`${cVar}.__geaTpl`, id("removeAttribute"), false, true),
-        [libExports.stringLiteral("data-gea-item-id")],
+        [libExports.stringLiteral("data-gid")],
         false
       )
     )
@@ -51701,7 +51589,7 @@ function collectIdentityPatchesForElement(node, elementPath, childPath, ctx, pat
           expr: rewritePropsForClone(libExports.cloneNode(userIdExpr, true), propContext)
         });
       }
-      patches.push({ kind: "attr", childPath: [...childPath], expr: jsExpr`this.id`, attrName: "data-gea-cid" });
+      patches.push({ kind: "attr", childPath: [...childPath], expr: jsExpr`this.id`, attrName: "data-gcc" });
     } else {
       patches.push({ kind: "id", childPath: [...childPath], expr: buildEventIdExpr() });
     }
@@ -51806,7 +51694,7 @@ function collectIdentityPatchesForElement(node, elementPath, childPath, ctx, pat
             token: generatedEventToken
           });
         }
-        selector = `[data-gea-event="${generatedEventToken}"]`;
+        selector = `[data-ge="${generatedEventToken}"]`;
       }
     }
     if (selectorExpression || selector) {
@@ -51889,7 +51777,7 @@ function buildCloneTemplateBody(identityPatches, contentPatches, cloneCtx) {
     } else if (patch.kind === "attr") {
       stmts.push(js`${nav}.setAttribute(${patch.attrName}, ${patch.expr});`);
     } else {
-      stmts.push(js`${nav}.setAttribute('data-gea-event', ${patch.token});`);
+      stmts.push(js`${nav}.setAttribute('data-ge', ${patch.token});`);
     }
   }
   for (const entry of contentPatches) {
@@ -51999,7 +51887,7 @@ function ensureMapItemHelper(classBody, ctx, helperName) {
       ...jsBlockBody`
         if (!__el) return null;
         if (__el[GEA_DOM_ITEM]) return __el[GEA_DOM_ITEM];
-        const __itemId = __el[GEA_DOM_KEY] ?? (__el.getAttribute && __el.getAttribute('data-gea-item-id'));
+        const __itemId = __el[GEA_DOM_KEY] ?? (__el.getAttribute && __el.getAttribute('data-gid'));
         if (__itemId == null) return null;
         const __items = ${itemsExpr};
         const __arr = Array.isArray(__items) ? __items : Array.isArray(__items?.__getTarget) ? __items.__getTarget : [];
@@ -52013,7 +51901,7 @@ function ensureMapItemHelper(classBody, ctx, helperName) {
       ...jsBlockBody`
         if (!__el) return null;
         if (__el[GEA_DOM_ITEM]) return __el[GEA_DOM_ITEM];
-        const __itemId = __el[GEA_DOM_KEY] ?? (__el.getAttribute && __el.getAttribute('data-gea-item-id'));
+        const __itemId = __el[GEA_DOM_KEY] ?? (__el.getAttribute && __el.getAttribute('data-gid'));
         if (__itemId == null) return null;
         const __items = ${itemsExpr};
         const __arr = Array.isArray(__items) ? __items : Array.isArray(__items?.__getTarget) ? __items.__getTarget : [];
@@ -52194,7 +52082,7 @@ function buildArrayItemsExpr(ctx, opts = {}) {
 function buildGeaItemDomWalk() {
   return jsBlockBody`
     var __el = e.target;
-    while (__el && __el[GEA_DOM_KEY] == null && (!__el.getAttribute || !__el.getAttribute('data-gea-item-id'))) __el = __el.parentElement;
+    while (__el && __el[GEA_DOM_KEY] == null && (!__el.getAttribute || !__el.getAttribute('data-gid'))) __el = __el.parentElement;
   `;
 }
 function buildMapEventBody(handler, paramContext) {
@@ -52550,7 +52438,7 @@ function buildElementLookup(binding, stateRefs) {
     if (stateRefs && !libExports.isStringLiteral(idExpr2)) {
       idExpr2 = rewriteStateRefs(idExpr2, stateRefs);
     }
-    return libExports.callExpression(libExports.memberExpression(libExports.identifier("document"), libExports.identifier("getElementById")), [idExpr2]);
+    return libExports.callExpression(libExports.identifier("__gid"), [idExpr2]);
   }
   if (binding.bindingId === void 0) {
     return libExports.callExpression(libExports.memberExpression(libExports.thisExpression(), libExports.identifier("$")), [
@@ -52565,7 +52453,7 @@ function buildElementLookup(binding, stateRefs) {
     libExports.memberExpression(libExports.thisExpression(), libExports.identifier("id")),
     libExports.stringLiteral("-" + binding.bindingId)
   );
-  return libExports.callExpression(libExports.memberExpression(libExports.identifier("document"), libExports.identifier("getElementById")), [idExpr]);
+  return libExports.callExpression(libExports.identifier("__gid"), [idExpr]);
 }
 function buildSimpleUpdate(binding, param, stateRefs) {
   const el = buildElementLookup(binding, stateRefs);
@@ -52846,7 +52734,7 @@ function generateCreatedHooks(stores, hasArrayConfigs, observeListConfigs = []) 
     for (const config of observeListConfigs.filter((c) => c.storeVar === store.storeVar)) {
       const pathArray = libExports.arrayExpression(config.pathParts.map((part) => libExports.stringLiteral(part)));
       const itemPropsMethodName = `__itemProps_${config.arrayPropName}`;
-      const containerExpr = config.containerUserIdExpr ? jsExpr`document.getElementById(${libExports.cloneNode(config.containerUserIdExpr, true)})` : config.containerBindingId ? jsExpr`this[${id("GEA_EL")}](${config.containerBindingId})` : jsExpr`this.$(":scope")`;
+      const containerExpr = config.containerUserIdExpr ? jsExpr`__gid(${libExports.cloneNode(config.containerUserIdExpr, true)})` : config.containerBindingId ? jsExpr`this[${id("GEA_EL")}](${config.containerBindingId})` : jsExpr`this.$(":scope")`;
       const containerArrow = jsExpr`() => ${containerExpr}`;
       const propsArrow = jsExpr`(opt, __k) => this.${id(itemPropsMethodName)}(opt, __k)`;
       let keyArrow;
@@ -53019,7 +52907,7 @@ function generateUnresolvedRelationalObserver(arrayMap, unresolvedMap, relBindin
   const arrayPathString = pathPartsToString(arrayMap.arrayPathParts);
   const containerName = `__${arrayPathString.replace(/\./g, "_")}_container`;
   const containerRef = jsExpr`this.${id(containerName)}`;
-  const containerLookup = arrayMap.containerUserIdExpr ? jsExpr`document.getElementById(${libExports.cloneNode(arrayMap.containerUserIdExpr, true)})` : arrayMap.containerBindingId !== void 0 ? jsExpr`document.getElementById(this.id + ${"-" + arrayMap.containerBindingId})` : jsExpr`this.$(":scope")`;
+  const containerLookup = arrayMap.containerUserIdExpr ? jsExpr`__gid(${libExports.cloneNode(arrayMap.containerUserIdExpr, true)})` : arrayMap.containerBindingId !== void 0 ? jsExpr`__gid(this.id + ${"-" + arrayMap.containerBindingId})` : jsExpr`this.$(":scope")`;
   const setupStatements = replacePropRefsInStatements(
     (unresolvedMap.computationSetupStatements || []).map((s) => libExports.cloneNode(s, true)),
     templatePropNames,
@@ -53054,7 +52942,7 @@ function generateUnresolvedRelationalObserver(arrayMap, unresolvedMap, relBindin
           ])
         ),
         ...jsBlockBody`
-          var __items = ${containerRef}.querySelectorAll('[data-gea-item-id]');
+          var __items = ${containerRef}.querySelectorAll('[data-gid]');
           for (var __i = 0; __i < __items.length && __i < __arr.length; __i++) {
             if (${itemComparison} === value) {
               __items[__i].classList.add(${relBinding.classToggleName});
@@ -53073,7 +52961,7 @@ function generateUnresolvedRelationalObserver(arrayMap, unresolvedMap, relBindin
       method,
       ...commonPreamble,
       ...jsBlockBody`
-        var __items = ${containerRef}.querySelectorAll('[data-gea-item-id]');
+        var __items = ${containerRef}.querySelectorAll('[data-gid]');
         for (var __i = 0; __i < __items.length && __i < __arr.length; __i++) {
           var __child = __items[__i];
           if (${itemComparison} === value) {
@@ -53421,7 +53309,7 @@ function generateMapRegistration(arrayMap, unresolvedMap, templatePropNames, who
   const arrayName = arrayPathString.replace(/\./g, "");
   const createMethodName = `create${arrayName.charAt(0).toUpperCase() + arrayName.slice(1)}Item`;
   const mapIdx = getMapIndex(arrayMap.arrayPathParts);
-  const containerLookup = arrayMap.containerUserIdExpr ? jsExpr`document.getElementById(${libExports.cloneNode(arrayMap.containerUserIdExpr, true)})` : arrayMap.containerBindingId !== void 0 ? jsExpr`document.getElementById(${jsExpr`this.id`} + ${"-" + arrayMap.containerBindingId})` : jsExpr`this.$(":scope")`;
+  const containerLookup = arrayMap.containerUserIdExpr ? jsExpr`__gid(${libExports.cloneNode(arrayMap.containerUserIdExpr, true)})` : arrayMap.containerBindingId !== void 0 ? jsExpr`__gid(${jsExpr`this.id`} + ${"-" + arrayMap.containerBindingId})` : jsExpr`this.$(":scope")`;
   let arrExpr = libExports.cloneNode(unresolvedMap.computationExpr || libExports.arrayExpression([]), true);
   let setupStatements = unresolvedMap.computationSetupStatements?.length ? unresolvedMap.computationSetupStatements.map((s) => libExports.cloneNode(s, true)) : [];
   if (templatePropNames && templatePropNames.size > 0 || wholeParamName) {
@@ -53595,7 +53483,7 @@ function injectMapItemAttrsIntoTemplate(templateMethod, mapInfos) {
       if (!rootTL) return;
       for (let qi = 0; qi < rootTL.quasis.length; qi++) {
         const raw = rootTL.quasis[qi].value.raw;
-        const attrIdx = raw.indexOf(' data-gea-item-id="');
+        const attrIdx = raw.indexOf(' data-gid="');
         if (attrIdx === -1) continue;
         const before = raw.substring(0, attrIdx);
         const nextRaw = rootTL.quasis[qi + 1]?.value.raw;
@@ -53612,10 +53500,10 @@ function injectMapItemAttrsIntoTemplate(templateMethod, mapInfos) {
       if (!tagMatch) return;
       const tagPart = tagMatch[1], remainder = first.substring(tagPart.length);
       const tagName = tagPart.slice(1).toLowerCase();
-      const eventAttr = info.eventToken && !tagName.includes("-") ? ` data-gea-event="${info.eventToken}"` : "";
+      const eventAttr = info.eventToken && !tagName.includes("-") ? ` data-ge="${info.eventToken}"` : "";
       const itemIdExpr = info.keyExpression ? libExports.callExpression(id("String"), [libExports.cloneNode(info.keyExpression, true)]) : info.itemIdProperty && info.itemIdProperty !== ITEM_IS_KEY ? libExports.logicalExpression("??", buildOptionalMemberChain(id(info.itemVariable), info.itemIdProperty), id(info.itemVariable)) : jsExpr`String(${id(info.itemVariable)})`;
       rootTL.quasis = [
-        libExports.templateElement({ raw: `${tagPart} data-gea-item-id="`, cooked: `${tagPart} data-gea-item-id="` }),
+        libExports.templateElement({ raw: `${tagPart} data-gid="`, cooked: `${tagPart} data-gid="` }),
         libExports.templateElement({ raw: `"${eventAttr}${remainder}`, cooked: `"${eventAttr}${remainder}` }, rootTL.quasis[0].tail),
         ...rootTL.quasis.slice(1)
       ];
@@ -54242,7 +54130,7 @@ function processUnresolvedMaps(ctx, analysis, stateRefs, imports, sourceFile, st
             usesTargetComponent: true
           }));
           if (delegatedEvents.length > 0) {
-            appendCompiledEventMethods(classPath.node.body, delegatedEvents);
+            appendCompiledEventMethods(classPath.node.body, delegatedEvents, /* @__PURE__ */ new Map(), /* @__PURE__ */ new Set(), []);
           }
         }
         inlineIntoConstructor(classPath.node.body, [
@@ -54265,7 +54153,7 @@ function processUnresolvedMaps(ctx, analysis, stateRefs, imports, sourceFile, st
           const refreshMethodName = getComponentArrayRefreshMethodName(arrayPropName);
           const itemPropsMethodNameRef = `__itemProps_${arrayPropName}`;
           const containerSuffix = arrayResult.containerBindingId;
-          const containerExpr = arrayResult.containerUserIdExpr ? jsExpr`document.getElementById(${libExports.cloneNode(arrayResult.containerUserIdExpr, true)})` : containerSuffix ? jsExpr`this[${id("GEA_EL")}](${containerSuffix})` : jsExpr`this.$(":scope")`;
+          const containerExpr = arrayResult.containerUserIdExpr ? jsExpr`__gid(${libExports.cloneNode(arrayResult.containerUserIdExpr, true)})` : containerSuffix ? jsExpr`this[${id("GEA_EL")}](${containerSuffix})` : jsExpr`this.$(":scope")`;
           const itemIdProp = arrayResult.itemIdProperty;
           const keyFn = itemIdProp && itemIdProp !== ITEM_IS_KEY ? jsExpr`(opt) => opt.${id(itemIdProp)}` : itemIdProp === ITEM_IS_KEY ? jsExpr`(opt) => opt` : jsExpr`(opt, __k) => ${"__idx_"} + __k`;
           const thisItems = buildThisListItems(arrayPropName);
@@ -54384,7 +54272,7 @@ function processUnresolvedMaps(ctx, analysis, stateRefs, imports, sourceFile, st
     if (needsUnwrapHelper) needsModuleLevelUnwrapHelper = true;
     if (needsRawStoreCache) needsClassLevelRawStoreField = true;
     const newHandlers = unresolvedEventHandlers.slice(prevEventLen);
-    const tokenMatch = newHandlers[0]?.selector?.match(/data-gea-event="([^"]+)"/);
+    const tokenMatch = newHandlers[0]?.selector?.match(/data-ge="([^"]+)"/);
     mapItemAttrInfos.push({
       itemVariable: um.itemVariable,
       itemIdProperty: um.itemIdProperty,
@@ -54648,7 +54536,7 @@ function processResolvedArrayMaps(ctx, analysis, stateRefs, imports, sourceFile,
           usesTargetComponent: true
         }));
         if (delegatedEvents.length > 0) {
-          appendCompiledEventMethods(classPath.node.body, delegatedEvents);
+          appendCompiledEventMethods(classPath.node.body, delegatedEvents, /* @__PURE__ */ new Map(), /* @__PURE__ */ new Set(), []);
         }
       }
       inlineIntoConstructor(classPath.node.body, [
@@ -55245,10 +55133,7 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
           const buildCachedGetElementById = (idArg) => {
             const field = allocElRefField();
             const read = libExports.memberExpression(libExports.thisExpression(), libExports.identifier(field));
-            const inner = libExports.callExpression(
-              libExports.memberExpression(libExports.identifier("document"), libExports.identifier("getElementById")),
-              [idArg]
-            );
+            const inner = libExports.callExpression(libExports.identifier("__gid"), [idArg]);
             return libExports.logicalExpression(
               "||",
               read,
@@ -55763,10 +55648,10 @@ function applyStaticReactivity(ast, originalAST, className, sourceFile, imports,
             );
           }
           if (renderEventHandlers.length > 0) {
-            applied = appendCompiledEventMethods(classPath.node.body, renderEventHandlers) || applied;
+            applied = appendCompiledEventMethods(classPath.node.body, renderEventHandlers, storeImports, /* @__PURE__ */ new Set(), []) || applied;
           }
           if (unresolvedEventHandlers.length > 0) {
-            applied = appendCompiledEventMethods(classPath.node.body, unresolvedEventHandlers) || applied;
+            applied = appendCompiledEventMethods(classPath.node.body, unresolvedEventHandlers, storeImports, /* @__PURE__ */ new Set(), []) || applied;
           }
           ctx.applied = applied;
           wireObservers(
