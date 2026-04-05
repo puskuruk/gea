@@ -1,5 +1,45 @@
 # @geajs/core
 
+## 1.2.0
+
+### Minor Changes
+
+- [`0de2a3c`](https://github.com/dashersw/gea/commit/0de2a3ce5314d2480ed475a202e1089b09c49f8f) Thanks [@dashersw](https://github.com/dashersw)! - ### @geajs/core (minor)
+
+  **Convert runtime internals to module-level functions with tree-shaking and performance optimizations.**
+
+  #### Architecture
+  - Replace ~25 symbol-keyed store instance methods with plain module-level functions, eliminating symbol dispatch overhead
+  - Convert component, router, and list subsystem methods to symbol-keyed functions with `/*#__PURE__*/` annotations for tree-shaking
+  - Thread `StoreInstancePrivate` through the entire reactivity pipeline to eliminate redundant `WeakMap.get()` lookups
+
+  #### Store performance optimizations
+  - **Targeted array index cache invalidation**: Per-index `arrayIndexProxyCache` eviction instead of full-array clear on single-element set/delete
+  - **Pipeline threading**: Pass private state (`p`) through `_deliverArrayBatch`, `_getObserverNode`, `_collectMatchingNodes`, `_notify`, `_normalizeBatch`, `_commitObjSet`, `_createProxy`, and `_rootPathPartsCache`
+  - **Pre-computed `shouldSkipReactiveWrapForPath`**: Evaluate once per proxy creation instead of on every get-trap invocation
+  - **Single global microtask scheduler**: Replace per-store `queueMicrotask` calls with a shared `_flushAllPending` function
+  - **Fast-path single-change batches**: Skip `Map` allocation in `_deliverTopLevelBatch` for the common single-property-update case
+
+  ### @geajs/vite-plugin (minor)
+
+  Update compiler codegen to emit the new module-level function calls and symbol-keyed method references from the core refactor.
+
+### Patch Changes
+
+- [`4fed17a`](https://github.com/dashersw/gea/commit/4fed17a2469b887261b8266b4aeb07b26e8ba81b) Thanks [@dashersw](https://github.com/dashersw)! - ### @geajs/vite-plugin (patch)
+  - **EVENT_NAMES**: Added missing `'drag'` event to the `EVENT_NAMES` Set in `event-helpers.ts`
+  - **getElementById in GEA_ON_PROP_CHANGE**: Extended `isCompilerGenerated` check to include computed `GEA_ON_PROP_CHANGE` methods so that `this.id` is cached as `const __id = this.id` before `getElementById` calls
+  - **Style map sentinel uses double quotes**: Replaced `jsExpr` template (which preserves single-quote style) with `t.binaryExpression` + `t.stringLiteral` for the `<!---->` sentinel appended to unresolved map `.join()` calls
+  - **Null guard for single-part observer keys**: When an observer key is a guard key and the method body contains `GEA_UPDATE_PROPS` calls, inject a null guard `if (store.prop == null) return` before those calls
+  - **Early-return guard observer**: Replaced hand-rolled rerender observer (missing `prev !== undefined` and `GEA_RENDERED` guard) with `generateRerenderObserver` for correct deduplication
+  - **Nested ternary conditional slot**: Fixed `extractHtmlTemplatesFromConditional` to preserve the full `C ? D : E` expression as the falsy branch when the alternate is itself a conditional
+  - **Children diff-patch**: Changed `emitInnerHTML` to use `Component[GEA_PATCH_NODE]` for in-place DOM diff-patching when the children prop updates, preserving existing DOM node references and runtime-added attributes instead of replacing via `innerHTML`
+
+  ### @geajs/core (patch)
+  - **dnd-manager symbol APIs**: Updated `DndManager._getComponentFromElement`, `_findCompiledArray`, and `_performTransfer` in `gea-ui` to use the correct GEA symbol APIs (`GEA_DOM_COMPONENT`, `geaListItemsSymbol`, `GEA_PARENT_COMPONENT`, `GEA_PROXY_GET_RAW_TARGET`) instead of legacy string property names
+
+- [`d04312e`](https://github.com/dashersw/gea/commit/d04312e2fcfd65dbd9ec9ac9f1cade624ec04898) Thanks [@dashersw](https://github.com/dashersw)! - Fix cascading flush failures: when an observer handler throws during `Store.flushAll()` or the global microtask flush, remaining stores in the batch are no longer skipped. Each store's flush is now isolated with try/catch so one error does not block other stores (e.g. dialog close) from updating.
+
 ## 1.1.3
 
 ### Patch Changes

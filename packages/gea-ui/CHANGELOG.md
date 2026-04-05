@@ -1,5 +1,11 @@
 # @geajs/ui
 
+## 0.2.3
+
+### Patch Changes
+
+- [`4a65330`](https://github.com/dashersw/gea/commit/4a653309329deaf0057556759037bb1250c683bf) Thanks [@dashersw](https://github.com/dashersw)! - Fix missing `stashComponentForTransfer` import in dnd-manager causing `ReferenceError` when dropping a dragged card into a different column. Also remove unused `geaListItemsSymbol` import.
+
 ## 0.2.2
 
 ### Patch Changes

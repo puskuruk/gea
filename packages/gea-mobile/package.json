@@ -1,6 +1,6 @@
 {
   "name": "@geajs/mobile",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Mobile-oriented UI primitives for the Gea framework — views, navigation, gestures, and layout components",
   "type": "module",
   "main": "dist/index.mjs",

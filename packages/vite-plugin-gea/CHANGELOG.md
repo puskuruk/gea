@@ -1,5 +1,73 @@
 # @geajs/vite-plugin
 
+## 1.2.0
+
+### Minor Changes
+
+- [`0f6a207`](https://github.com/dashersw/gea/commit/0f6a20702dc4281103f2195c1329bf718bdb0b72) Thanks [@dashersw](https://github.com/dashersw)! - ### @geajs/vite-plugin (minor)
+
+  **Modular compiler architecture rewrite — 20,467 → 17,197 lines (16% reduction), all 410 tests pass.**
+
+  #### New architecture
+  - **Emitter registry** (`src/emit/`): Pluggable `PatchEmitter` interface for binding-type dispatch. Adding new binding types: create emitter + 1-line registration. No orchestrator changes needed.
+  - **Reactivity split**: Monolithic `gen-reactivity.ts` (2,285 lines) → 5 focused modules: `reactivity.ts` (orchestrator), `reactivity-arrays.ts`, `reactivity-bindings.ts`, `reactivity-wiring.ts`, `reactivity-types.ts`.
+  - **Shared JSX walker** (`analyze/jsx-walker.ts`): `walkJSX()`, `classifyAttribute()`, `isEventAttribute()` shared between analysis and codegen walkers.
+  - **Shared template params** (`codegen/template-params.ts`): Deduplicated prop name/param analysis.
+
+  #### Eliminated dead code and indirection
+  - Deleted `ast-helpers.ts` barrel (62 lines of pure re-exports) — all 20 consumers updated to import directly
+  - Merged `gen-observe.ts` (78-line wrapper) into `gen-observe-helpers.ts`
+  - Deleted dead `postprocess/map-join.ts` and `postprocess/xss-imports.ts` (117 lines)
+  - Merged `map-analyzer.ts` into `template-walker.ts`
+
+  #### Code quality
+  - Generic `deepMap`/`walk` helpers replace 7+ hand-rolled 150-300 line recursive visitors
+  - All codegen converted to eszter tagged templates
+  - Unified array create/patch loop via `buildRefCacheAndApply`
+  - Compressed all codegen + analyze files (event helpers -30%, map helpers -28%, array subsystem -19%, analyze files -23%)
+
+- [`0de2a3c`](https://github.com/dashersw/gea/commit/0de2a3ce5314d2480ed475a202e1089b09c49f8f) Thanks [@dashersw](https://github.com/dashersw)! - ### @geajs/core (minor)
+
+  **Convert runtime internals to module-level functions with tree-shaking and performance optimizations.**
+
+  #### Architecture
+  - Replace ~25 symbol-keyed store instance methods with plain module-level functions, eliminating symbol dispatch overhead
+  - Convert component, router, and list subsystem methods to symbol-keyed functions with `/*#__PURE__*/` annotations for tree-shaking
+  - Thread `StoreInstancePrivate` through the entire reactivity pipeline to eliminate redundant `WeakMap.get()` lookups
+
+  #### Store performance optimizations
+  - **Targeted array index cache invalidation**: Per-index `arrayIndexProxyCache` eviction instead of full-array clear on single-element set/delete
+  - **Pipeline threading**: Pass private state (`p`) through `_deliverArrayBatch`, `_getObserverNode`, `_collectMatchingNodes`, `_notify`, `_normalizeBatch`, `_commitObjSet`, `_createProxy`, and `_rootPathPartsCache`
+  - **Pre-computed `shouldSkipReactiveWrapForPath`**: Evaluate once per proxy creation instead of on every get-trap invocation
+  - **Single global microtask scheduler**: Replace per-store `queueMicrotask` calls with a shared `_flushAllPending` function
+  - **Fast-path single-change batches**: Skip `Map` allocation in `_deliverTopLevelBatch` for the common single-property-update case
+
+  ### @geajs/vite-plugin (minor)
+
+  Update compiler codegen to emit the new module-level function calls and symbol-keyed method references from the core refactor.
+
+### Patch Changes
+
+- [`20cf8a8`](https://github.com/dashersw/gea/commit/20cf8a870725327c5ca1d21a06657e86467c3fac) Thanks [@dashersw](https://github.com/dashersw)! - Fix three compiler bugs:
+  - **Conditional observer early-return preventing list reconciliation**: `generateConditionalSlotObserveMethod` emitted `return` statements inside conditional patching blocks. When other observer actions (like `GEA_REFRESH_LIST`) were merged into the same method, the `return` would exit the entire method prematurely, preventing getter-backed lists from reconciling when a sibling conditional also changed. Replaced `return`-based guards with `if (!condPatched)` wrapping pattern.
+  - **GEA_CLONE_TEMPLATE missing from auto-import list**: Added `GEA_CLONE_TEMPLATE` to `GEA_COMPILER_SYMBOL_IMPORTS` so compiled files that use clone templates get the symbol imported automatically.
+  - **Browser compiler missing symbol imports**: The `compileForBrowser` entry point used by the website playground was not calling `ensureGeaCompilerSymbolImports`, causing `ReferenceError` for symbols like `GEA_ELEMENT` in the playground iframe.
+
+- [`4fed17a`](https://github.com/dashersw/gea/commit/4fed17a2469b887261b8266b4aeb07b26e8ba81b) Thanks [@dashersw](https://github.com/dashersw)! - ### @geajs/vite-plugin (patch)
+  - **EVENT_NAMES**: Added missing `'drag'` event to the `EVENT_NAMES` Set in `event-helpers.ts`
+  - **getElementById in GEA_ON_PROP_CHANGE**: Extended `isCompilerGenerated` check to include computed `GEA_ON_PROP_CHANGE` methods so that `this.id` is cached as `const __id = this.id` before `getElementById` calls
+  - **Style map sentinel uses double quotes**: Replaced `jsExpr` template (which preserves single-quote style) with `t.binaryExpression` + `t.stringLiteral` for the `<!---->` sentinel appended to unresolved map `.join()` calls
+  - **Null guard for single-part observer keys**: When an observer key is a guard key and the method body contains `GEA_UPDATE_PROPS` calls, inject a null guard `if (store.prop == null) return` before those calls
+  - **Early-return guard observer**: Replaced hand-rolled rerender observer (missing `prev !== undefined` and `GEA_RENDERED` guard) with `generateRerenderObserver` for correct deduplication
+  - **Nested ternary conditional slot**: Fixed `extractHtmlTemplatesFromConditional` to preserve the full `C ? D : E` expression as the falsy branch when the alternate is itself a conditional
+  - **Children diff-patch**: Changed `emitInnerHTML` to use `Component[GEA_PATCH_NODE]` for in-place DOM diff-patching when the children prop updates, preserving existing DOM node references and runtime-added attributes instead of replacing via `innerHTML`
+
+  ### @geajs/core (patch)
+  - **dnd-manager symbol APIs**: Updated `DndManager._getComponentFromElement`, `_findCompiledArray`, and `_performTransfer` in `gea-ui` to use the correct GEA symbol APIs (`GEA_DOM_COMPONENT`, `geaListItemsSymbol`, `GEA_PARENT_COMPONENT`, `GEA_PROXY_GET_RAW_TARGET`) instead of legacy string property names
+
+- [`a23721b`](https://github.com/dashersw/gea/commit/a23721bd2dd943fa3b1418c781f094575d875ca1) Thanks [@dashersw](https://github.com/dashersw)! - ### @geajs/vite-plugin (patch)
+  - **Unified array compiler**: Merged `gen-array.ts`, `gen-array-patch.ts`, `gen-array-render.ts`, and `gen-array-slot-sync.ts` into a single `array-compiler.ts` (1,833 lines). Eliminates 4 files and deduplicates shared helpers (`thisPrivate`, naming helpers). All 410 tests pass with identical generated output.
+
 ## 1.1.3
 
 ### Patch Changes
