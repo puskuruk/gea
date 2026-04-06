@@ -298,6 +298,120 @@ test('compiler emits events getter for scroll and resize', () => {
 // JSDOM runtime: dispatched events fire through Gea's event delegation
 // ---------------------------------------------------------------------------
 
+test('click={this.handleClick} direct method reference fires through delegation', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-click-method-ref`
+    const [{ default: Component }] = await loadRuntimeModules(seed)
+
+    const ClickBox = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+
+        export default class ClickBox extends Component {
+          clicked = false
+
+          handleClick() {
+            this.clicked = true
+          }
+
+          template() {
+            return (
+              <div class="wrapper">
+                <button class="btn" click={this.handleClick}>click me</button>
+              </div>
+            )
+          }
+        }
+      `,
+      '/virtual/ClickBox.jsx',
+      'ClickBox',
+      { Component },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const view = new ClickBox()
+    view.render(root)
+    await flushMicrotasks()
+
+    assert.equal(view.clicked, false)
+
+    const btn = view.el.querySelector('.btn') as HTMLElement
+    assert.ok(btn, '.btn element must exist')
+    btn.dispatchEvent(new window.Event('click', { bubbles: true }))
+    await flushMicrotasks()
+
+    assert.equal(view.clicked, true, 'click handler via this.handleClick must fire and set this.clicked')
+
+    view.dispose()
+    await flushMicrotasks()
+  } finally {
+    restoreDom()
+  }
+})
+
+test('document event listener added in created() is removed in dispose()', async () => {
+  const restoreDom = installDom()
+
+  try {
+    const seed = `runtime-${Date.now()}-doc-listener`
+    const [{ default: Component }] = await loadRuntimeModules(seed)
+
+    const Listener = await compileJsxComponent(
+      `
+        import { Component } from '@geajs/core'
+
+        export default class Listener extends Component {
+          _handler = null
+          clickCount = 0
+
+          created() {
+            this._handler = (ev) => { this.clickCount++ }
+            document.addEventListener('click', this._handler)
+          }
+
+          dispose() {
+            document.removeEventListener('click', this._handler)
+            super.dispose()
+          }
+
+          template() {
+            return <div>listener</div>
+          }
+        }
+      `,
+      '/virtual/Listener.jsx',
+      'Listener',
+      { Component },
+    )
+
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const view = new Listener()
+    view.render(root)
+    await flushMicrotasks()
+
+    assert.ok(view._handler, '_handler must not be overwritten by field initializer')
+    assert.equal(view.clickCount, 0)
+
+    document.dispatchEvent(new window.Event('click'))
+    assert.equal(view.clickCount, 1, 'document click listener should fire')
+
+    document.dispatchEvent(new window.Event('click'))
+    assert.equal(view.clickCount, 2, 'document click listener should fire again')
+
+    view.dispose()
+    await flushMicrotasks()
+
+    document.dispatchEvent(new window.Event('click'))
+    assert.equal(view.clickCount, 2, 'listener must be removed after dispose — count should not increase')
+  } finally {
+    restoreDom()
+  }
+})
+
 test('mouseover event fires through event delegation', async () => {
   const restoreDom = installDom()
 

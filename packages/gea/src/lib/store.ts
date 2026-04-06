@@ -269,8 +269,10 @@ function _rootPathPartsCache(priv: StoreInstancePrivate, prop: string): string[]
  *
  * SSR overlay handler lives in `@geajs/ssr` and is wired via `Store.rootProxyHandlerFactory`.
  */
-function _bindVal(v: any, ctx: any): any {
-  return typeof v !== 'function' ? v : isClassConstructorValue(v) ? v : v.bind(ctx)
+function _bindVal(v: any, ctx: any, target: any, prop: string): any {
+  if (typeof v !== 'function' || isClassConstructorValue(v)) return v
+  if (Object.prototype.hasOwnProperty.call(target, prop)) return v
+  return v.bind(ctx)
 }
 
 export function _getBrowserRootProxyHandler(): ProxyHandler<Store> {
@@ -284,9 +286,9 @@ export function _getBrowserRootProxyHandler(): ProxyHandler<Store> {
         }
         if (typeof prop === 'string') {
           const bridged = tryComponentRootBridgeGet(t, prop)
-          if (bridged?.ok) return _bindVal(bridged.value, receiver)
+          if (bridged?.ok) return _bindVal(bridged.value, receiver, t, prop)
         }
-        return _bindVal(Store.rootGetValue(t, prop, receiver), receiver)
+        return _bindVal(Store.rootGetValue(t, prop, receiver), receiver, t, prop)
       },
       set(t, prop, value, receiver) {
         if (typeof prop === 'symbol') {

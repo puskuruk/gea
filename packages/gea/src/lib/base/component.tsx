@@ -13,6 +13,7 @@ import {
   GEA_CLONE_ITEM,
   GEA_CLONE_TEMPLATE,
   GEA_COERCE_STATIC_PROP_VALUE,
+  GEA_COMPILED,
   GEA_COMPILED_CHILD,
   GEA_COMPONENT_CLASSES,
   GEA_CONDS,
@@ -429,11 +430,12 @@ export default class Component<P = Record<string, any>> extends Store {
 
     _cm().setComponent(this)
 
-    this.created(this.props)
-    this.createdHooks(this.props)
-
-    if (typeof (this as any)[GEA_SETUP_LOCAL_STATE_OBSERVERS] === 'function') {
-      ;(this as any)[GEA_SETUP_LOCAL_STATE_OBSERVERS]()
+    if (!(this.constructor as any)[GEA_COMPILED]) {
+      this.created(this.props)
+      this.createdHooks(this.props)
+      if (typeof (this as any)[GEA_SETUP_LOCAL_STATE_OBSERVERS] === 'function') {
+        ;(this as any)[GEA_SETUP_LOCAL_STATE_OBSERVERS]()
+      }
     }
   }
 

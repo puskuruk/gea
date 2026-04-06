@@ -8,7 +8,7 @@
 import { traverse, t } from '../utils/babel-interop.ts'
 import type { NodePath } from '../utils/babel-interop.ts'
 import type { ClassMethod, ReturnStatement } from '@babel/types'
-import { appendToBody, id, jsExpr, jsImport, jsMethod } from 'eszter'
+import { appendToBody, id, js, jsExpr, jsImport, jsMethod } from 'eszter'
 import type { ChildComponent, EventHandler } from '../ir/types.ts'
 import type { AnalysisResult } from '../analyze/analyzer.ts'
 import { analyzeTemplate } from '../analyze/analyzer.ts'
@@ -482,6 +482,19 @@ export function transformComponentFile(
           if (member.computed && name === 'GEA_ON_PROP_CHANGE')
             wrapSubpathCacheGuards(member, subpathPcCounter, path.node.body)
         }
+
+        const compiledProp = t.classProperty(
+          t.identifier('GEA_COMPILED'),
+          t.booleanLiteral(true),
+          undefined,
+          undefined,
+          true,
+          true,
+        )
+        path.node.body.body.push(compiledProp)
+
+        injectLifecycleCallsIntoConstructor(path.node.body)
+
         path.stop()
       },
     })
@@ -633,4 +646,55 @@ function transformRemainingJSX(ast: t.File, imports: Map<string, string>): void 
       }
     },
   })
+}
+
+function injectLifecycleCallsIntoConstructor(classBody: t.ClassBody): void {
+  const createdCall = js`this.created(this.props);` as t.ExpressionStatement
+  const createdHooksCall = js`this.createdHooks(this.props);` as t.ExpressionStatement
+
+  const setupObserversAccess = t.memberExpression(
+    t.thisExpression(),
+    t.identifier('GEA_SETUP_LOCAL_STATE_OBSERVERS'),
+    true,
+  )
+  const setupObserversCall = t.ifStatement(
+    t.binaryExpression('===', t.unaryExpression('typeof', setupObserversAccess), t.stringLiteral('function')),
+    t.expressionStatement(t.callExpression(setupObserversAccess, [])),
+  )
+
+  const lifecycleCalledAccess = t.memberExpression(t.thisExpression(), t.identifier('GEA_LIFECYCLE_CALLED'), true)
+  const setLifecycleCalled = t.expressionStatement(
+    t.assignmentExpression('=', t.cloneNode(lifecycleCalledAccess), t.booleanLiteral(true)),
+  )
+
+  const guardedBlock = t.ifStatement(
+    t.unaryExpression('!', lifecycleCalledAccess),
+    t.blockStatement([setLifecycleCalled, createdCall, createdHooksCall, setupObserversCall]),
+  )
+
+  const ctor = classBody.body.find(
+    (m) => t.isClassMethod(m) && (m.kind === 'constructor' || (t.isIdentifier(m.key) && m.key.name === 'constructor')),
+  ) as t.ClassMethod | undefined
+  if (ctor) {
+    let superIdx = -1
+    for (let i = 0; i < ctor.body.body.length; i++) {
+      const s = ctor.body.body[i]
+      if (t.isExpressionStatement(s) && t.isCallExpression(s.expression) && t.isSuper(s.expression.callee)) {
+        superIdx = i
+        break
+      }
+    }
+    if (superIdx >= 0) {
+      ctor.body.body.splice(superIdx + 1, 0, guardedBlock)
+    } else {
+      ctor.body.body.unshift(guardedBlock)
+    }
+  } else {
+    const newCtor = appendToBody(
+      jsMethod`${id('constructor')}(...args) {}`,
+      js`super(...args);` as t.ExpressionStatement,
+      guardedBlock,
+    )
+    classBody.body.unshift(newCtor)
+  }
 }

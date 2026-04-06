@@ -136,6 +136,9 @@ export const GEA_NORMALIZE_PROP_NAME = /*#__PURE__*/ Symbol.for('gea.component.n
 
 export const GEA_CTOR_AUTO_REGISTERED = /*#__PURE__*/ Symbol.for('gea.ctor.autoRegistered')
 export const GEA_CTOR_TAG_NAME = /*#__PURE__*/ Symbol.for('gea.ctor.tagName')
+export const GEA_COMPILED = /*#__PURE__*/ Symbol.for('gea.component.compiled')
+export const GEA_EVENTS_CACHE = /*#__PURE__*/ Symbol.for('gea.component.eventsCache')
+export const GEA_LIFECYCLE_CALLED = /*#__PURE__*/ Symbol.for('gea.component.lifecycleCalled')
 
 /** ComponentManager.callEventsGetterHandler: skip callItemHandler (delegated handler ran on an ancestor). */
 export const GEA_SKIP_ITEM_HANDLER = /*#__PURE__*/ Symbol.for('gea.componentManager.skipItemHandler')

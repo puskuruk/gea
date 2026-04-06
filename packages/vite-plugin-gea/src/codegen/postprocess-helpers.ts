@@ -5,10 +5,7 @@
 import { t } from '../utils/babel-interop.ts'
 import { id } from 'eszter'
 
-export {
-  collectValueSubpaths,
-  wrapSubpathCacheGuards,
-} from './subpath-cache.ts'
+export { collectValueSubpaths, wrapSubpathCacheGuards } from './subpath-cache.ts'
 
 // ─── Post-processing: this.id caching ───────────────────────────────
 
@@ -44,10 +41,7 @@ export function cacheThisIdInMethod(method: t.ClassMethod): boolean {
   if (found) {
     method.body.body.unshift(
       t.variableDeclaration('const', [
-        t.variableDeclarator(
-          t.identifier('__id'),
-          t.memberExpression(t.thisExpression(), t.identifier('id')),
-        ),
+        t.variableDeclarator(t.identifier('__id'), t.memberExpression(t.thisExpression(), t.identifier('id'))),
       ]),
     )
   }
@@ -67,21 +61,11 @@ function isThisIdMember(node: t.Node): boolean {
 
 export function wrapEventsGetterWithCache(getter: t.ClassMethod): void {
   const body = getter.body.body
-  const returnStmt = body.find(
-    (s): s is t.ReturnStatement =>
-      t.isReturnStatement(s) && s.argument !== null,
-  )
+  const returnStmt = body.find((s): s is t.ReturnStatement => t.isReturnStatement(s) && s.argument !== null)
   if (!returnStmt?.argument) return
 
-  const cachedProp = t.memberExpression(
-    t.thisExpression(),
-    t.identifier('__evts'),
-  )
-  const elementProp = t.memberExpression(
-    t.thisExpression(),
-    id('GEA_ELEMENT'),
-    true,
-  )
+  const cachedProp = t.memberExpression(t.thisExpression(), t.identifier('GEA_EVENTS_CACHE'), true)
+  const elementProp = t.memberExpression(t.thisExpression(), id('GEA_ELEMENT'), true)
   const tmpId = t.identifier('__geaEvtsResult')
   const objectExpr = returnStmt.argument as t.Expression
 
@@ -92,34 +76,24 @@ export function wrapEventsGetterWithCache(getter: t.ClassMethod): void {
     t.variableDeclaration('const', [t.variableDeclarator(tmpId, objectExpr)]),
     t.ifStatement(
       elementProp,
-      t.expressionStatement(
-        t.assignmentExpression('=', cachedProp, t.cloneNode(tmpId, true)),
-      ),
+      t.expressionStatement(t.assignmentExpression('=', cachedProp, t.cloneNode(tmpId, true))),
     ),
     t.returnStatement(t.cloneNode(tmpId, true)),
   )
 
   body.unshift(
-    t.ifStatement(
-      t.logicalExpression('&&', cachedProp, elementProp),
-      t.returnStatement(t.cloneNode(cachedProp, true)),
-    ),
+    t.ifStatement(t.logicalExpression('&&', cachedProp, elementProp), t.returnStatement(t.cloneNode(cachedProp, true))),
   )
 }
 
 // ─── Logging catch clause ───────────────────────────────────────────
 
-export function loggingCatchClause(
-  extra: t.Statement[] = [],
-): t.CatchClause {
+export function loggingCatchClause(extra: t.Statement[] = []): t.CatchClause {
   return t.catchClause(
     t.identifier('__err'),
     t.blockStatement([
       t.expressionStatement(
-        t.callExpression(
-          t.memberExpression(t.identifier('console'), t.identifier('error')),
-          [t.identifier('__err')],
-        ),
+        t.callExpression(t.memberExpression(t.identifier('console'), t.identifier('error')), [t.identifier('__err')]),
       ),
       ...extra,
     ]),
