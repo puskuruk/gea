@@ -39,11 +39,11 @@ jobs:
       - run: npm run benchmark:record:simulation
       - run: cp benchmark-history/benchmark-simulation.latest.json /tmp/branch-results.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v8
         with:
           name: main-results
           path: /tmp/main-results.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v8
         with:
           name: branch-results
           path: /tmp/branch-results.json
