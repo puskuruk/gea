@@ -76,7 +76,12 @@ jobs:
         with:
           script: |
             const fs = require('fs')
-            const report = fs.readFileSync('/tmp/perf-report.md', 'utf8')
+            const path = '/tmp/perf-report.md'
+            if (!fs.existsSync(path) || fs.statSync(path).size === 0) {
+              core.warning('No performance report generated — skipping PR comment')
+              return
+            }
+            const report = fs.readFileSync(path, 'utf8')
             const marker = '<!-- perf-regression -->'
             const body = `${marker}\n${report}\n\n_Commit: ${{ github.sha }}_`
             const { owner, repo } = context.repo
