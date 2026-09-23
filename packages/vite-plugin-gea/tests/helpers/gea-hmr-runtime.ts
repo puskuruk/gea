@@ -94,17 +94,30 @@ export function unregisterComponentInstance(className: string, instance: any): v
   }
 }
 
+function moveAppendedBefore(parent: Node, tail: Node | null, nextSibling: Node | null): void {
+  if (!nextSibling) return
+  let first = tail ? tail.nextSibling : parent.firstChild
+  while (first && first !== nextSibling) {
+    const node = first
+    first = node.nextSibling
+    parent.insertBefore(node, nextSibling)
+  }
+}
+
 function reRenderComponent(instance: any): void {
   const el = ((instance && instance[GEA_ELEMENT]) || instance?.el) as Element | null | undefined
   if (!el || !el.parentNode) return
   const parent = el.parentNode
+  const nextSibling = el.nextSibling
   const props = Object.assign({}, instance.props)
   instance.dispose()
   instance[GEA_DISPOSER] = createDisposer()
   instance[GEA_CREATED_CALLED] = true
   instance.props = props
   instance.rendered = false
+  const tail = parent.lastChild
   instance.render(parent)
+  moveAppendedBefore(parent, tail, nextSibling)
   const newEl = ((instance && instance[GEA_ELEMENT]) || instance?.el) as { [k: symbol]: any } | null
   if (newEl) newEl[GEA_DOM_COMPONENT] = instance
 }

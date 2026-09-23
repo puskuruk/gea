@@ -164,12 +164,22 @@ export function unregisterComponentInstance(className, instance) {
   }
 }
 
+function moveAppendedBefore(parent, tail, nextSibling) {
+  if (!nextSibling) return;
+  var first = tail ? tail.nextSibling : parent.firstChild;
+  while (first && first !== nextSibling) {
+    var node = first;
+    first = node.nextSibling;
+    parent.insertBefore(node, nextSibling);
+  }
+}
+
 function reRenderComponent(instance) {
   var oldEl = instance && (instance[GEA_ELEMENT] || instance.el);
   if (!oldEl) return;
   var parent = oldEl.parentElement;
   if (!parent) return;
-  var index = Array.prototype.indexOf.call(parent.children, oldEl);
+  var nextSibling = oldEl.nextSibling;
   var props = Object.assign({}, instance.props);
   var __stateSnapshot = {};
   var __ownKeys = Object.getOwnPropertyNames(instance);
@@ -202,7 +212,9 @@ function reRenderComponent(instance) {
   if (!instance.__bindingRemovers) instance.__bindingRemovers = [];
   if (!instance[GEA_SELF_LISTENERS]) instance[GEA_SELF_LISTENERS] = [];
   if (!instance[GEA_CHILD_COMPONENTS]) instance[GEA_CHILD_COMPONENTS] = [];
-  instance.render(parent, index);
+  var tail = parent.lastChild;
+  instance.render(parent);
+  moveAppendedBefore(parent, tail, nextSibling);
   if (typeof instance.createdHooks === 'function') {
     instance.createdHooks(instance.props);
   }
